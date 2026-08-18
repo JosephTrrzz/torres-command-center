@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Role = "client" | "employee" | "owner";
 
@@ -15,6 +16,7 @@ const roleCopy: Record<Role, { label: string; title: string; description: string
 export default function LoginPage() {
   const [role, setRole] = useState<Role>("client");
   const [notice, setNotice] = useState(false);
+  const router = useRouter();
   const current = roleCopy[role];
 
   return (
@@ -30,7 +32,7 @@ export default function LoginPage() {
           {(Object.keys(roleCopy) as Role[]).map((item) => <button key={item} role="tab" aria-selected={role === item} className={role === item ? "selected" : ""} onClick={() => { setRole(item); setNotice(false); }}>{roleCopy[item].label}</button>)}
         </div>
         <div className="login-role-copy"><span className="role-kicker">{current.label}</span><h2>{current.title}</h2><p>{current.description}</p></div>
-        <form onSubmit={(event) => { event.preventDefault(); setNotice(true); }}>
+        <form onSubmit={(event) => { event.preventDefault(); window.localStorage.setItem("torres-demo-session", role); router.push("/"); }}>
           <label htmlFor="email">Work email</label>
           <input id="email" type="email" placeholder="you@company.com" autoComplete="email" required />
           <label htmlFor="password">Password</label>

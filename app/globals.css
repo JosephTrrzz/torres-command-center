@@ -6,6 +6,8 @@
 body{color:var(--charcoal)}
 .brand-mark{border-radius:3px;letter-spacing:-.08em;background:transparent url('/brand/torres-co-monogram.png') center/contain no-repeat;font-size:0}
 .login-wordmark{display:block;width:min(270px,72vw);height:auto;margin:0 auto 28px}
+.logout-button{font-size:10px;color:var(--green);font-weight:700}.mobile-logout{display:none;margin-left:auto;font-size:10px;color:var(--green);font-weight:700}
+@media(max-width:680px){.mobile-logout{display:block}}
 .workspace{background:#f0eadf}
 nav a.active{background:#f2eadc;color:var(--ink)}
 nav a em{background:#eee4d2}
