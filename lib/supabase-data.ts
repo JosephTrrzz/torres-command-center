@@ -27,3 +27,11 @@ export async function createClient(input: { name: string; industry: string; loca
 function headersForWrite(session: { access_token?: string } | null) {
   return { apikey: key ?? "", Authorization: `Bearer ${session?.access_token ?? key ?? ""}` };
 }
+
+export async function updateClient(id: string, input: Record<string, string | number>) {
+  if (!url || !key) throw new Error("Supabase is not configured yet.");
+  const raw = window.localStorage.getItem("torres-auth-session");
+  const session = raw ? JSON.parse(raw) : null;
+  const response = await fetch(`${url}/rest/v1/clients?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { ...headersForWrite(session), "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error("Unable to update client. Check your Supabase permissions.");
+}
