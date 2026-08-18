@@ -10,4 +10,16 @@ export interface Activity { id: string; clientId: string; title: string; detail:
 export interface ClientDetail extends ClientSummary {
   website: string; email?: string; phone?: string; owner: string; services: string[]; overview: string;
   traffic: { month: string; value: number }[]; opportunities: string[];
+  people?: ClientPerson[];
+}
+
+export interface ClientPerson {
+  id: string;
+  client_id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  notes: string;
+  created_at?: string;
 }
