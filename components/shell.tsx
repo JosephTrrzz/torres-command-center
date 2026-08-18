@@ -5,6 +5,7 @@ import { useState } from "react";
 const nav = [
   { label: "Overview", href: "/" },
   { label: "Clients", href: "/clients/" },
+  { label: "Integrations", href: "/integrations/" },
   { label: "Reports", href: "/reports/" },
   { label: "Settings", href: "/settings/" },
 ];
@@ -22,7 +23,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="brand"><span className="brand-mark">T</span><span>Torres <i>&amp; Co.</i></span></div>
       <div className="workspace"><span className="workspace-avatar">TC</span><div><small>Workspace</small><strong>Torres &amp; Co. <b>⌄</b></strong></div></div>
-      <nav aria-label="Main navigation">{nav.map((item) => <Link className={active === item.label ? "active" : ""} href={item.href} key={item.label}><span className="nav-icon">{item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && <em>3</em>}</Link>)}</nav>
+      <nav aria-label="Main navigation">{nav.map((item) => <Link className={active === item.label ? "active" : ""} href={item.href} key={item.label}><span className="nav-icon">{item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Integrations" ? "✦" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && <em>3</em>}</Link>)}</nav>
       <div className="sidebar-bottom"><div className="profile"><span className="avatar">JT</span><div><strong>Joseph Torres</strong><small>Admin</small></div><button className="logout-button" onClick={logout}>Log out</button></div></div>
     </aside>
     <main className="main">
