@@ -8,6 +8,6 @@ export interface ClientSummary {
 }
 export interface Activity { id: string; clientId: string; title: string; detail: string; time: string; type: "insight" | "report" | "alert"; }
 export interface ClientDetail extends ClientSummary {
-  website: string; owner: string; services: string[]; overview: string;
+  website: string; email?: string; phone?: string; owner: string; services: string[]; overview: string;
   traffic: { month: string; value: number }[]; opportunities: string[];
 }

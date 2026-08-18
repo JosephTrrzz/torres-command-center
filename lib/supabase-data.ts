@@ -11,11 +11,11 @@ export async function fetchClients(): Promise<ClientDetail[]> {
   if (!response.ok) throw new Error("Unable to load clients.");
   return (await response.json()).map((row: any) => {
     const name = row.name as string;
-    return { id: row.id, name, initials: name.split(/\s+/).map((part: string) => part[0]).join("").slice(0, 2).toUpperCase(), industry: row.industry ?? "Client account", location: row.location ?? "—", website: row.website ?? "—", status: (row.health_score ?? 0) >= 80 ? "healthy" : "watch", health: row.health_score ?? 0, metrics: [{ label: "Health score", value: `${row.health_score ?? 0}`, change: "—", trend: "flat" }], traffic: [], opportunities: [], overview: "Client profile connected to the Torres & Co. Command Center.", owner: "Joseph Torres", services: [], lastUpdated: "Today" } as ClientDetail;
+    return { id: row.id, name, initials: name.split(/\s+/).map((part: string) => part[0]).join("").slice(0, 2).toUpperCase(), industry: row.industry ?? "Client account", location: row.location ?? "—", website: row.website ?? "—", email: row.email ?? "", phone: row.phone ?? "", status: (row.health_score ?? 0) >= 80 ? "healthy" : "watch", health: row.health_score ?? 0, metrics: [{ label: "Health score", value: `${row.health_score ?? 0}`, change: "—", trend: "flat" }], traffic: [], opportunities: [], overview: "Client profile connected to the Torres & Co. Command Center.", owner: "Joseph Torres", services: [], lastUpdated: "Today" } as ClientDetail;
   });
 }
 
-export async function createClient(input: { name: string; industry: string; location: string; website: string; health_score: number }) {
+export async function createClient(input: { name: string; industry: string; location: string; website: string; email: string; phone: string; health_score: number }) {
   if (!url || !key) throw new Error("Supabase is not configured yet.");
   const raw = typeof window !== "undefined" ? window.localStorage.getItem("torres-auth-session") : null;
   const session = raw ? JSON.parse(raw) : null;
