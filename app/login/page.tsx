@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { requestPasswordReset, signInWithPassword } from "../../lib/supabase-auth";
 
 type Role = "client" | "employee" | "owner";
 
@@ -16,6 +17,10 @@ const roleCopy: Record<Role, { label: string; title: string; description: string
 export default function LoginPage() {
   const [role, setRole] = useState<Role>("client");
   const [notice, setNotice] = useState(false);
+  const [message, setMessage] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
   const current = roleCopy[role];
 
@@ -32,15 +37,16 @@ export default function LoginPage() {
           {(Object.keys(roleCopy) as Role[]).map((item) => <button key={item} role="tab" aria-selected={role === item} className={role === item ? "selected" : ""} onClick={() => { setRole(item); setNotice(false); }}>{roleCopy[item].label}</button>)}
         </div>
         <div className="login-role-copy"><span className="role-kicker">{current.label}</span><h2>{current.title}</h2><p>{current.description}</p></div>
-        <form onSubmit={(event) => { event.preventDefault(); window.localStorage.setItem("torres-demo-session", role); router.push("/"); }}>
+        <form onSubmit={async (event) => { event.preventDefault(); setBusy(true); setMessage(""); try { const session = await signInWithPassword(email, password); window.localStorage.setItem("torres-auth-session", JSON.stringify(session)); window.localStorage.setItem("torres-demo-session", role); router.push("/"); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to sign in."); } finally { setBusy(false); } }}>
           <label htmlFor="email">Work email</label>
-          <input id="email" type="email" placeholder="you@company.com" autoComplete="email" required />
+          <input id="email" type="email" placeholder="you@company.com" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           <label htmlFor="password">Password</label>
-          <input id="password" type="password" placeholder="Enter your password" autoComplete="current-password" required />
-          <div className="login-options"><label className="remember"><input type="checkbox" /> <span>Remember me</span></label><button type="button" className="forgot" onClick={() => setNotice(true)}>Forgot password?</button></div>
-          <button className="button button-login" type="submit">{current.action}<span>→</span></button>
+          <input id="password" type="password" placeholder="Enter your password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          <div className="login-options"><label className="remember"><input type="checkbox" /> <span>Remember me</span></label><button type="button" className="forgot" onClick={async () => { setMessage(""); try { await requestPasswordReset(email); setNotice(true); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to request a password reset."); } }}>Forgot password?</button></div>
+          <button className="button button-login" type="submit" disabled={busy}>{busy ? "Signing in…" : current.action}<span>→</span></button>
         </form>
-        {notice && <p className="login-notice" role="status">Authentication will be connected in the next setup step. Your information has not been submitted.</p>}
+        {notice && <p className="login-notice" role="status">If that email exists, a password-reset link has been sent.</p>}
+        {message && <p className="login-notice" role="alert">{message}</p>}
         <p className="login-help">Need an account? <Link href="#">Ask Torres &amp; Co. for an invitation.</Link></p>
       </section>
       <p className="login-footer">Secure access for Torres &amp; Co. Technology</p>
