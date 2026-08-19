@@ -61,6 +61,20 @@ export async function fetchCustomerAccount(clientId: string): Promise<CustomerAc
   return rows[0] ? mapCustomerAccount(rows[0]) : null;
 }
 
+export async function fetchCustomerAccountByEmail(email: string): Promise<CustomerAccount | null> {
+  if (!url || !key) throw new Error("Supabase is not configured yet.");
+  const normalizedEmail = email.trim();
+  if (!normalizedEmail) return null;
+
+  const response = await fetch(
+    `${url}/rest/v1/customer_accounts?portal_email=ilike.${encodeURIComponent(normalizedEmail)}&portal_enabled=eq.true&portal_status=eq.active&select=*`,
+    { headers: headersForRead() },
+  );
+  if (!response.ok) throw new Error("Unable to load the customer portal account.");
+  const rows = await response.json();
+  return rows[0] ? mapCustomerAccount(rows[0]) : null;
+}
+
 export async function upsertCustomerAccount(input: { client_id: string; portal_email: string; portal_enabled: boolean; portal_status: PortalStatus; billing_email: string; billing_status: BillingStatus; }) {
   if (!url || !key) throw new Error("Supabase is not configured yet.");
   const response = await fetch(`${url}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify(input) });
