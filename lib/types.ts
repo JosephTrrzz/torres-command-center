@@ -23,3 +23,20 @@ export interface ClientPerson {
   notes: string;
   created_at?: string;
 }
+
+export type PortalStatus = "invited" | "active" | "paused" | "revoked";
+export type BillingStatus = "not_connected" | "pending" | "active" | "past_due" | "canceled";
+
+export interface CustomerAccount {
+  id: string;
+  client_id: string;
+  portal_email: string;
+  portal_enabled: boolean;
+  portal_status: PortalStatus;
+  billing_email: string;
+  billing_status: BillingStatus;
+  square_customer_id?: string | null;
+  square_subscription_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}

@@ -1,4 +1,4 @@
-import { ClientDetail, ClientPerson } from "./types";
+import { BillingStatus, ClientDetail, ClientPerson, CustomerAccount, PortalStatus } from "./types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -47,6 +47,26 @@ export async function fetchClientPeople(clientId: string): Promise<ClientPerson[
   const response = await fetch(`${url}/rest/v1/client_people?client_id=eq.${encodeURIComponent(clientId)}&select=*&order=created_at.asc`, { headers: headersForRead() });
   if (!response.ok) throw new Error("Unable to load people. Run the client_people.sql setup in Supabase.");
   return response.json();
+}
+
+function mapCustomerAccount(row: any): CustomerAccount {
+  return { id: row.id, client_id: row.client_id, portal_email: row.portal_email ?? "", portal_enabled: Boolean(row.portal_enabled), portal_status: row.portal_status ?? "invited", billing_email: row.billing_email ?? "", billing_status: row.billing_status ?? "not_connected", square_customer_id: row.square_customer_id ?? null, square_subscription_id: row.square_subscription_id ?? null, created_at: row.created_at, updated_at: row.updated_at };
+}
+
+export async function fetchCustomerAccount(clientId: string): Promise<CustomerAccount | null> {
+  if (!url || !key) throw new Error("Supabase is not configured yet.");
+  const response = await fetch(`${url}/rest/v1/customer_accounts?client_id=eq.${encodeURIComponent(clientId)}&select=*`, { headers: headersForRead() });
+  if (!response.ok) throw new Error("Unable to load customer portal settings. Run customer_accounts.sql in Supabase.");
+  const rows = await response.json();
+  return rows[0] ? mapCustomerAccount(rows[0]) : null;
+}
+
+export async function upsertCustomerAccount(input: { client_id: string; portal_email: string; portal_enabled: boolean; portal_status: PortalStatus; billing_email: string; billing_status: BillingStatus; }) {
+  if (!url || !key) throw new Error("Supabase is not configured yet.");
+  const response = await fetch(`${url}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error("Unable to save customer portal settings. Check the customer_accounts table and permissions.");
+  const rows = await response.json();
+  return rows[0] ? mapCustomerAccount(rows[0]) : null;
 }
 
 export async function createClientPerson(input: Omit<ClientPerson, "id" | "created_at">) {

@@ -119,3 +119,24 @@ select:not([multiple]):disabled,
 .inline-form select:disabled{opacity:.62;cursor:not-allowed;background-color:#f7f5f0}
 .field-label .field-input{width:min(100%,360px);min-width:260px}
 @media(max-width:680px){.field-label{display:grid;justify-content:stretch}.field-label .field-input{width:100%;min-width:0}}
+
+/* Customer portal and billing foundation */
+.customer-account-panel { margin-top: 1.25rem; }
+.customer-account-panel .section-heading { margin-bottom: 1.25rem; }
+.account-status-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; margin:1.25rem 0; }
+.account-status-card { padding:1rem; border:1px solid #e4ded3; border-radius:16px; background:#faf9f5; }
+.account-status-card span { display:block; font-size:.68rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#927342; }
+.account-status-card strong { display:block; margin-top:.35rem; color:var(--ink); }
+.account-status-card small { display:block; margin-top:.45rem; color:var(--muted); line-height:1.45; }
+.account-status-card[data-state="ready"] { border-color:rgba(113,139,88,.45); background:#f4f7f1; }
+.account-status-card[data-state="pending"] { border-color:rgba(176,141,87,.45); background:#fbf7ee; }
+.account-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; padding:1rem; border:1px solid #e4ded3; border-radius:18px; background:#fff; }
+.account-form-grid label { display:grid; gap:.45rem; font-size:.82rem; font-weight:700; color:var(--ink); }
+.account-form-grid .full { grid-column:1/-1; }
+.account-toggle { display:flex !important; align-items:center; gap:.65rem; padding:.85rem 1rem; border-radius:14px; background:#faf9f5; border:1px solid #e4ded3; }
+.account-toggle input { width:18px; height:18px; accent-color:var(--ink); }
+.account-help { margin:1rem 0 0; padding:.9rem 1rem; border-left:3px solid var(--brass, #B08D57); border-radius:0 12px 12px 0; background:#fbf7ee; color:var(--muted); line-height:1.55; }
+.account-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.7rem; margin-top:1rem; }
+.account-message { margin:0; font-size:.82rem; color:var(--muted); }
+.account-message.error { color:#a34c3f; }
+@media(max-width:680px){ .account-status-grid,.account-form-grid{grid-template-columns:1fr}.account-form-grid .full{grid-column:auto;} }

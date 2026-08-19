@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientProfileForm } from "../../../components/client-profile-form";
+import { CustomerAccountPanel } from "../../../components/customer-account-panel";
 import { PeoplePanel } from "../../../components/people-panel";
 import { Shell } from "../../../components/shell";
 import { getClient } from "../../../lib/demo-data";
@@ -75,6 +76,7 @@ export default function ClientDetailPage() {
       </div>
     </section>
     <ClientProfileForm client={client} onSaved={(fields) => setClient((current) => current ? { ...current, ...fields } : current)} />
-    <PeoplePanel clientId={client.id} />
+        <CustomerAccountPanel clientId={client.id} clientName={client.name} defaultEmail={client.email ?? ""} />
+        <PeoplePanel clientId={client.id} />
   </Shell>;
 }
