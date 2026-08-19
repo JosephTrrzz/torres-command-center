@@ -182,3 +182,122 @@ select:not([multiple]):disabled,
 .account-message { margin:0; font-size:.82rem; color:var(--muted); }
 .account-message.error { color:#a34c3f; }
 @media(max-width:680px){ .account-status-grid,.account-form-grid{grid-template-columns:1fr}.account-form-grid .full{grid-column:auto;} }
+
+/* Keep the integrations page comfortably spaced at every viewport width. */
+.page-heading.integrations-page-heading {
+  align-items: flex-end;
+  gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+.page-heading.integrations-page-heading > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.page-heading.integrations-page-heading .lede {
+  max-width: 46rem;
+  line-height: 1.6;
+}
+
+.page-heading.integrations-page-heading .health-badge {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+
+.integration-banner > div:first-child {
+  min-width: 0;
+}
+
+.integration-banner p:last-child {
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+
+@media (max-width: 800px) {
+  .page-heading.integrations-page-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .page-heading.integrations-page-heading .health-badge {
+    display: inline-flex;
+    justify-self: start;
+    align-self: auto;
+    width: max-content;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .integration-banner {
+    gap: 1.25rem;
+    margin-top: 0;
+  }
+
+  .integration-controls {
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .integration-summary {
+    gap: .9rem;
+    margin: 1.25rem 0 2rem;
+  }
+}
+
+@media (max-width: 680px) {
+  .page-heading.integrations-page-heading {
+    display: grid;
+    gap: 1.35rem;
+    margin-bottom: 2rem;
+  }
+
+  .page-heading.integrations-page-heading h1 {
+    margin-bottom: .75rem;
+  }
+
+  .page-heading.integrations-page-heading .lede {
+    line-height: 1.55;
+  }
+
+  .page-heading.integrations-page-heading .health-badge {
+    padding: .7rem 1rem;
+  }
+
+  .integration-banner {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.35rem;
+    margin-bottom: 1.5rem;
+    border-radius: 16px;
+  }
+
+  .integration-banner h2 {
+    line-height: 1.2;
+  }
+
+  .integration-controls {
+    gap: 1.25rem;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .integration-summary {
+    gap: .8rem;
+    margin: 1.25rem 0 2rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .page-heading.integrations-page-heading {
+    gap: 1.1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .integration-banner {
+    padding: 1.2rem;
+  }
+}
