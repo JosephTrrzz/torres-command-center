@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { fetchCustomerAccount, upsertCustomerAccount } from "../lib/supabase-data";
 import { BillingStatus, CustomerAccount, PortalStatus } from "../lib/types";
+import { BrandSelect } from "./brand-select";
 
 type Props = { clientId: string; clientName: string; defaultEmail?: string };
 
@@ -42,8 +43,29 @@ export function CustomerAccountPanel({ clientId, clientName, defaultEmail = "" }
     <form id="customer-account-form" className="account-form-grid" onSubmit={save}>
       <label>Portal email<input className="field-input" type="email" value={portalEmail} onChange={(event) => setPortalEmail(event.target.value)} placeholder="customer@company.com" required /></label>
       <label>Billing email<input className="field-input" type="email" value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} placeholder="billing@company.com" required /></label>
-      <label>Portal status<select className="field-input" value={portalStatus} onChange={(event) => setPortalStatus(event.target.value as PortalStatus)}><option value="invited">Invited</option><option value="active">Active</option><option value="paused">Paused</option><option value="revoked">Revoked</option></select></label>
-      <label>Billing status<select className="field-input" value={billingStatus} onChange={(event) => setBillingStatus(event.target.value as BillingStatus)}><option value="not_connected">Not connected</option><option value="pending">Pending</option><option value="active">Active</option><option value="past_due">Past due</option><option value="canceled">Canceled</option></select></label>
+<BrandSelect
+  label="Portal status"
+  value={portalStatus}
+  onChange={(value) => setPortalStatus(value as PortalStatus)}
+  options={[
+    { value: "invited", label: "Invited", description: "Invite prepared but not accepted" },
+    { value: "active", label: "Active", description: "Customer can sign in" },
+    { value: "paused", label: "Paused", description: "Access temporarily suspended" },
+    { value: "revoked", label: "Revoked", description: "Access removed" },
+  ]}
+/>
+<BrandSelect
+  label="Billing status"
+  value={billingStatus}
+  onChange={(value) => setBillingStatus(value as BillingStatus)}
+  options={[
+    { value: "not_connected", label: "Not connected", description: "Square has not been linked" },
+    { value: "pending", label: "Pending", description: "Setup needs attention" },
+    { value: "active", label: "Active", description: "Payments are ready" },
+    { value: "past_due", label: "Past due", description: "A balance needs attention" },
+    { value: "canceled", label: "Canceled", description: "Billing connection closed" },
+  ]}
+/>
       <label className="account-toggle full"><input type="checkbox" checked={portalEnabled} onChange={(event) => setPortalEnabled(event.target.checked)} /> Enable customer portal access for this business</label>
     </form>
     <p className="account-help">This record is tied to <strong>{clientName}</strong>. Later, the customer will sign in with this portal email and see only their company. Square should process checkout, invoices, and payment methods; this app stores status and IDs, never card numbers.</p>

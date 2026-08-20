@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
+import { BrandSelect } from "../../components/brand-select";
 import { clients as demoClients } from "../../lib/demo-data";
 import { fetchClients } from "../../lib/supabase-data";
 import { ClientDetail } from "../../lib/types";
@@ -54,7 +55,26 @@ export default function IntegrationsPage() {
   return <Shell active="Integrations">
       <div className="page-heading integrations-page-heading"><div><p className="eyebrow">Data connections</p><h1>Integrations</h1><p className="lede">Organize the proof behind every client website, campaign, and growth recommendation.</p></div><span className="health-badge watch">{selectedClient ? `${readyCount}/${integrations.length} prepared` : "Choose a client"}</span></div>
     <section className="integration-banner"><div><p className="eyebrow">Torres & Co. evidence layer</p><h2>One setup hub for every client connection.</h2><p>Prepare the accounts and permissions that turn dashboard estimates into verified business results. Provider authorization is kept separate until each connection is approved.</p></div><div className="integration-logo">TC</div></section>
-    <section className="integration-controls detail-card"><div><p className="eyebrow">Client scope</p><h2>Whose connections are you preparing?</h2><p>Readiness is tracked per client so accounts never get mixed together.</p></div><label className="field-label">Client<select className="field-input" value={selectedClientId} onChange={(event) => setSelectedClientId(event.target.value)}><option value="">Choose a client</option>{clientList.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label></section>
+    <section className="integration-controls detail-card">
+      <div>
+        <p className="eyebrow">Client scope</p>
+        <h2>Whose connections are you preparing?</h2>
+        <p>Readiness is tracked per client so accounts never get mixed together.</p>
+      </div>
+      <BrandSelect
+        label="Client"
+        onChange={setSelectedClientId}
+        options={clientList.map((client) => ({
+          value: client.id,
+          label: client.name,
+          description:
+            [client.industry, client.location].filter(Boolean).join(" · ") ||
+            "Client account",
+        }))}
+        placeholder="Choose a client"
+        value={selectedClientId}
+      />
+    </section>
     <div className="integration-summary"><div><span>Prepared</span><strong>{selectedClient ? readyCount : "—"}</strong><small>connections ready for review</small></div><div><span>Available</span><strong>{integrations.length}</strong><small>connection types</small></div><div><span>Live data</span><strong>Off</strong><small>authorization still required</small></div></div>
     {notice && <p className="integration-notice">{notice}</p>}
     <div className="section-heading"><div><p className="eyebrow">Connection catalog</p><h2>Choose what to set up next</h2></div><Link className="button button-light" href="/clients/">View clients <span>→</span></Link></div>
