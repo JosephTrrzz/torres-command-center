@@ -25,8 +25,12 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
 
   const callback = `${current.origin}/api/google/callback`;
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID || "", client_secret: env.GOOGLE_CLIENT_SECRET || "", redirect_uri: callback, grant_type: "authorization_code" }) });
-  if (!tokenResponse.ok) return redirect(`${appUrl}/integrations/?error=Google%20could%20not%20complete%20authorization`);
-  const tokens = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
+  const tokenPayload = await tokenResponse.json() as { error?: string; error_description?: string; access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
+  if (!tokenResponse.ok) {
+    const reason = tokenPayload.error_description || tokenPayload.error || "unknown token exchange error";
+    return redirect(`${appUrl}/integrations/?error=${encodeURIComponent(`Google authorization failed: ${reason}`)}${clientQuery}`);
+  }
+  const tokens = tokenPayload;
   if (!tokens.access_token || !clientId) return redirect(`${appUrl}/integrations/?error=Google%20did%20not%20return%20a%20usable%20connection`);
   const identityResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${tokens.access_token}` } });
   const identity = await identityResponse.json() as { email?: string };
