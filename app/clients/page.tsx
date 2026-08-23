@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientCard } from "../../components/client-card";
 import { Shell } from "../../components/shell";
@@ -14,6 +15,7 @@ export default function ClientsPage() {
   const [editing, setEditing] = useState<ClientDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [onboarding, setOnboarding] = useState<ClientDetail | null>(null);
 
   useEffect(() => {
     fetchClients()
@@ -45,8 +47,14 @@ export default function ClientsPage() {
         await updateClient(editing.id, input);
         setMessage("Client updated successfully");
       } else {
-        await createClient(input);
+        const created = await createClient(input);
         setMessage("Client added successfully");
+        const row = created?.[0];
+        if (row?.id) setOnboarding({
+          ...demoClients[0], ...input, id: row.id, initials: input.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+          health: input.health_score, status: input.health_score >= 80 ? "healthy" : "watch",
+          metrics: [{ label: "Health score", value: String(input.health_score), change: "—", trend: "flat" }],
+        });
       }
 
       closeForm();
@@ -140,6 +148,11 @@ export default function ClientsPage() {
           </div>
         </form>
       )}
+
+      {onboarding && <section className="detail-card onboarding-next" aria-live="polite">
+        <div><p className="eyebrow">Next step</p><h2>{onboarding.name} is connected.</h2><p>Finish the handoff by preparing integrations and opening the client site from this workspace.</p></div>
+        <div className="form-actions"><Link className="button button-dark" href={`/clients/detail/?id=${encodeURIComponent(onboarding.id)}`}>Open client account <span>→</span></Link><Link className="button button-light" href={`/integrations/?client=${encodeURIComponent(onboarding.id)}`}>Prepare integrations <span>→</span></Link>{onboarding.website && <a className="button button-outline" href={onboarding.website.startsWith("http") ? onboarding.website : `https://${onboarding.website}`} target="_blank" rel="noreferrer">Open client site ↗</a>}</div>
+      </section>}
 
       <section className="client-grid client-grid-wide">
         {clients.map((client) => (
