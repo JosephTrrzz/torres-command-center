@@ -4,12 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientCard } from "../../components/client-card";
 import { Shell } from "../../components/shell";
-import { clients as demoClients } from "../../lib/demo-data";
 import { createClient, fetchClients, updateClient } from "../../lib/supabase-data";
 import { ClientDetail } from "../../lib/types";
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<ClientDetail[]>(demoClients);
+  const [clients, setClients] = useState<ClientDetail[]>([]);
   const [message, setMessage] = useState("Loading connected clients…");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ClientDetail | null>(null);
@@ -51,8 +50,10 @@ export default function ClientsPage() {
         setMessage("Client added successfully");
         const row = created?.[0];
         if (row?.id) setOnboarding({
-          ...demoClients[0], ...input, id: row.id, initials: input.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
-          health: input.health_score, status: input.health_score >= 80 ? "healthy" : "watch",
+          id: row.id, name: input.name, initials: input.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+          industry: input.industry, location: input.location, website: input.website, email: input.email, phone: input.phone,
+          health: input.health_score, status: input.health_score >= 80 ? "healthy" : "watch", owner: "Joseph Torres", services: [], lastUpdated: "Today",
+          overview: "Client profile connected to the Torres & Co. Command Center.", traffic: [], opportunities: [],
           metrics: [{ label: "Health score", value: String(input.health_score), change: "—", trend: "flat" }],
         });
       }

@@ -6,11 +6,8 @@ import { ClientProfileForm } from "../../../components/client-profile-form";
 import { CustomerAccountPanel } from "../../../components/customer-account-panel";
 import { PeoplePanel } from "../../../components/people-panel";
 import { Shell } from "../../../components/shell";
-import { getClient } from "../../../lib/demo-data";
-import { fetchClient, fetchClients } from "../../../lib/supabase-data";
+import { fetchClient } from "../../../lib/supabase-data";
 import { ClientDetail } from "../../../lib/types";
-
-const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export default function ClientDetailPage() {
   const [id, setId] = useState("");
@@ -20,26 +17,15 @@ export default function ClientDetailPage() {
   useEffect(() => {
     const currentId = new URLSearchParams(window.location.search).get("id") ?? "";
     setId(currentId);
-    const demo = currentId ? getClient(currentId) ?? null : null;
-    if (demo) setClient(demo);
     if (!currentId) { setStatus(""); return; }
 
     (async () => {
       try {
         const row = await fetchClient(currentId);
         if (row) { setClient(row); setStatus(""); return; }
-        if (demo) {
-          const connectedClients = await fetchClients();
-          const demoName = normalizeName(demo.name);
-          const connected = connectedClients.find((item) => {
-            const connectedName = normalizeName(item.name);
-            return connectedName === demoName || connectedName.includes(demoName) || demoName.includes(connectedName);
-          });
-          if (connected) { setClient({ ...demo, ...connected }); setStatus(""); return; }
-        }
-        setStatus("Showing the saved account profile.");
+        setStatus("This client record is not available.");
       } catch {
-        setStatus("Showing the saved account profile.");
+        setStatus("Unable to load this client record.");
       }
     })();
   }, []);

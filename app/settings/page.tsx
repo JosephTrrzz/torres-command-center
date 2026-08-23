@@ -5,16 +5,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { ProfilePictureEditor } from "../../components/profile-picture-editor";
+import { fetchClients } from "../../lib/supabase-data";
 
 type CustomerStatus = "Active" | "Invited" | "Paused";
 type Customer = { id: string; name: string; email: string; status: CustomerStatus; phone?: string; industry?: string };
 type Modal = "customer" | "team" | null;
-
-const starterCustomers: Customer[] = [
-  { id: "hvac", name: "HVAC Ministries", email: "owner@hvacministries.com", status: "Active" },
-  { id: "taqueria", name: "Taqueria Market", email: "hello@taqueriamarket.com", status: "Active" },
-  { id: "torres", name: "Torres & Co.", email: "joseph@torrescotechnology.com", status: "Active" },
-];
 
 const checklistLabels = [
   ["Create the customer record", "Capture the company details and primary contact."],
@@ -26,7 +21,7 @@ const checklistLabels = [
 export default function SettingsPage() {
   const [compact, setCompact] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [customers, setCustomers] = useState<Customer[]>(starterCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [completed, setCompleted] = useState([true, true, false, false]);
   const [modal, setModal] = useState<Modal>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
@@ -43,7 +38,12 @@ export default function SettingsPage() {
       const storedPreferences = window.localStorage.getItem("torres-settings-preferences");
       const storedSecurity = window.localStorage.getItem("torres-settings-security");
       const storedChecklist = window.localStorage.getItem("torres-settings-checklist");
-      if (storedCustomers) setCustomers(JSON.parse(storedCustomers));
+      if (storedCustomers) {
+        const saved = JSON.parse(storedCustomers) as Customer[];
+        setCustomers(saved.filter((customer) => !["hvac", "taqueria", "torres"].includes(customer.id)));
+      } else {
+        fetchClients().then((rows) => setCustomers(rows.map((row) => ({ id: row.id, name: row.name, email: row.email ?? "", phone: row.phone, industry: row.industry, status: "Active" as const })))).catch(() => undefined);
+      }
       if (storedPreferences) setPreferences(JSON.parse(storedPreferences));
       if (storedSecurity) setSecurity(JSON.parse(storedSecurity));
       if (storedChecklist) setCompleted(JSON.parse(storedChecklist));

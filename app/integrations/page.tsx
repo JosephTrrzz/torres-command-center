@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
 import { BrandSelect } from "../../components/brand-select";
-import { clients as demoClients } from "../../lib/demo-data";
 import { fetchClients } from "../../lib/supabase-data";
 import { ClientDetail } from "../../lib/types";
 
@@ -25,7 +24,7 @@ const readinessKey = "torres-command-center-integration-readiness";
 export default function IntegrationsPage() {
   const [notice, setNotice] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
-  const [clientList, setClientList] = useState<ClientDetail[]>(demoClients);
+  const [clientList, setClientList] = useState<ClientDetail[]>([]);
   const [activeIntegration, setActiveIntegration] = useState<IntegrationDefinition | null>(null);
   const [ready, setReady] = useState<Record<string, boolean>>({});
 
@@ -50,10 +49,7 @@ export default function IntegrationsPage() {
     if (query.get("connected") === "google") setNotice("Google was connected for this client.");
     if (query.get("error")) setNotice(query.get("error") ?? "Unable to connect Google.");
     try { setReady(JSON.parse(window.localStorage.getItem(readinessKey) ?? "{}")); } catch { setReady({}); }
-    fetchClients().then((live) => {
-      if (!live.length) return;
-      setClientList([...live, ...demoClients.filter((demo) => !live.some((item) => item.id === demo.id))] as ClientDetail[]);
-    }).catch(() => undefined);
+    fetchClients().then(setClientList).catch(() => setClientList([]));
   }, []);
 
   const selectedClient = useMemo(() => clientList.find((client) => client.id === selectedClientId), [clientList, selectedClientId]);
