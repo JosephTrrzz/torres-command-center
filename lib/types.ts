@@ -1,5 +1,28 @@
 export type Trend = "up" | "down" | "flat";
 export type HealthStatus = "healthy" | "watch" | "attention";
+export type AppRole = "owner" | "employee" | "customer";
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: AppRole;
+  client_id: string | null;
+  active: boolean;
+}
+
+export interface AuthUser {
+  id: string;
+  email?: string;
+}
+
+export interface AuthSession {
+  access_token: string;
+  refresh_token?: string;
+  expires_at?: number;
+  user: AuthUser;
+  profile: UserProfile;
+}
 
 export interface Metric { label: string; value: string; change: string; trend: Trend; }
 export interface ClientSummary {
