@@ -17,6 +17,12 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "TC";
 }
 
+function displayNameFor(profile: AuthSession["profile"]) {
+  if (profile.full_name.trim()) return profile.full_name.trim();
+  const localPart = profile.email.split("@")[0].replace(/[._-]+/g, " ").trim();
+  return localPart.split(/\s+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(" ") || "Workspace member";
+}
+
 export function Shell({ children, active }: { children: React.ReactNode; active: string }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState(false);
@@ -58,7 +64,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const markAllRead = () => { const ids = workspaceNotifications.map((item) => item.id); setReadNotifications(ids); window.localStorage.setItem("torres-read-notifications", JSON.stringify(ids)); };
   if (!checked || !session) return <main className="auth-loading" aria-live="polite">Opening your secure workspace…</main>;
   const nav = APP_NAVIGATION[session.profile.role];
-  const displayName = session.profile.full_name || session.profile.email;
+  const displayName = displayNameFor(session.profile);
   const avatar = initials(displayName);
   const accessLabel = roleLabel(session.profile.role);
   return <div className="app-shell">
