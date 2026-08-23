@@ -15,13 +15,14 @@ function cookieValue(request: Request, name: string) {
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
   const appUrl = env.PUBLIC_APP_URL || "https://torres-command-center-app.pages.dev";
   const current = new URL(request.url);
+  const clientId = cookieValue(request, "cc_google_client");
   const error = current.searchParams.get("error");
-  if (error) return redirect(`${appUrl}/integrations/?error=${encodeURIComponent(error)}`);
+  const clientQuery = clientId ? `&client=${encodeURIComponent(clientId)}` : "";
+  if (error) return redirect(`${appUrl}/integrations/?error=${encodeURIComponent(error)}${clientQuery}`);
   const code = current.searchParams.get("code");
   const state = current.searchParams.get("state");
   if (!code || !state || state !== cookieValue(request, "cc_google_state")) return redirect(`${appUrl}/integrations/?error=Google%20authorization%20expired%20or%20invalid`);
 
-  const clientId = cookieValue(request, "cc_google_client");
   const callback = `${current.origin}/api/google/callback`;
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID || "", client_secret: env.GOOGLE_CLIENT_SECRET || "", redirect_uri: callback, grant_type: "authorization_code" }) });
   if (!tokenResponse.ok) return redirect(`${appUrl}/integrations/?error=Google%20could%20not%20complete%20authorization`);

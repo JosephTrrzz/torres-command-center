@@ -29,9 +29,24 @@ export default function IntegrationsPage() {
   const [activeIntegration, setActiveIntegration] = useState<IntegrationDefinition | null>(null);
   const [ready, setReady] = useState<Record<string, boolean>>({});
 
+  const handleClientChange = (clientId: string) => {
+    setSelectedClientId(clientId);
+    setNotice("");
+    try { window.sessionStorage.setItem("torres-command-center-selected-client", clientId); } catch { /* browser storage may be unavailable */ }
+    const url = new URL(window.location.href);
+    if (clientId) url.searchParams.set("client", clientId);
+    else url.searchParams.delete("client");
+    url.searchParams.delete("error");
+    window.history.replaceState({}, "", url);
+  };
+
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
-    setSelectedClientId(query.get("client") ?? "");
+    let clientId = query.get("client") ?? "";
+    if (!clientId) {
+      try { clientId = window.sessionStorage.getItem("torres-command-center-selected-client") ?? ""; } catch { /* browser storage may be unavailable */ }
+    }
+    setSelectedClientId(clientId);
     if (query.get("connected") === "google") setNotice("Google was connected for this client.");
     if (query.get("error")) setNotice(query.get("error") ?? "Unable to connect Google.");
     try { setReady(JSON.parse(window.localStorage.getItem(readinessKey) ?? "{}")); } catch { setReady({}); }
@@ -69,7 +84,7 @@ export default function IntegrationsPage() {
       </div>
       <BrandSelect
         label="Client"
-        onChange={setSelectedClientId}
+        onChange={handleClientChange}
         options={clientList.map((client) => ({
           value: client.id,
           label: client.name,
