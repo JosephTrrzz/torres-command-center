@@ -6,6 +6,7 @@ import { APP_NAVIGATION, canAccessPath, defaultRouteForRole, roleLabel } from ".
 import { clearAuthSession, readStoredSession } from "../lib/supabase-auth";
 import type { AuthSession } from "../lib/types";
 import { readProfileAvatar } from "./profile-picture-editor";
+import { fetchClients } from "../lib/supabase-data";
 
 const workspaceNotifications = [
   { id: "site-health", title: "Website health check ready", detail: "Your client site scorecards are ready to review.", time: "Today", tone: "insight" },
@@ -31,6 +32,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const [session, setSession] = useState<AuthSession | null>(null);
   const [checked, setChecked] = useState(false);
   const [avatarImage, setAvatarImage] = useState("");
+  const [clientCount, setClientCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -56,6 +58,10 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
   }, [pathname, router]);
 
+  useEffect(() => {
+    fetchClients().then((rows) => setClientCount(rows.length)).catch(() => setClientCount(0));
+  }, []);
+
   const logout = () => {
     clearAuthSession();
     router.replace("/login/");
@@ -71,7 +77,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="brand"><span className="brand-mark">T</span><span>Torres <i>&amp; Co.</i></span></div>
       <div className="workspace"><span className="workspace-avatar">TC</span><div><small>Workspace</small><strong>Torres &amp; Co. <b>⌄</b></strong></div></div>
-      <nav aria-label="Main navigation">{nav.map((item) => <Link onClick={() => setOpen(false)} className={active === item.label ? "active" : ""} href={item.href} key={item.label}><span className="nav-icon">{item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Portal" ? "↗" : item.label === "Integrations" ? "✦" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && session.profile.role !== "customer" && <em>3</em>}</Link>)}</nav>
+      <nav aria-label="Main navigation">{nav.map((item) => <Link onClick={() => setOpen(false)} className={active === item.label ? "active" : ""} href={item.href} key={item.label}><span className="nav-icon">{item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Portal" ? "↗" : item.label === "Integrations" ? "✦" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && session.profile.role !== "customer" && clientCount > 0 && <em>{clientCount}</em>}</Link>)}</nav>
       <div className="sidebar-bottom"><div className="profile">{avatarImage ? <img className="avatar avatar-image" src={avatarImage} alt="" /> : <span className="avatar">{avatar}</span>}<div><strong>{displayName}</strong><small>{accessLabel}</small></div><button className="logout-button" onClick={logout}>Log out</button></div></div>
     </aside>
     <main className="main">

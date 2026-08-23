@@ -16,6 +16,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const appUrl = env.PUBLIC_APP_URL || "https://torres-command-center-app.pages.dev";
   const current = new URL(request.url);
   const clientId = cookieValue(request, "cc_google_client");
+  const verifier = cookieValue(request, "cc_google_verifier");
   const error = current.searchParams.get("error");
   const clientQuery = clientId ? `&client=${encodeURIComponent(clientId)}` : "";
   if (error) return redirect(`${appUrl}/integrations/?error=${encodeURIComponent(error)}${clientQuery}`);
@@ -24,7 +25,8 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   if (!code || !state || state !== cookieValue(request, "cc_google_state")) return redirect(`${appUrl}/integrations/?error=Google%20authorization%20expired%20or%20invalid`);
 
   const callback = `${current.origin}/api/google/callback`;
-  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID || "", client_secret: env.GOOGLE_CLIENT_SECRET || "", redirect_uri: callback, grant_type: "authorization_code" }) });
+  const tokenBody = new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID || "", redirect_uri: callback, grant_type: "authorization_code", code_verifier: verifier || "" });
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: tokenBody });
   const tokenPayload = await tokenResponse.json() as { error?: string; error_description?: string; access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
   if (!tokenResponse.ok) {
     const reason = tokenPayload.error_description || tokenPayload.error || "unknown token exchange error";
