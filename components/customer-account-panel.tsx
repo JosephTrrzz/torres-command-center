@@ -41,8 +41,8 @@ export function CustomerAccountPanel({ clientId, clientName, defaultEmail = "" }
     <div className="section-heading"><div><p className="eyebrow">Customer relationship</p><h2>Portal access & billing</h2><p>Keep {clientName}&apos;s portal, billing contact, and future payment status connected to this business.</p></div><Link className="button button-light" href={`/integrations/?client=${encodeURIComponent(clientId)}`}>Manage connections <span>→</span></Link></div>
     <div className="account-status-grid"><div className="account-status-card" data-state={portalEnabled && portalStatus === "active" ? "ready" : "pending"}><span>Portal</span><strong>{portalEnabled ? portalStatus : "Disabled"}</strong><small>Controls whether the customer can access their private workspace.</small></div><div className="account-status-card" data-state={billingStatus === "active" ? "ready" : "pending"}><span>Billing</span><strong>{billingStatus.replace("_", " ")}</strong><small>Shows Square readiness; card details will stay with Square.</small></div></div>
     <form id="customer-account-form" className="account-form-grid" onSubmit={save}>
-      <label>Portal email<input className="field-input" type="email" value={portalEmail} onChange={(event) => setPortalEmail(event.target.value)} placeholder="customer@company.com" required /></label>
-      <label>Billing email<input className="field-input" type="email" value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} placeholder="billing@company.com" required /></label>
+      <label>Portal email<input className="field-input" type="email" value={portalEmail} onChange={(event) => setPortalEmail(event.target.value)} required /></label>
+      <label>Billing email<input className="field-input" type="email" value={billingEmail} onChange={(event) => setBillingEmail(event.target.value)} required /></label>
 <BrandSelect
   label="Portal status"
   value={portalStatus}

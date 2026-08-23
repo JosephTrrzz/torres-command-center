@@ -23,7 +23,7 @@ export default function ClientsPage() {
         setClients(rows);
         setMessage(rows.length ? "Connected to Supabase" : "No clients added yet");
       })
-      .catch(() => setMessage("Showing demo clients until Supabase access is configured."));
+      .catch(() => setMessage("Unable to load live client records. Check the Supabase connection."));
   }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -109,31 +109,31 @@ export default function ClientsPage() {
           <div className="form-grid">
             <label className="form-field">
               <span>Business name</span>
-              <input name="name" defaultValue={editing?.name} placeholder="Example Company" autoComplete="organization" required />
+              <input name="name" defaultValue={editing?.name} autoComplete="organization" required />
             </label>
             <label className="form-field">
               <span>Industry</span>
-              <input name="industry" defaultValue={editing?.industry} placeholder="HVAC services" required />
+              <input name="industry" defaultValue={editing?.industry} required />
             </label>
             <label className="form-field">
               <span>Contact email</span>
-              <input name="email" type="email" defaultValue={editing?.email} placeholder="owner@example.com" autoComplete="email" required />
+              <input name="email" type="email" defaultValue={editing?.email} autoComplete="email" required />
             </label>
             <label className="form-field">
               <span>Phone number</span>
-              <input name="phone" type="tel" defaultValue={editing?.phone} placeholder="(555) 555-0123" autoComplete="tel" required />
+              <input name="phone" type="tel" defaultValue={editing?.phone} autoComplete="tel" required />
             </label>
             <label className="form-field">
               <span>Location</span>
-              <input name="location" defaultValue={editing?.location} placeholder="City, State" autoComplete="address-level2" />
+              <input name="location" defaultValue={editing?.location} autoComplete="address-level2" />
             </label>
             <label className="form-field">
               <span>Website</span>
-              <input name="website" defaultValue={editing?.website} placeholder="example.com" autoComplete="url" />
+              <input name="website" defaultValue={editing?.website} autoComplete="url" />
             </label>
             <label className="form-field">
               <span>Health score</span>
-              <input name="health_score" type="number" min="0" max="100" defaultValue={editing?.health} placeholder="0–100" />
+              <input name="health_score" type="number" min="0" max="100" defaultValue={editing?.health} />
             </label>
           </div>
 

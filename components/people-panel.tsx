@@ -105,23 +105,23 @@ export function PeoplePanel({ clientId }: { clientId: string }) {
           <div className="form-grid">
             <label className="form-field">
               <span>Full name</span>
-              <input required placeholder="e.g. Maria Torres" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+              <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             </label>
             <label className="form-field">
               <span>Role or title</span>
-              <input placeholder="e.g. General Manager" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} />
+              <input value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} />
             </label>
             <label className="form-field">
               <span>Email address</span>
-              <input type="email" placeholder="name@company.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+              <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
             </label>
             <label className="form-field">
               <span>Phone number</span>
-              <input type="tel" placeholder="(555) 555-0123" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+              <input type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
             </label>
             <label className="form-field form-field-full">
               <span>Notes</span>
-              <textarea placeholder="Add responsibilities, preferences, or account notes." value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+              <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
             </label>
           </div>
           <div className="form-actions">

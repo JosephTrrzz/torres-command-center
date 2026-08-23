@@ -27,9 +27,9 @@ export default function LoginPage() {
         <div className="login-role-copy"><span className="role-kicker">Secure access</span><h2>One sign-in for every account type</h2><p>Owners, employees, and customers only see the areas assigned to them.</p></div>
 <form onSubmit={async (event) => { event.preventDefault(); setBusy(true); setMessage(""); try { const session = await createAuthSession(email, password); storeAuthSession(session); const requestedPath = new URLSearchParams(window.location.search).get("returnTo"); const destination = requestedPath && isSafeReturnTo(requestedPath) && canAccessPath(session.profile.role, requestedPath) ? requestedPath : defaultRouteForRole(session.profile.role); router.replace(destination); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to sign in."); } finally { setBusy(false); } }}>
           <label htmlFor="email">Work email</label>
-          <input id="email" type="email" placeholder="you@company.com" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          <input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           <label htmlFor="password">Password</label>
-          <input id="password" type="password" placeholder="Enter your password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          <input id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           <div className="login-options"><label className="remember"><input type="checkbox" /> <span>Remember me</span></label><button type="button" className="forgot" onClick={async () => { setMessage(""); try { await requestPasswordReset(email); setNotice(true); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to request a password reset."); } }}>Forgot password?</button></div>
           <button className="button button-login" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in securely"}<span>→</span></button>
         </form>

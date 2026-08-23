@@ -155,7 +155,7 @@ export function BrandSelect({
           </span>
           <span className="brand-select-value">
             <strong>{selectedOption?.label ?? placeholder}</strong>
-            <small>{selectedOption?.description || "Select an option"}</small>
+            {selectedOption?.description ? <small>{selectedOption.description}</small> : null}
           </span>
           <span aria-hidden="true" className="brand-select-chevron" />
         </button>
