@@ -23,6 +23,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const code = current.searchParams.get("code");
   const state = current.searchParams.get("state");
   if (!code || !state || state !== cookieValue(request, "cc_google_state")) return redirect(`${appUrl}/integrations/?error=Google%20authorization%20expired%20or%20invalid`);
+  if (!verifier) return redirect(`${appUrl}/integrations/?error=Google%20authorization%20expired%20or%20invalid%20(refresh%20the%20integration%20page%20and%20try%20again)${clientQuery}`);
 
   const callback = `${current.origin}/api/google/callback`;
   const tokenBody = new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID || "", redirect_uri: callback, grant_type: "authorization_code", code_verifier: verifier || "" });

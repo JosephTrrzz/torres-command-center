@@ -185,6 +185,8 @@ select:not([multiple]):disabled,
   gap: clamp(1.5rem, 4vw, 3rem);
 }
 
+.integration-status-connected { color:#718b58; }
+
 /* Unified branded form system */
 .form-heading {
   display: grid;

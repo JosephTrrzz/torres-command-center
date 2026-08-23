@@ -27,6 +27,9 @@ export default function IntegrationsPage() {
   const [clientList, setClientList] = useState<ClientDetail[]>([]);
   const [activeIntegration, setActiveIntegration] = useState<IntegrationDefinition | null>(null);
   const [ready, setReady] = useState<Record<string, boolean>>({});
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleClientChange = (clientId: string) => {
     setSelectedClientId(clientId);
@@ -51,6 +54,26 @@ export default function IntegrationsPage() {
     try { setReady(JSON.parse(window.localStorage.getItem(readinessKey) ?? "{}")); } catch { setReady({}); }
     fetchClients().then(setClientList).catch(() => setClientList([]));
   }, []);
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setGoogleConnected(false);
+      setGoogleEmail("");
+      return;
+    }
+    let active = true;
+    setGoogleLoading(true);
+    fetch(`/api/google/status?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { connected: false })
+      .then((status: { connected?: boolean; googleEmail?: string }) => {
+        if (!active) return;
+        setGoogleConnected(Boolean(status.connected));
+        setGoogleEmail(status.googleEmail || "");
+      })
+      .catch(() => { if (active) setGoogleConnected(false); })
+      .finally(() => { if (active) setGoogleLoading(false); });
+    return () => { active = false; };
+  }, [selectedClientId]);
 
   const selectedClient = useMemo(() => clientList.find((client) => client.id === selectedClientId), [clientList, selectedClientId]);
   const readyCount = integrations.filter((integration) => ready[`${selectedClientId}:${integration.id}`]).length;
@@ -92,10 +115,10 @@ export default function IntegrationsPage() {
         value={selectedClientId}
       />
     </section>
-    <div className="integration-summary"><div><span>Prepared</span><strong>{selectedClient ? readyCount : "—"}</strong><small>connections ready for review</small></div><div><span>Available</span><strong>{integrations.length}</strong><small>connection types</small></div><div><span>Live data</span><strong>Off</strong><small>authorization still required</small></div></div>
+    <div className="integration-summary"><div><span>Prepared</span><strong>{selectedClient ? readyCount : "—"}</strong><small>connections ready for review</small></div><div><span>Available</span><strong>{integrations.length}</strong><small>connection types</small></div><div><span>Live data</span><strong>{googleLoading ? "Checking" : googleConnected ? "On" : "Off"}</strong><small>{googleConnected ? `Google${googleEmail ? ` · ${googleEmail}` : ""} connected` : "authorization still required"}</small></div></div>
     {notice && <p className="integration-notice">{notice}</p>}
     <div className="section-heading"><div><p className="eyebrow">Connection catalog</p><h2>Choose what to set up next</h2></div><Link className="button button-light" href="/clients/">View clients <span>→</span></Link></div>
-    <div className="integration-grid">{integrations.map((integration) => { const isReady = Boolean(ready[`${selectedClientId}:${integration.id}`]); const isGoogle = ["gbp", "search-console", "analytics"].includes(integration.id); return <article className="integration-card" key={integration.id}><div className="integration-card-top"><div><div className="integration-logo">{integration.icon}</div><p className="integration-category">{integration.category}</p></div><span className="integration-status">{isReady ? "Prepared" : "Not connected"}</span></div><h3>{integration.name}</h3><p>{integration.description}</p><div className="integration-proof"><strong>Proof:</strong> {integration.proof}</div><div className="integration-unlocks">{integration.unlocks.map((item) => <span key={item}>{item}</span>)}</div><div className="integration-card-actions"><button className="button button-light" type="button" onClick={() => selectedClientId ? setActiveIntegration(integration) : setNotice("Choose a client first so this connection is scoped correctly.")}>{selectedClientId ? (isReady ? "Review setup" : "Prepare connection") : "Choose client"} <span>→</span></button>{isGoogle && <button className="text-button integration-connect" type="button" onClick={connectGoogle}>Connect Google</button>}</div></article>; })}</div>
+    <div className="integration-grid">{integrations.map((integration) => { const isReady = Boolean(ready[`${selectedClientId}:${integration.id}`]); const isGoogle = ["gbp", "search-console", "analytics"].includes(integration.id); const status = isGoogle && googleConnected ? "Connected" : isReady ? "Prepared" : "Not connected"; return <article className="integration-card" key={integration.id}><div className="integration-card-top"><div><div className="integration-logo">{integration.icon}</div><p className="integration-category">{integration.category}</p></div><span className={`integration-status${status === "Connected" ? " integration-status-connected" : ""}`}>{status}</span></div><h3>{integration.name}</h3><p>{integration.description}</p><div className="integration-proof"><strong>Proof:</strong> {integration.proof}</div><div className="integration-unlocks">{integration.unlocks.map((item) => <span key={item}>{item}</span>)}</div><div className="integration-card-actions"><button className="button button-light" type="button" onClick={() => selectedClientId ? setActiveIntegration(integration) : setNotice("Choose a client first so this connection is scoped correctly.")}>{selectedClientId ? (isReady ? "Review setup" : "Prepare connection") : "Choose client"} <span>→</span></button>{isGoogle && <button className="text-button integration-connect" type="button" onClick={googleConnected ? () => setNotice(`Google is connected for ${googleEmail || "this client"}.`) : connectGoogle}>{googleConnected ? "Google connected" : "Connect Google"}</button>}</div></article>; })}</div>
     <p className="integration-notice">This catalog prepares the workflow and explains what each provider will supply. It does not claim live Google, Cloudflare, or review data until the provider authorization step is completed.</p>
     {activeIntegration && <div className="modal-backdrop" role="presentation" onClick={() => setActiveIntegration(null)}><section className="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" aria-label="Close" onClick={() => setActiveIntegration(null)}>×</button><p className="eyebrow">Connection setup</p><h2 id="setup-title">{activeIntegration.name}</h2><p>{activeIntegration.description}</p><div className="setup-modal-grid"><div><span>Client</span><strong>{selectedClient?.name}</strong></div><div><span>Status</span><strong>{ready[`${selectedClientId}:${activeIntegration.id}`] ? "Prepared" : "Not connected"}</strong></div></div><h3>What this unlocks</h3><ul>{activeIntegration.unlocks.map((item) => <li key={item}>{item}</li>)}</ul><h3>Before authorization</h3><ul>{activeIntegration.requirements.map((item) => <li key={item}>{item}</li>)}</ul><div className="modal-actions"><button className="button button-light" type="button" onClick={() => setActiveIntegration(null)}>Cancel</button><button className="button button-dark" type="button" onClick={markReady}>Mark ready for authorization <span>→</span></button></div></section></div>}
   </Shell>;
