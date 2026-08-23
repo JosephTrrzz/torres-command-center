@@ -7,6 +7,12 @@ import { clearAuthSession, readStoredSession } from "../lib/supabase-auth";
 import type { AuthSession } from "../lib/types";
 import { readProfileAvatar } from "./profile-picture-editor";
 
+const workspaceNotifications = [
+  { id: "site-health", title: "Website health check ready", detail: "Your client site scorecards are ready to review.", time: "Today", tone: "insight" },
+  { id: "onboarding", title: "Finish a client setup", detail: "Connect reporting services for your newest account.", time: "Yesterday", tone: "action" },
+  { id: "report", title: "Weekly report window", detail: "Your next portfolio summary is ready to schedule.", time: "2 days ago", tone: "report" },
+];
+
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "TC";
 }
@@ -14,6 +20,7 @@ function initials(name: string) {
 export function Shell({ children, active }: { children: React.ReactNode; active: string }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState(false);
+  const [readNotifications, setReadNotifications] = useState<string[]>([]);
   const [profile, setProfile] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [checked, setChecked] = useState(false);
@@ -23,6 +30,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
 
   useEffect(() => {
     const stored = readStoredSession();
+    try { setReadNotifications(JSON.parse(window.localStorage.getItem("torres-read-notifications") ?? "[]")); } catch { setReadNotifications([]); }
     setAvatarImage(readProfileAvatar());
     const onAvatarChanged = () => setAvatarImage(readProfileAvatar());
     window.addEventListener("torres-profile-avatar-changed", onAvatarChanged);
@@ -46,6 +54,8 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     clearAuthSession();
     router.replace("/login/");
   };
+  const unreadCount = workspaceNotifications.filter((item) => !readNotifications.includes(item.id)).length;
+  const markAllRead = () => { const ids = workspaceNotifications.map((item) => item.id); setReadNotifications(ids); window.localStorage.setItem("torres-read-notifications", JSON.stringify(ids)); };
   if (!checked || !session) return <main className="auth-loading" aria-live="polite">Opening your secure workspace…</main>;
   const nav = APP_NAVIGATION[session.profile.role];
   const displayName = session.profile.full_name || session.profile.email;
@@ -60,7 +70,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     </aside>
     <main className="main">
       <header className="mobile-header"><button onClick={() => setOpen(!open)} aria-label="Toggle menu">☰</button><span className="brand-mark">T</span><strong>Torres &amp; Co.</strong><button className="mobile-logout" onClick={logout}>Log out</button></header>
-      <div className="topbar"><span className="breadcrumb">Torres &amp; Co. <b>/</b> {active}</span><div className="top-actions"><div className="header-menu"><button className="round-button" onClick={() => setNotice(!notice)} aria-label="Notifications">♢<span /></button>{notice && <div className="menu-popover"><strong>Notifications</strong><p>No new alerts right now.</p></div>}</div><div className="header-menu"><button className="top-avatar" onClick={() => setProfile(!profile)} aria-label="Open profile">{avatarImage ? <img src={avatarImage} alt="" /> : avatar}</button>{profile && <div className="menu-popover profile-popover"><strong>{displayName}</strong><small>{accessLabel}</small><button onClick={logout}>Log out</button></div>}</div></div></div>
+      <div className="topbar"><span className="breadcrumb">Torres &amp; Co. <b>/</b> {active}</span><div className="top-actions"><div className="header-menu"><button className="round-button notification-trigger" onClick={() => setNotice(!notice)} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={notice}><span className="notification-bell">♧</span>{unreadCount > 0 && <b className="notification-count">{unreadCount}</b>}</button>{notice && <div className="menu-popover notification-popover"><div className="notification-heading"><div><strong>Notifications</strong><small>{unreadCount ? `${unreadCount} unread` : "All caught up"}</small></div>{unreadCount > 0 && <button className="mark-read" onClick={markAllRead}>Mark all read</button>}</div><div className="notification-list">{workspaceNotifications.map((item) => <div className={`notification-item ${readNotifications.includes(item.id) ? "is-read" : ""}`} key={item.id}><span className={`notification-dot ${item.tone}`} /><div><strong>{item.title}</strong><p>{item.detail}</p><small>{item.time}</small></div></div>)}</div><Link className="notification-footer" href="/settings/#admin-console" onClick={() => setNotice(false)}>Review workspace settings <span>→</span></Link></div>}</div><div className="header-menu"><button className="top-avatar" onClick={() => setProfile(!profile)} aria-label="Open profile">{avatarImage ? <img src={avatarImage} alt="" /> : avatar}</button>{profile && <div className="menu-popover profile-popover"><strong>{displayName}</strong><small>{accessLabel}</small><button onClick={logout}>Log out</button></div>}</div></div></div>
       <div className="content">{children}</div>
     </main>
   </div>;
