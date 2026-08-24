@@ -6,6 +6,9 @@ create table if not exists public.google_connections (
   refresh_token text,
   expires_at timestamptz,
   scopes text[] not null default '{}',
+  business_profile_location text,
+  search_console_site text,
+  analytics_property text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (client_id)

@@ -8,6 +8,7 @@ import { fetchClients } from "../../lib/supabase-data";
 import { ClientDetail } from "../../lib/types";
 
 type IntegrationDefinition = { id: string; name: string; category: string; icon: string; description: string; proof: string; unlocks: string[]; requirements: string[] };
+type GoogleProperties = { searchConsole: { properties: Array<{ siteUrl: string; permissionLevel?: string }>; error?: string }; analytics: { properties: Array<{ property: string; displayName?: string; account?: string }>; error?: string }; businessProfile: { properties: Array<{ name: string; title?: string; storeCode?: string; websiteUri?: string }>; error?: string } };
 
 const integrations: IntegrationDefinition[] = [
   { id: "gbp", name: "Google Business Profile", category: "Reviews & listings", icon: "G", description: "Prepare reviews, rating, business details, hours, calls, and listing health.", proof: "Reviews, rating, profile completeness", unlocks: ["Review response queue", "Profile actions", "Listing completeness"], requirements: ["Verified Google Business Profile", "Manager access for the client location"] },
@@ -38,6 +39,10 @@ export default function IntegrationsPage() {
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleEmail, setGoogleEmail] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleProperties, setGoogleProperties] = useState<GoogleProperties | null>(null);
+  const [propertiesLoading, setPropertiesLoading] = useState(false);
+  const [propertiesMessage, setPropertiesMessage] = useState("");
+  const [propertySelection, setPropertySelection] = useState({ businessProfile: "", searchConsole: "", analytics: "" });
 
   const handleClientChange = (clientId: string) => {
     setSelectedClientId(clientId);
@@ -71,6 +76,7 @@ export default function IntegrationsPage() {
     }
     let active = true;
     setGoogleLoading(true);
+    setGoogleProperties(null);
     fetch(`/api/google/status?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : { connected: false })
       .then((status: { connected?: boolean; googleEmail?: string }) => {
@@ -82,6 +88,38 @@ export default function IntegrationsPage() {
       .finally(() => { if (active) setGoogleLoading(false); });
     return () => { active = false; };
   }, [selectedClientId]);
+
+  const discoverGoogleProperties = async () => {
+    if (!selectedClientId) return;
+    setPropertiesLoading(true);
+    setPropertiesMessage("");
+    try {
+      const response = await fetch(`/api/google/properties?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Google properties could not be loaded.");
+      setGoogleProperties(payload);
+      setPropertiesMessage("Google properties loaded. Choose the resources that belong to this client, then save the mapping.");
+    } catch (error) {
+      setPropertiesMessage(error instanceof Error ? error.message : "Google properties could not be loaded.");
+    } finally {
+      setPropertiesLoading(false);
+    }
+  };
+
+  const saveGoogleProperties = async () => {
+    if (!selectedClientId) return;
+    setPropertiesLoading(true);
+    try {
+      const response = await fetch("/api/google/properties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: selectedClientId, ...propertySelection }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Google property selections could not be saved.");
+      setPropertiesMessage("Google property mapping saved. Reports can use these resources after metric sync is enabled.");
+    } catch (error) {
+      setPropertiesMessage(error instanceof Error ? error.message : "Google property selections could not be saved.");
+    } finally {
+      setPropertiesLoading(false);
+    }
+  };
 
   const selectedClient = useMemo(() => clientList.find((client) => client.id === selectedClientId), [clientList, selectedClientId]);
   const readyCount = integrations.filter((integration) => ready[`${selectedClientId}:${integration.id}`]).length;
@@ -125,6 +163,7 @@ export default function IntegrationsPage() {
     </section>
     <div className="integration-summary"><div><span>Prepared</span><strong>{selectedClient ? readyCount : "—"}</strong><small>connections ready for review</small></div><div><span>Available</span><strong>{integrations.length}</strong><small>connection types</small></div><div><span>Live data</span><strong>{googleLoading ? "Checking" : googleConnected ? "On" : "Off"}</strong><small>{googleConnected ? `Google${googleEmail ? ` · ${googleEmail}` : ""} connected` : "authorization still required"}</small></div></div>
     {notice && <p className="integration-notice">{notice}</p>}
+    {selectedClient && googleConnected && <section className="google-property-panel detail-card"><div className="section-heading"><div><p className="eyebrow">Google resources</p><h2>Choose the properties for this client</h2><p>Authorization is confirmed for {googleEmail || "this account"}. Select the matching resources before metrics are added to Reports.</p></div><button className="button button-light" type="button" onClick={discoverGoogleProperties} disabled={propertiesLoading}>{propertiesLoading ? "Checking…" : "Discover properties"}</button></div>{propertiesMessage && <p className="integration-notice">{propertiesMessage}</p>}{googleProperties && <div className="google-property-grid"><label>Business Profile<select value={propertySelection.businessProfile} onChange={(event) => setPropertySelection({ ...propertySelection, businessProfile: event.target.value })}><option value="">Choose a location</option>{googleProperties.businessProfile.properties.map((property) => <option key={property.name} value={property.name}>{property.title || property.name}{property.websiteUri ? ` · ${property.websiteUri}` : ""}</option>)}</select>{googleProperties.businessProfile.error && <small>{googleProperties.businessProfile.error}</small>}</label><label>Search Console<select value={propertySelection.searchConsole} onChange={(event) => setPropertySelection({ ...propertySelection, searchConsole: event.target.value })}><option value="">Choose a site</option>{googleProperties.searchConsole.properties.map((property) => <option key={property.siteUrl} value={property.siteUrl}>{property.siteUrl}</option>)}</select>{googleProperties.searchConsole.error && <small>{googleProperties.searchConsole.error}</small>}</label><label>Google Analytics<select value={propertySelection.analytics} onChange={(event) => setPropertySelection({ ...propertySelection, analytics: event.target.value })}><option value="">Choose a property</option>{googleProperties.analytics.properties.map((property) => <option key={property.property} value={property.property}>{property.displayName || property.property}{property.account ? ` · ${property.account}` : ""}</option>)}</select>{googleProperties.analytics.error && <small>{googleProperties.analytics.error}</small>}</label><button className="button button-dark" type="button" onClick={saveGoogleProperties} disabled={propertiesLoading}>Save property mapping <span>→</span></button></div>}</section>}
     <div className="section-heading"><div><p className="eyebrow">Connection catalog</p><h2>Choose what to set up next</h2></div><Link className="button button-light" href="/clients/">View clients <span>→</span></Link></div>
     <div className="integration-grid">{integrations.map((integration) => { const isReady = Boolean(ready[`${selectedClientId}:${integration.id}`]); const isGoogle = ["gbp", "search-console", "analytics"].includes(integration.id); const status = isGoogle && googleConnected ? "Connected" : isReady ? "Prepared" : "Not connected"; return <article className="integration-card" key={integration.id}><div className="integration-card-top"><div><div className="integration-logo">{integration.icon}</div><p className="integration-category">{integration.category}</p></div><span className={`integration-status${status === "Connected" ? " integration-status-connected" : ""}`}>{status}</span></div><h3>{integration.name}</h3><p>{integration.description}</p><div className="integration-proof"><strong>Proof:</strong> {integration.proof}</div><div className="integration-unlocks">{integration.unlocks.map((item) => <span key={item}>{item}</span>)}</div><div className="integration-card-actions"><button className="button button-light" type="button" onClick={() => selectedClientId ? setActiveIntegration(integration) : setNotice("Choose a client first so this connection is scoped correctly.")}>{selectedClientId ? (isReady ? "Review setup" : "Prepare connection") : "Choose client"} <span>→</span></button>{isGoogle && <button className="text-button integration-connect" type="button" onClick={googleConnected ? () => setNotice(`Google is connected for ${googleEmail || "this client"}.`) : connectGoogle}>{googleConnected ? "Google connected" : "Connect Google"}</button>}</div></article>; })}</div>
     <p className="integration-notice">This catalog prepares the workflow and explains what each provider will supply. It does not claim live Google, Cloudflare, or review data until the provider authorization step is completed.</p>
