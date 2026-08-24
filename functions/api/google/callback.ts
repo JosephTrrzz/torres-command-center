@@ -18,8 +18,12 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const clientId = cookieValue(request, "cc_google_client");
   const verifier = cookieValue(request, "cc_google_verifier");
   const error = current.searchParams.get("error");
+  const errorDescription = current.searchParams.get("error_description");
   const clientQuery = clientId ? `&client=${encodeURIComponent(clientId)}` : "";
-  if (error) return redirect(`${appUrl}/integrations/?error=${encodeURIComponent(error)}${clientQuery}`);
+  if (error) {
+    const detail = [error, errorDescription].filter(Boolean).join(": ").slice(0, 700);
+    return redirect(`${appUrl}/integrations/?error=${encodeURIComponent(detail || "Google authorization was declined")}${clientQuery}`);
+  }
   const code = current.searchParams.get("code");
   const state = current.searchParams.get("state");
   if (!code || !state || state !== cookieValue(request, "cc_google_state")) return redirect(`${appUrl}/integrations/?error=Google%20authorization%20expired%20or%20invalid`);

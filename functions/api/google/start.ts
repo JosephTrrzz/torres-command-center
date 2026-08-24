@@ -34,7 +34,9 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   auth.searchParams.set("redirect_uri", callback);
   auth.searchParams.set("response_type", "code");
   auth.searchParams.set("access_type", "offline");
-  auth.searchParams.set("prompt", "consent");
+  // Always let the admin choose the intended Google account. This prevents a
+  // previously selected personal account from being sent to the testing app.
+  auth.searchParams.set("prompt", "select_account consent");
   auth.searchParams.set("state", state);
   auth.searchParams.set("code_challenge", pkce.challenge);
   auth.searchParams.set("code_challenge_method", "S256");

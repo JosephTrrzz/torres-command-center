@@ -21,6 +21,14 @@ const integrations: IntegrationDefinition[] = [
 
 const readinessKey = "torres-command-center-integration-readiness";
 
+function formatGoogleNotice(message: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("access_denied") || normalized.includes("not verified") || normalized.includes("testing")) {
+    return "Google blocked this account because the app is still in Testing. Choose one of the accounts listed under Google Cloud → OAuth consent screen → Test users, then try again.";
+  }
+  return message;
+}
+
 export default function IntegrationsPage() {
   const [notice, setNotice] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -50,7 +58,7 @@ export default function IntegrationsPage() {
     }
     setSelectedClientId(clientId);
     if (query.get("connected") === "google") setNotice("Google was connected for this client.");
-    if (query.get("error")) setNotice(query.get("error") ?? "Unable to connect Google.");
+    if (query.get("error")) setNotice(formatGoogleNotice(query.get("error") ?? "Unable to connect Google."));
     try { setReady(JSON.parse(window.localStorage.getItem(readinessKey) ?? "{}")); } catch { setReady({}); }
     fetchClients().then(setClientList).catch(() => setClientList([]));
   }, []);
