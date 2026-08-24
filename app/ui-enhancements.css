@@ -536,6 +536,17 @@ select:not([multiple]):disabled,
   }
 }
 
+/* The client picker must stay anchored to its trigger at every compressed width. */
+.brand-select-menu {
+  position: absolute !important;
+  bottom: auto !important;
+  top: calc(100% + 0.55rem);
+}
+.brand-select-menu[data-placement="top"] {
+  bottom: calc(100% + 0.55rem) !important;
+  top: auto !important;
+}
+
 /* Shared branded form controls */
 form input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]),
 form textarea {
