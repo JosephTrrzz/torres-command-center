@@ -30,7 +30,10 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   if (!verifier) return redirect(`${appUrl}/integrations/?error=Google%20authorization%20expired%20or%20invalid%20(refresh%20the%20integration%20page%20and%20try%20again)${clientQuery}`);
 
   const callback = `${current.origin}/api/google/callback`;
-  const tokenBody = new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID || "", redirect_uri: callback, grant_type: "authorization_code", code_verifier: verifier || "" });
+  const tokenBody = new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID || "", redirect_uri: callback, grant_type: "authorization_code", code_verifier: verifier });
+  // This Google OAuth client is configured as a web application, so Google
+  // requires the client secret in addition to PKCE during token exchange.
+  if (env.GOOGLE_CLIENT_SECRET) tokenBody.set("client_secret", env.GOOGLE_CLIENT_SECRET);
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: tokenBody });
   const tokenPayload = await tokenResponse.json() as { error?: string; error_description?: string; access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
   if (!tokenResponse.ok) {
