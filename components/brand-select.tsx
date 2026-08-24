@@ -47,11 +47,13 @@ export function BrandSelect({
   const [activeIndex, setActiveIndex] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const labelId = useId();
   const listboxId = useId();
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : undefined;
+  const [menuPlacement, setMenuPlacement] = useState<"bottom" | "top">("bottom");
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -71,6 +73,14 @@ export function BrandSelect({
     setActiveIndex(nextIndex);
     window.requestAnimationFrame(() => optionRefs.current[nextIndex]?.focus());
   }, [open, options.length, selectedIndex]);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current || !menuRef.current) return;
+    const trigger = triggerRef.current.getBoundingClientRect();
+    const menuHeight = Math.min(menuRef.current.scrollHeight, Math.min(window.innerHeight * 0.6, 420));
+    const hasRoomBelow = trigger.bottom + menuHeight + 16 <= window.innerHeight;
+    setMenuPlacement(hasRoomBelow || trigger.top < menuHeight + 16 ? "bottom" : "top");
+  }, [open, options.length]);
 
   function moveFocus(index: number) {
     if (!options.length) return;
@@ -164,7 +174,9 @@ export function BrandSelect({
           <div
             aria-labelledby={labelId}
             className="brand-select-menu"
+            data-placement={menuPlacement}
             id={listboxId}
+            ref={menuRef}
             role="listbox"
           >
             {options.map((option, index) => (
