@@ -13,6 +13,7 @@ describe("role access control", () => {
     expect(canAccessPath("customer", "/today/")).toBe(true);
     expect(canAccessPath("customer", "/onboarding/")).toBe(true);
     expect(canAccessPath("customer", "/projects/")).toBe(true);
+    expect(canAccessPath("customer", "/crm/")).toBe(false);
     expect(canAccessPath("customer", "/portal/account/")).toBe(true);
     expect(canAccessPath("customer", "/portal-impersonation/")).toBe(false);
     expect(canAccessPath("customer", "/clients/")).toBe(false);
@@ -24,6 +25,7 @@ describe("role access control", () => {
     expect(canAccessPath("employee", "/clients/detail/")).toBe(true);
     expect(canAccessPath("employee", "/integrations/")).toBe(true);
     expect(canAccessPath("employee", "/projects/")).toBe(true);
+    expect(canAccessPath("employee", "/crm/")).toBe(true);
     expect(canAccessPath("employee", "/settings/")).toBe(false);
   });
 

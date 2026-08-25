@@ -36,8 +36,11 @@ Status: in progress.
 
 ## Phase 3 — CRM, customers, tasks, and calendar
 
-- Leads, assignments, pipeline, customer 360, jobs, appointments, tasks, estimates, and documents.
-- Complete the vertical slice through website lead → appointment → task.
+Status: in progress.
+
+- Lead capture, assignment, explicit pipeline status, appointments, follow-up tasks, and activity history: implemented, migrated, and production-verified as the first protected vertical slice.
+- The completed workflow runs website/referral lead → assignment → appointment → follow-up task without seeded demo data.
+- Customer 360 expansion, jobs, estimates, documents, and broader calendar operations remain for the next Phase 3 slices.
 
 ## Phase 4 — communications and marketing
 

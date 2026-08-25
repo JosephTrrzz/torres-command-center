@@ -43,11 +43,20 @@ New clients are provisioned through the protected `/api/clients` Function, which
 
 Project progress is calculated as completed milestones divided by total milestones, rounded to a whole percentage. A project with no milestones reports zero progress. The protected `/api/projects` Function is the only mutation boundary; browser sessions receive organization-scoped snapshots and direct authenticated writes are revoked. Project changes create audit events and outbox events for later notification and automation consumers.
 
+## Phase 3 CRM foundation
+
+- `crm_leads`: client-scoped prospects with source, contact details, assignment, and explicit pipeline status.
+- `crm_appointments`: lead-linked sales or service appointments with ownership, schedule, location, and lifecycle status.
+- `crm_tasks`: assigned follow-up work tied to a lead or appointment with due dates and completion state.
+- `crm_activities`: immutable timeline entries produced by protected CRM workflows.
+
+The protected `/api/crm` Function is the CRM mutation boundary. It validates organization and client scope, requires CRM permissions, creates appointment follow-up tasks as one workflow, and emits audit, notification, and outbox records. Direct authenticated writes are revoked; RLS preserves tenant-scoped reads. The migration contains no demo records.
+
 ## Planned domain groups
 
 ### CRM and operations
 
-`contacts`, `leads`, `lead_assignments`, `pipelines`, `pipeline_stages`, `jobs`, `job_status_history`, `appointments`, `tasks`, `task_assignments`, `estimates`, `estimate_items`, `invoices`, `payments`, `files`, and `document_links`.
+`contacts`, `lead_assignments`, `pipelines`, `pipeline_stages`, `jobs`, `job_status_history`, `task_assignments`, `estimates`, `estimate_items`, `invoices`, `payments`, `files`, and `document_links`. The live `crm_leads`, `crm_appointments`, and `crm_tasks` tables provide the initial workflow and can be normalized further as these domain groups expand.
 
 ### Strategy and intelligence
 

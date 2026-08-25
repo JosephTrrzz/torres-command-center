@@ -36,10 +36,21 @@ Updated 2026-08-25.
 | Production migration | Applied | `supabase/client_projects.sql` was applied successfully on 2026-08-25 without seeded demo records. |
 | Verification | Passed | 24 tests, application and Function type checks, whitespace validation, production build, migration execution, route checks, and unauthenticated API-boundary checks pass. |
 
+## Phase 3 — CRM vertical slice
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Lead pipeline | Live | Staff can capture real client-scoped leads, assign owners, and move records through explicit pipeline stages. |
+| Appointment handoff | Live | Scheduling an appointment creates a linked appointment and follow-up task while preserving lead history. |
+| Follow-up work | Live | Staff can review due and overdue tasks and update task or appointment status from the CRM workspace. |
+| Protected mutations | Live | `/api/crm` enforces organization/client scope and CRM permissions, with audit, activity, notification, and outbox records. |
+| Production migration | Applied | `supabase/crm.sql` was applied successfully on 2026-08-25 without seeded demo records. |
+| Verification | Passed | 27 tests, application and Function type checks, whitespace validation, production build, migration execution, route checks, and unauthenticated API-boundary checks pass. |
+
 ## Later phases
 
-Client 360 enhancements, collaboration, calendar/newsletters/AI, billing, and additional integrations remain planned or setup-only. They must not be described as production-complete until their backend contracts, permissions, empty/error states, and tests exist.
+Customer 360 expansion, jobs, collaboration, broader calendar/newsletters/AI, billing, and additional integrations remain planned or setup-only. They must not be described as production-complete until their backend contracts, permissions, empty/error states, and tests exist.
 
 ## Manual gates
 
-Google Business Profile provider approval/quota remains an external gate. The notifications, client onboarding, and project delivery migrations were applied and verified on 2026-08-25; production deployments and secrets remain auditable operator actions.
+Google Business Profile provider approval/quota remains an external gate. The notifications, client onboarding, project delivery, and CRM migrations were applied and verified on 2026-08-25; production deployments and secrets remain auditable operator actions.

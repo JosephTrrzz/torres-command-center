@@ -10,6 +10,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
     { href: "/today/", label: "Today" },
     { href: "/", label: "Overview" },
     { href: "/clients/", label: "Clients" },
+    { href: "/crm/", label: "CRM" },
     { href: "/projects/", label: "Projects" },
     { href: "/portal/", label: "Portal" },
     { href: "/integrations/", label: "Integrations" },
@@ -20,6 +21,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
     { href: "/today/", label: "Today" },
     { href: "/", label: "Overview" },
     { href: "/clients/", label: "Clients" },
+    { href: "/crm/", label: "CRM" },
     { href: "/projects/", label: "Projects" },
     { href: "/integrations/", label: "Integrations" },
     { href: "/reports/", label: "Reports" },
@@ -70,6 +72,6 @@ export function canAccessPath(role: AppRole, pathname: string) {
   if (role === "owner") return true;
   if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects");
 
-  const employeeRoots = ["/today", "/clients", "/projects", "/integrations", "/reports", "/portal"];
+  const employeeRoots = ["/today", "/clients", "/crm", "/projects", "/integrations", "/reports", "/portal"];
   return pathname === "/" || employeeRoots.some((root) => matchesRoute(pathname, root));
 }
