@@ -38,6 +38,9 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const fullName = input?.fullName?.trim() || clientRows[0]?.name?.trim() || "";
   if (!email) return json({ error: "This client needs a contact email before an activation link can be sent." }, 400);
 
+  // Keep an existing auth profile aligned before generating a resend link. This
+  // matters when a client already has a Supabase account but was never assigned
+  // to this client record in the Command Center.
   const existingProfile = await fetch(`${supabaseUrl}/rest/v1/profiles?email=eq.${encodeURIComponent(email)}&select=id&limit=1`, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
   const existingRows = await existingProfile.json().catch(() => []) as Array<{ id?: string }>;
   const existingProfileId = existingRows[0]?.id;
@@ -45,7 +48,16 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(existingProfileId)}`, { method: "PATCH", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ email, full_name: fullName, role: "customer", client_id: clientId, active: true, updated_at: new Date().toISOString() }) });
   }
 
-  const redirectTo = `${env.PUBLIC_APP_URL || new URL(request.url).origin}/login/?returnTo=/portal/`;
+  const requestOrigin = new URL(request.url).origin;
+  const configuredAppUrl = (env.PUBLIC_APP_URL || "").trim().replace(/\/$/, "");
+  let appUrl = requestOrigin;
+  try {
+    const configuredHost = configuredAppUrl ? new URL(configuredAppUrl).hostname : "";
+    if (configuredAppUrl && configuredHost && !["localhost", "127.0.0.1", "::1"].includes(configuredHost)) appUrl = configuredAppUrl;
+  } catch {
+    appUrl = requestOrigin;
+  }
+  const redirectTo = `${appUrl}/login/?returnTo=/portal/`;
   if (input?.resend) {
     const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "magiclink", email, redirect_to: redirectTo }) });
     const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; msg?: string; message?: string };
@@ -61,7 +73,9 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   if (!inviteResponse.ok && inviteResponse.status !== 422) return json({ error: inviteBody.msg || inviteBody.message || "Supabase could not send the customer invitation." }, 502);
 
   let userId = inviteBody.user?.id;
-  if (!userId && inviteResponse.status === 422) userId = existingProfileId;
+  if (!userId && inviteResponse.status === 422) {
+    userId = existingProfileId;
+  }
   if (userId) {
     await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ email, full_name: fullName, role: "customer", client_id: clientId, active: true, updated_at: new Date().toISOString() }) });
   }
