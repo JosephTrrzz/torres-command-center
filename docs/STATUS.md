@@ -27,7 +27,7 @@ Updated 2026-08-25.
 
 ## Verified baseline
 
-On 2026-08-25: 14 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the new `/today/` operating brief. Cloudflare deployed commit `3d56f33` to production. The atomic Supabase migration completed successfully and verification returned 3 organizations, 2 organization memberships, 10 permissions, and 39 role-permission mappings.
+On 2026-08-25: 14 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the new `/today/` operating brief. Cloudflare deployed commit `3d56f33` to production. The atomic Supabase migration completed successfully and verification returned 3 organizations, 2 organization memberships, 10 permissions, and 39 role-permission mappings. All 8 new foundation tables have RLS enabled with 11 policies, and the organization linkage columns exist on both `clients` and `profiles`.
 
 ## Known limitations
 
