@@ -30,7 +30,7 @@ export default function SettingsPage() {
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: "", email: "", phone: "", industry: "" });
   const [newTeam, setNewTeam] = useState({ name: "", email: "", role: "Employee" });
-  const [preferences, setPreferences] = useState({ company: "Torres & Co.", industry: "Technology Agency", location: "Dallas, TX", website: "https://torrescotechnology.com", email: "joseph@torrescotechnology.com", phone: "", timezone: "America/Los_Angeles", cadence: "Weekly", emailAlerts: true, weeklyDigest: true, explanations: true });
+  const [preferences, setPreferences] = useState({ company: "Torres & Co.", industry: "Technology Agency", location: "Dallas, TX", website: "https://torrescotechnology.com", email: "jos.jt@icloud.com", phone: "", timezone: "America/Los_Angeles", cadence: "Weekly", emailAlerts: true, weeklyDigest: true, explanations: true });
   const [security, setSecurity] = useState({ mfa: true, customerEdit: true, audit: true, backups: true });
 
   useEffect(() => {
