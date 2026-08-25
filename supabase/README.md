@@ -12,6 +12,13 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `customer_accounts` | Client portal activation status and billing status. | Client onboarding/settings |
 | `google_connections` | Private Google OAuth connection and the selected Business Profile, Search Console, and GA4 resources. | Integrations |
 | `notifications` | User-specific workspace activity, such as a client activation link becoming ready. Read state is stored per user. | Notification bell in the app header |
+| `organizations` | Agency and client tenant boundaries for Torres OS. Existing clients are linked through `legacy_client_id`. | Torres OS organization settings |
+| `organization_memberships` | A user’s role inside a specific agency or client organization. | Team and client access management |
+| `permissions` / `role_permissions` | Stable permission catalog and the default role-to-permission matrix. | Platform-managed authorization rules |
+| `organization_invitations` | Organization invitation lifecycle metadata. Raw invitation tokens are never stored. | Torres OS onboarding |
+| `user_preferences` | User settings synchronized per organization and device. | User settings |
+| `audit_events` | Immutable organization-scoped security and business history. | Audit history |
+| `event_outbox` | Durable background work for providers, notifications, analytics, AI, and automations. | Server workers only |
 
 ## How the records connect
 
@@ -24,6 +31,8 @@ profiles ── client_id ──> clients <── client_id ── client_people
 ```
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
+
+The additive Torres OS migration in [`torres_os_foundation.sql`](./torres_os_foundation.sql) introduces normalized organizations without removing the current `profiles.role` and `profiles.client_id` access model. That legacy model remains authoritative until the application and RLS cutover is separately verified.
 
 ## What an empty table means
 
@@ -46,6 +55,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Never store passwords, API keys, OAuth secrets, or invitation tokens in contact notes.
 - Do not insert shared notifications without a specific `user_id`; every notification belongs to one authenticated user.
 - Use the app for normal changes so validation and access controls run consistently.
+- Do not insert `audit_events`, `organization_memberships`, `organization_invitations`, or `event_outbox` rows directly from browser code. Those mutations belong behind authenticated server boundaries.
 
 ## Add descriptions inside Supabase
 
