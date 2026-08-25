@@ -22,16 +22,16 @@ Updated 2026-08-25.
 ## Phase status
 
 - Phase 0 repository audit: complete.
-- Phase 1 foundation: in progress; organization/RBAC/audit/outbox migration and the real-data Today experience are implemented locally and pending production migration/deployment verification.
+- Phase 1 foundation: in progress; the organization/RBAC/audit/outbox migration and real-data Today experience are live in production and verified. Legacy authorization remains active during the controlled cutover.
 - Phases 2–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-25: 14 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the new `/today/` operating brief.
+On 2026-08-25: 14 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the new `/today/` operating brief. Cloudflare deployed commit `3d56f33` to production. The atomic Supabase migration completed successfully and verification returned 3 organizations, 2 organization memberships, 10 permissions, and 39 role-permission mappings.
 
 ## Known limitations
 
-- Tenant authorization still primarily uses `profiles.role` and `profiles.client_id` until organization migration is applied and consumed.
+- Tenant authorization still primarily uses `profiles.role` and `profiles.client_id` while the live organization model runs in parallel during the controlled cutover.
 - Team invitation controls in Settings are not yet a complete server-backed workflow.
 - Some preferences remain browser-local and are not yet portable across devices.
 - Business Profile metrics cannot load until Google grants API quota.
