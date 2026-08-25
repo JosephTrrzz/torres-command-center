@@ -42,8 +42,11 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   if (input?.resend) {
     const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "magiclink", email, redirect_to: redirectTo }) });
     const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; msg?: string; message?: string };
-    if (!linkResponse.ok || !linkBody.action_link) return json({ error: linkBody.msg || linkBody.message || "Supabase could not generate an activation link. The client may need a new invitation." }, 502);
-    return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
+    if (linkResponse.ok && linkBody.action_link) return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
+    const inviteAgain = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
+    const inviteAgainBody = await inviteAgain.json().catch(() => ({})) as { msg?: string; message?: string };
+    if (inviteAgain.ok) return json({ invited: true, email, message: "The client does not have an account yet. A new activation invitation has been sent." });
+    return json({ error: inviteAgainBody.msg || inviteAgainBody.message || linkBody.msg || linkBody.message || "Supabase could not prepare an activation link." }, 502);
   }
 
   const inviteResponse = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
