@@ -1,4 +1,4 @@
-import type { AppRole, AuthSession, UserProfile } from "./types";
+import type { AppRole, AuthSession, AuthUser, UserProfile } from "./types";
 
 const SESSION_KEY = "torres-auth-session";
 
@@ -64,14 +64,19 @@ export async function createAuthSession(
     throw new Error("Supabase did not return a valid sign-in session.");
   }
 
+  return createAuthSessionFromTokens(auth.access_token, auth.refresh_token, auth.expires_at, { id: userId, email: auth.user?.email });
+}
+
+export async function createAuthSessionFromTokens(
+  accessToken: string,
+  refreshToken: string | undefined,
+  expiresAt: number | undefined,
+  user: AuthUser,
+): Promise<AuthSession> {
+  const { url, key } = getConfig();
   const profileResponse = await fetch(
-    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,email,full_name,role,client_id,active&limit=1`,
-    {
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${auth.access_token}`,
-      },
-    },
+    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,email,full_name,role,client_id,active&limit=1`,
+    { headers: { apikey: key, Authorization: `Bearer ${accessToken}` } },
   );
 
   if (!profileResponse.ok) throw new Error(await parseError(profileResponse));
@@ -86,10 +91,10 @@ export async function createAuthSession(
   }
 
   return {
-    access_token: auth.access_token,
-    refresh_token: auth.refresh_token,
-    expires_at: auth.expires_at,
-    user: { id: userId, email: auth.user?.email },
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_at: expiresAt,
+    user,
     profile,
   };
 }
