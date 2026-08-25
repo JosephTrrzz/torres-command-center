@@ -49,6 +49,6 @@ export function canAccessPath(role: AppRole, pathname: string) {
   if (role === "owner") return true;
   if (role === "customer") return matchesRoute(pathname, "/portal");
 
-  const employeeRoots = ["/clients", "/integrations", "/reports"];
+  const employeeRoots = ["/clients", "/integrations", "/reports", "/portal"];
   return pathname === "/" || employeeRoots.some((root) => matchesRoute(pathname, root));
 }
