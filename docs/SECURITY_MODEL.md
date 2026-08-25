@@ -31,6 +31,17 @@ Permissions, not labels, are the long-term contract. Default role permissions ar
 6. Perform privileged work server-side.
 7. Write an audit event and, when asynchronous, an outbox event.
 
+The current controlled cutover applies this sequence to Google connection/property routes, report data, team invitations, and customer invitations. A legacy profile fallback remains only for accounts without active organization memberships; once a membership is present, organization scope is authoritative.
+
+## Invitation lifecycle
+
+- Owners and administrators can invite agency team members through a server Function guarded by `organization.manage`.
+- Agency operators with `clients.manage` can invite customers only into client organizations they can access.
+- New memberships remain `invited` until the Supabase activation session is accepted.
+- Acceptance activates the membership, records the accepting user, updates the invitation lifecycle, and writes an audit event.
+- Raw action links are returned only to the authenticated administrator and are never stored in application tables.
+- Owner access cannot be granted through the ordinary invitation form.
+
 ## RLS invariants
 
 - A user cannot read another organization's records without a membership or explicit agency relationship.

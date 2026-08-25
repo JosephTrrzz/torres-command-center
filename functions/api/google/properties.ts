@@ -21,7 +21,7 @@ async function googleGet(url: string, accessToken: string) {
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
   const clientId = new URL(request.url).searchParams.get("client");
   if (!clientId || !/^[0-9a-f-]{36}$/i.test(clientId)) return json({ error: "Choose a valid client first." }, 400);
-  const auth = await requireAuth(request, env, { staffOnly: true });
+  const auth = await requireAuth(request, env, { staffOnly: true, clientId, permission: "integrations.read" });
   if ("response" in auth) return auth.response;
   const supabaseUrl = getSupabaseUrl(env);
   if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Google connection storage is not configured." }, 500);
@@ -54,7 +54,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
   const body = await request.json() as { clientId?: string; businessProfile?: string; searchConsole?: string; analytics?: string };
   if (!body.clientId || !/^[0-9a-f-]{36}$/i.test(body.clientId)) return json({ error: "Choose a valid client first." }, 400);
-  const auth = await requireAuth(request, env, { staffOnly: true });
+  const auth = await requireAuth(request, env, { staffOnly: true, clientId: body.clientId, permission: "integrations.manage" });
   if ("response" in auth) return auth.response;
   const supabaseUrl = getSupabaseUrl(env);
   if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Google connection storage is not configured." }, 500);

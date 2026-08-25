@@ -22,6 +22,8 @@ Status: in progress.
 - Preserve and map the existing profile/client authorization model.
 - Add a Today route powered only by real portfolio, report, and notification data.
 - Expand cross-tenant and permission tests before switching production reads to organization scope.
+- Cut protected Google, reports, and invitation Functions over to organization membership and permission checks with a temporary legacy fallback.
+- Replace placeholder team onboarding with server-backed invitations, membership activation, and audit events.
 
 ## Phase 2 — agency and client management
 

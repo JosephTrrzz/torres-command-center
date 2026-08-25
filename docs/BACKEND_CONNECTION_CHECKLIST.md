@@ -28,7 +28,9 @@ Use this checklist before calling a backend or provider production-ready.
 - [x] Service-role key stored as a Cloudflare secret.
 - [x] Auth, profiles, clients, portal accounts, Google mappings, and notifications live.
 - [x] Core RLS enabled.
-- [ ] Apply and verify `supabase/torres_os_foundation.sql`.
+- [x] Apply and verify `supabase/torres_os_foundation.sql`.
+- [x] Protect team/customer invitation mutation behind organization-aware Functions.
+- [x] Activate memberships only after an authenticated invitation session is accepted.
 - [ ] Add cross-tenant database tests for organization-owned tables.
 - [ ] Configure owner MFA policy.
 - [ ] Test backup restoration and account deletion/export procedures.

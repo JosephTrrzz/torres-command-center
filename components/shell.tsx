@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { APP_NAVIGATION, canAccessPath, defaultRouteForRole, roleLabel } from "../lib/access-control";
+import { APP_NAVIGATION, appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, organizationRoleLabel } from "../lib/access-control";
 import { clearAuthSession, readStoredSession } from "../lib/supabase-auth";
 import type { AuthSession } from "../lib/types";
 import { readProfileAvatar } from "./profile-picture-editor";
@@ -51,8 +51,9 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       setChecked(true);
       return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
     }
-    if (!canAccessPath(stored.profile.role, pathname || "/")) {
-      router.replace(defaultRouteForRole(stored.profile.role));
+    const effectiveRole = appRoleForOrganizationRole(stored.organization?.role, stored.profile.role);
+    if (!canAccessPath(effectiveRole, pathname || "/")) {
+      router.replace(defaultRouteForRole(effectiveRole));
       setChecked(true);
       return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
     }
@@ -87,15 +88,16 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     });
   };
   if (!checked || !session) return <main className="auth-loading" aria-live="polite">Opening your secure workspace…</main>;
-  const nav = APP_NAVIGATION[session.profile.role];
+  const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
+  const nav = APP_NAVIGATION[effectiveRole];
   const displayName = displayNameFor(session.profile);
   const avatar = initials(displayName);
-  const accessLabel = roleLabel(session.profile.role);
+  const accessLabel = organizationRoleLabel(session.organization?.role, session.profile.role);
   return <div className="app-shell">
     <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="brand"><span className="brand-mark">T</span><span>Torres <i>&amp; Co.</i></span></div>
-      <div className="workspace"><span className="workspace-avatar">TC</span><div><small>Workspace</small><strong>Torres &amp; Co. <b>⌄</b></strong></div></div>
-      <nav aria-label="Main navigation">{nav.map((item) => <Link onClick={() => setOpen(false)} className={active === item.label ? "active" : ""} aria-current={active === item.label ? "page" : undefined} href={item.href} key={item.label}><span className="nav-icon" aria-hidden="true">{item.label === "Today" ? "☼" : item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Portal" || item.label === "My account" ? "↗" : item.label === "Integrations" ? "✦" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && session.profile.role !== "customer" && clientCount > 0 && <em aria-label={`${clientCount} clients`}>{clientCount}</em>}</Link>)}</nav>
+      <div className="workspace"><span className="workspace-avatar">TC</span><div><small>Workspace</small><strong>{session.organization?.name || "Torres & Co."} <b>⌄</b></strong></div></div>
+      <nav aria-label="Main navigation">{nav.map((item) => <Link onClick={() => setOpen(false)} className={active === item.label ? "active" : ""} aria-current={active === item.label ? "page" : undefined} href={item.href} key={item.label}><span className="nav-icon" aria-hidden="true">{item.label === "Today" ? "☼" : item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Portal" || item.label === "My account" ? "↗" : item.label === "Integrations" ? "✦" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && effectiveRole !== "customer" && clientCount > 0 && <em aria-label={`${clientCount} clients`}>{clientCount}</em>}</Link>)}</nav>
       <div className="sidebar-bottom"><div className="profile">{avatarImage ? <img className="avatar avatar-image" src={avatarImage} alt="" /> : <span className="avatar">{avatar}</span>}<div><strong>{displayName}</strong><small>{accessLabel}</small></div><button className="logout-button" onClick={logout}>Log out</button></div></div>
     </aside>
     <main className="main">

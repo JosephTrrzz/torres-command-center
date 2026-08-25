@@ -1,11 +1,7 @@
 import { createNotification } from "../../_shared/notifications";
+import { getSupabaseUrl, requireAuth, type FunctionEnv } from "../../_shared/auth";
 
-interface Env {
-  SUPABASE_URL?: string;
-  NEXT_PUBLIC_SUPABASE_URL?: string;
-  SUPABASE_ANON_KEY?: string;
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
-  SUPABASE_SERVICE_ROLE_KEY?: string;
+interface Env extends FunctionEnv {
   PUBLIC_APP_URL?: string;
 }
 
@@ -14,31 +10,67 @@ function json(data: Record<string, unknown>, status = 200) {
 }
 
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
-  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
-  const anonKey = env.SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
-  const authorization = request.headers.get("Authorization") || "";
-  if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Customer onboarding is not configured." }, 500);
-  if (!authorization.startsWith("Bearer ")) return json({ error: "Sign in as a workspace administrator first." }, 401);
-
-  const caller = await fetch(`${supabaseUrl}/auth/v1/user`, { headers: { apikey: anonKey, Authorization: authorization } });
-  if (!caller.ok) return json({ error: "Your admin session has expired. Sign in again." }, 401);
-  const callerUser = await caller.json() as { id?: string };
-  if (!callerUser.id) return json({ error: "Unable to verify the admin session." }, 401);
-
-  const profileResponse = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(callerUser.id)}&select=role,active&limit=1`, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
-  const callerProfile = (await profileResponse.json() as Array<{ role?: string; active?: boolean }>)[0];
-  if (!profileResponse.ok || !callerProfile || !callerProfile.active || !["owner", "employee"].includes(callerProfile.role || "")) return json({ error: "Only workspace staff can invite customers." }, 403);
-
   const input = await request.json().catch(() => null) as { clientId?: string; email?: string; fullName?: string; resend?: boolean } | null;
   const clientId = input?.clientId || "";
   if (!/^[0-9a-f-]{36}$/i.test(clientId)) return json({ error: "A valid client is required." }, 400);
 
-  const clientResponse = await fetch(`${supabaseUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=name,email&limit=1`, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
-  const clientRows = await clientResponse.json().catch(() => []) as Array<{ name?: string; email?: string }>;
+  const auth = await requireAuth(request, env, { staffOnly: true, clientId, permission: "clients.manage" });
+  if ("response" in auth) return auth.response;
+
+  const supabaseUrl = getSupabaseUrl(env);
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!supabaseUrl || !serviceKey) return json({ error: "Customer onboarding is not configured." }, 500);
+
+  const clientResponse = await fetch(`${supabaseUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=name,email,organization_id&limit=1`, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
+  const clientRows = await clientResponse.json().catch(() => []) as Array<{ name?: string; email?: string; organization_id?: string | null }>;
   const email = input?.email?.trim().toLowerCase() || clientRows[0]?.email?.trim().toLowerCase() || "";
   const fullName = input?.fullName?.trim() || clientRows[0]?.name?.trim() || "";
+  const organizationId = clientRows[0]?.organization_id || null;
   if (!email) return json({ error: "This client needs a contact email before an activation link can be sent." }, 400);
+
+  const serviceHeaders = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" };
+  const recordOrganizationInvitation = async (userId?: string) => {
+    if (!organizationId) return;
+    const now = new Date().toISOString();
+    if (userId) {
+      const membershipStatusResponse = await fetch(`${supabaseUrl}/rest/v1/organization_memberships?organization_id=eq.${encodeURIComponent(organizationId)}&user_id=eq.${encodeURIComponent(userId)}&select=status,joined_at&limit=1`, { headers: serviceHeaders });
+      const membershipStatusRows = await membershipStatusResponse.json().catch(() => []) as Array<{ status?: string; joined_at?: string | null }>;
+      const membershipStatus = membershipStatusRows[0]?.status === "active" ? "active" : "invited";
+      await fetch(`${supabaseUrl}/rest/v1/organization_memberships?on_conflict=organization_id,user_id`, {
+        method: "POST",
+        headers: { ...serviceHeaders, Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ organization_id: organizationId, user_id: userId, role: "client", status: membershipStatus, invited_by: auth.context.userId, joined_at: membershipStatus === "active" ? membershipStatusRows[0]?.joined_at || now : null, updated_at: now }),
+      });
+      await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        headers: { ...serviceHeaders, Prefer: "return=minimal" },
+        body: JSON.stringify({ email, full_name: fullName, role: "customer", client_id: clientId, active: Boolean(existingProfileId) || membershipStatus === "active", default_organization_id: organizationId, updated_at: now }),
+      });
+    }
+    const pendingResponse = await fetch(`${supabaseUrl}/rest/v1/organization_invitations?organization_id=eq.${encodeURIComponent(organizationId)}&email=eq.${encodeURIComponent(email)}&status=eq.pending&select=id&limit=1`, { headers: serviceHeaders });
+    const pendingRows = await pendingResponse.json().catch(() => []) as Array<{ id?: string }>;
+    let invitationId = pendingRows[0]?.id;
+    if (invitationId) {
+      await fetch(`${supabaseUrl}/rest/v1/organization_invitations?id=eq.${encodeURIComponent(invitationId)}`, {
+        method: "PATCH",
+        headers: { ...serviceHeaders, Prefer: "return=minimal" },
+        body: JSON.stringify({ role: "client", invited_by: auth.context.userId, expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), updated_at: now }),
+      });
+    } else {
+      const invitationResponse = await fetch(`${supabaseUrl}/rest/v1/organization_invitations`, {
+        method: "POST",
+        headers: { ...serviceHeaders, Prefer: "return=representation" },
+        body: JSON.stringify({ organization_id: organizationId, email, role: "client", status: "pending", invited_by: auth.context.userId }),
+      });
+      const invitationRows = await invitationResponse.json().catch(() => []) as Array<{ id?: string }>;
+      invitationId = invitationRows[0]?.id;
+    }
+    await fetch(`${supabaseUrl}/rest/v1/audit_events`, {
+      method: "POST",
+      headers: { ...serviceHeaders, Prefer: "return=minimal" },
+      body: JSON.stringify({ organization_id: organizationId, actor_user_id: auth.context.userId, action: "organization.invitation.created", entity_type: "organization_invitation", entity_id: invitationId || null, metadata: { email, role: "client", client_id: clientId, invited_user_id: userId || null } }),
+    });
+  };
 
   // Keep an existing auth profile aligned before generating a resend link. This
   // matters when a client already has a Supabase account but was never assigned
@@ -61,7 +93,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   }
   const redirectTo = `${appUrl}/login/?returnTo=/portal/`;
   const notifyStaff = (message: string) => createNotification(env, {
-    userId: callerUser.id || "",
+    userId: auth.context.userId,
     clientId,
     type: "action",
     title: "Client activation ready",
@@ -80,18 +112,21 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "magiclink", email, redirect_to: redirectTo }) });
     const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; user?: { id?: string }; msg?: string; message?: string };
     if (linkResponse.ok && linkBody.action_link) {
+      await recordOrganizationInvitation(linkBody.user?.id || existingProfileId);
       await Promise.allSettled([notifyStaff(`${fullName || email} has a fresh portal activation link.`), notifyCustomer(linkBody.user?.id || existingProfileId)]);
       return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
     }
     const inviteLinkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "invite", email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
     const inviteLinkBody = await inviteLinkResponse.json().catch(() => ({})) as { action_link?: string; user?: { id?: string }; msg?: string; message?: string };
     if (inviteLinkResponse.ok && inviteLinkBody.action_link) {
+      await recordOrganizationInvitation(inviteLinkBody.user?.id || existingProfileId);
       await Promise.allSettled([notifyStaff(`${fullName || email} has a new portal activation link.`), notifyCustomer(inviteLinkBody.user?.id || existingProfileId)]);
       return json({ invited: true, email, activationLink: inviteLinkBody.action_link, message: "A new activation link is ready. Copy it and send it to the client." });
     }
     const inviteAgain = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
     const inviteAgainBody = await inviteAgain.json().catch(() => ({})) as { user?: { id?: string }; msg?: string; message?: string };
     if (inviteAgain.ok) {
+      await recordOrganizationInvitation(inviteAgainBody.user?.id || existingProfileId);
       await Promise.allSettled([notifyStaff(`${fullName || email} was sent a new portal invitation.`), notifyCustomer(inviteAgainBody.user?.id || existingProfileId)]);
       return json({ invited: true, email, message: "A new activation invitation was sent by email." });
     }
@@ -107,8 +142,9 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     userId = existingProfileId;
   }
   if (userId) {
-    await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ email, full_name: fullName, role: "customer", client_id: clientId, active: true, updated_at: new Date().toISOString() }) });
+    await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ email, full_name: fullName, role: "customer", client_id: clientId, active: Boolean(existingProfileId), updated_at: new Date().toISOString() }) });
   }
+  await recordOrganizationInvitation(userId);
 
   const accountResponse = await fetch(`${supabaseUrl}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ client_id: clientId, portal_email: email, portal_enabled: true, portal_status: "invited", billing_email: email, billing_status: "not_connected", updated_at: new Date().toISOString() }) });
   if (!accountResponse.ok) return json({ error: "Invitation sent, but the customer portal account could not be saved." }, 502);

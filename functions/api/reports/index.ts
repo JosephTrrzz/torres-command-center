@@ -47,7 +47,7 @@ async function getAccessToken(connection: Connection, clientId: string, env: Env
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
   const clientId = new URL(request.url).searchParams.get("client");
   if (!clientId || !/^[0-9a-f-]{36}$/i.test(clientId)) return json({ error: "Choose a valid client first." }, 400);
-  const auth = await requireAuth(request, env, { clientId });
+  const auth = await requireAuth(request, env, { clientId, permission: "reports.read" });
   if ("response" in auth) return auth.response;
   const supabaseUrl = getSupabaseUrl(env);
   if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Report storage is not configured." }, 500);

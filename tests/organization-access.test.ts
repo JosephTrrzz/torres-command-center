@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { appRoleForOrganizationRole, organizationRoleLabel } from "../lib/access-control";
 import { canOrganizationRole, legacyRoleToOrganizationRole } from "../lib/organization-access";
 
 describe("organization access", () => {
@@ -23,5 +24,12 @@ describe("organization access", () => {
     expect(canOrganizationRole("viewer", "clients.read")).toBe(true);
     expect(canOrganizationRole("viewer", "reports.export")).toBe(false);
     expect(canOrganizationRole("viewer", "integrations.manage")).toBe(false);
+  });
+
+  it("maps organization roles to safe application shells", () => {
+    expect(appRoleForOrganizationRole("admin", "employee")).toBe("owner");
+    expect(appRoleForOrganizationRole("operator", "owner")).toBe("employee");
+    expect(appRoleForOrganizationRole("client", "owner")).toBe("customer");
+    expect(organizationRoleLabel("viewer", "employee")).toBe("Viewer");
   });
 });

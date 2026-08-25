@@ -19,7 +19,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const clientId = new URL(request.url).searchParams.get("client");
   if (!clientId || !/^[0-9a-f-]{36}$/i.test(clientId)) return json({ connected: false }, 400);
 
-  const auth = await requireAuth(request, env, { staffOnly: true });
+  const auth = await requireAuth(request, env, { staffOnly: true, clientId, permission: "integrations.read" });
   if ("response" in auth) return auth.response;
   const supabaseUrl = getSupabaseUrl(env);
   if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ connected: false, configured: false }, 200);

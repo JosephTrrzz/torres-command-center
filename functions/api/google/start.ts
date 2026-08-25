@@ -31,7 +31,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const clientId = requestUrl.searchParams.get("client");
   const appUrl = env.PUBLIC_APP_URL || "https://torres-command-center-app.pages.dev";
   if (!clientId || !/^[0-9a-f-]{36}$/i.test(clientId)) return redirect(`${appUrl}/integrations/?error=Choose%20a%20client%20before%20connecting%20Google`);
-  const authz = await requireAuth(request, env, { staffOnly: true });
+  const authz = await requireAuth(request, env, { staffOnly: true, clientId, permission: "integrations.manage" });
   if ("response" in authz) {
     if (request.headers.get("Accept")?.includes("application/json")) return authz.response;
     return redirect(`${appUrl}/login/?returnTo=/integrations/&error=Sign%20in%20before%20connecting%20Google`);

@@ -32,7 +32,7 @@ profiles ── client_id ──> clients <── client_id ── client_people
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
 
-The additive Torres OS migration in [`torres_os_foundation.sql`](./torres_os_foundation.sql) introduces normalized organizations without removing the current `profiles.role` and `profiles.client_id` access model. That legacy model remains authoritative until the application and RLS cutover is separately verified.
+The additive Torres OS migration in [`torres_os_foundation.sql`](./torres_os_foundation.sql) introduces normalized organizations without removing the current `profiles.role` and `profiles.client_id` access model. Active organization memberships are authoritative in the protected Google, reports, and invitation Functions. Legacy profile fields remain a temporary fallback for accounts that have not been migrated yet.
 
 ## What an empty table means
 

@@ -1,6 +1,17 @@
 export type Trend = "up" | "down" | "flat";
 export type HealthStatus = "healthy" | "watch" | "attention";
 export type AppRole = "owner" | "employee" | "customer";
+export type OrganizationRole = "owner" | "admin" | "operator" | "member" | "viewer" | "client";
+export type OrganizationKind = "agency" | "client";
+
+export interface OrganizationAccess {
+  id: string;
+  name: string;
+  slug: string;
+  kind: OrganizationKind;
+  role: OrganizationRole;
+  permissions: string[];
+}
 
 export interface UserProfile {
   id: string;
@@ -8,6 +19,7 @@ export interface UserProfile {
   full_name: string;
   role: AppRole;
   client_id: string | null;
+  default_organization_id?: string | null;
   active: boolean;
 }
 
@@ -22,6 +34,7 @@ export interface AuthSession {
   expires_at?: number;
   user: AuthUser;
   profile: UserProfile;
+  organization?: OrganizationAccess;
 }
 
 export interface Metric { label: string; value: string; change: string; trend: Trend; }

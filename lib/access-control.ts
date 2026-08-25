@@ -1,4 +1,4 @@
-import type { AppRole } from "./types";
+import type { AppRole, OrganizationRole } from "./types";
 
 export interface NavigationItem {
   href: string;
@@ -30,6 +30,18 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
 
 export function roleLabel(role: AppRole) {
   return role === "owner" ? "Owner" : role === "employee" ? "Team member" : "Customer";
+}
+
+export function appRoleForOrganizationRole(role: OrganizationRole | undefined, legacyRole: AppRole): AppRole {
+  if (!role) return legacyRole;
+  if (role === "owner" || role === "admin") return "owner";
+  if (role === "client") return "customer";
+  return "employee";
+}
+
+export function organizationRoleLabel(role: OrganizationRole | undefined, legacyRole: AppRole) {
+  if (!role) return roleLabel(legacyRole);
+  return role === "owner" ? "Owner" : role === "admin" ? "Administrator" : role === "operator" ? "Operator" : role === "member" ? "Team member" : role === "viewer" ? "Viewer" : "Client";
 }
 
 export function defaultRouteForRole(role: AppRole) {

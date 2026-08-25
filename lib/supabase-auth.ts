@@ -1,4 +1,5 @@
-import type { AppRole, AuthSession, AuthUser, UserProfile } from "./types";
+import { ROLE_PERMISSIONS } from "./organization-access";
+import type { AppRole, AuthSession, AuthUser, OrganizationAccess, OrganizationKind, OrganizationRole, UserProfile } from "./types";
 
 const SESSION_KEY = "torres-auth-session";
 
@@ -38,8 +39,47 @@ function isProfile(value: unknown): value is UserProfile {
     typeof profile.full_name === "string" &&
     isRole(profile.role) &&
     (typeof profile.client_id === "string" || profile.client_id === null) &&
+    (typeof profile.default_organization_id === "string" || profile.default_organization_id === null || profile.default_organization_id === undefined) &&
     typeof profile.active === "boolean"
   );
+}
+
+function isOrganizationRole(value: unknown): value is OrganizationRole {
+  return ["owner", "admin", "operator", "member", "viewer", "client"].includes(String(value));
+}
+
+function isOrganizationKind(value: unknown): value is OrganizationKind {
+  return value === "agency" || value === "client";
+}
+
+type MembershipRow = {
+  organization_id?: unknown;
+  role?: unknown;
+  status?: unknown;
+  organizations?: {
+    id?: unknown;
+    name?: unknown;
+    slug?: unknown;
+    kind?: unknown;
+    status?: unknown;
+  } | null;
+};
+
+function organizationFromMemberships(rows: MembershipRow[], defaultOrganizationId?: string | null): OrganizationAccess | undefined {
+  const active = rows.filter((row) => row.status === "active" && isOrganizationRole(row.role) && row.organizations?.status === "active");
+  const selected = active.find((row) => row.organization_id === defaultOrganizationId)
+    ?? active.find((row) => row.organizations?.kind === "agency")
+    ?? active[0];
+  const organization = selected?.organizations;
+  if (!selected || !organization || typeof organization.id !== "string" || typeof organization.name !== "string" || typeof organization.slug !== "string" || !isOrganizationKind(organization.kind) || !isOrganizationRole(selected.role)) return undefined;
+  return {
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    kind: organization.kind,
+    role: selected.role,
+    permissions: [...ROLE_PERMISSIONS[selected.role]],
+  };
 }
 
 export async function createAuthSession(
@@ -75,7 +115,7 @@ export async function createAuthSessionFromTokens(
 ): Promise<AuthSession> {
   const { url, key } = getConfig();
   const profileResponse = await fetch(
-    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,email,full_name,role,client_id,active&limit=1`,
+    `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,email,full_name,role,client_id,default_organization_id,active&limit=1`,
     { headers: { apikey: key, Authorization: `Bearer ${accessToken}` } },
   );
 
@@ -90,12 +130,23 @@ export async function createAuthSessionFromTokens(
     throw new Error("This account is inactive. Contact Torres & Co. for access.");
   }
 
+  let organization: OrganizationAccess | undefined;
+  const membershipResponse = await fetch(
+    `${url}/rest/v1/organization_memberships?user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&select=organization_id,role,status,organizations!inner(id,name,slug,kind,status)`,
+    { headers: { apikey: key, Authorization: `Bearer ${accessToken}` } },
+  );
+  if (membershipResponse.ok) {
+    const memberships = await membershipResponse.json().catch(() => []) as MembershipRow[];
+    organization = organizationFromMemberships(memberships, profile.default_organization_id);
+  }
+
   return {
     access_token: accessToken,
     refresh_token: refreshToken,
     expires_at: expiresAt,
     user,
     profile,
+    organization,
   };
 }
 

@@ -66,6 +66,8 @@
 .modal-close{position:absolute;right:18px;top:12px;border:0;background:transparent;font-size:28px;cursor:pointer;color:var(--muted)}
 .inline-form{display:grid;gap:14px;margin-top:20px}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+.activation-link-panel{display:grid;gap:16px;margin-top:20px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--cream)}
+.activation-link-panel>div:first-child{display:grid;gap:3px}.activation-link-panel span{font:600 9px "DM Mono",monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--green)}.activation-link-panel small{color:var(--muted)}
 @media(max-width:1050px){.admin-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.settings-grid-2,.settings-form-grid{grid-template-columns:1fr}.settings-section-head,.danger-zone{display:grid}.admin-action-grid{grid-template-columns:1fr}.customer-row{grid-template-columns:1fr auto}.customer-row .row-actions{grid-column:1/-1}}
 .integration-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);align-items:end;gap:1.5rem;margin-bottom:1rem}

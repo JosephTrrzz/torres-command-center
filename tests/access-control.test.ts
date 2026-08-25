@@ -48,6 +48,19 @@ describe("role access control", () => {
     expect(canAccessClient({ role: "customer", clientId: null }, "client-a")).toBe(false);
   });
 
+  it("uses organization memberships as the authoritative client boundary", () => {
+    const agencyMembership = [{ organizationId: "agency-1", role: "operator" as const, kind: "agency" as const, parentOrganizationId: null, legacyClientId: null }];
+    const clientMembership = [{ organizationId: "client-org-1", role: "client" as const, kind: "client" as const, parentOrganizationId: "agency-1", legacyClientId: "client-1" }];
+    const target = { id: "client-org-1", parentOrganizationId: "agency-1", legacyClientId: "client-1" };
+    const otherTarget = { id: "client-org-2", parentOrganizationId: "agency-1", legacyClientId: "client-2" };
+
+    expect(canAccessClient({ role: "employee", clientId: null, memberships: agencyMembership }, "client-1", target)).toBe(true);
+    expect(canAccessClient({ role: "customer", clientId: "client-1", memberships: clientMembership }, "client-1", target)).toBe(true);
+    expect(canAccessClient({ role: "customer", clientId: null, memberships: clientMembership }, "client-2", otherTarget)).toBe(false);
+    expect(canAccessClient({ role: "customer", clientId: "client-2", memberships: clientMembership }, "client-2", otherTarget)).toBe(false);
+    expect(canAccessClient({ role: "employee", clientId: null, memberships: agencyMembership }, "client-1", null)).toBe(false);
+  });
+
   it("builds user-scoped notifications without undefined database fields", () => {
     expect(buildNotificationInsert({
       userId: "user-1",

@@ -8,7 +8,7 @@ Updated 2026-08-25.
 | --- | --- | --- |
 | Custom admin domain | Live | `admin.torrescotechnology.com` serves the Cloudflare Pages app. |
 | Authentication | Live | Supabase sign-in, password reset, role loading, and protected routes work. |
-| Legacy authorization | Live | Owner, employee, and customer route rules plus core RLS policies. |
+| Organization authorization | Live cutover | Active memberships and role permissions now drive shell access and protected Google/report/customer-invite Functions, with legacy profile fallback for unmigrated accounts. |
 | Client management | Live foundation | Create/edit clients, contacts, portal settings, and activation links. |
 | Customer portal | Live foundation | Customer-scoped portal and agency preview entry point. |
 | Notifications | Live foundation | Persisted rows, RLS, popover states, mark-read, and onboarding producers. |
@@ -22,17 +22,17 @@ Updated 2026-08-25.
 ## Phase status
 
 - Phase 0 repository audit: complete.
-- Phase 1 foundation: in progress; the organization/RBAC/audit/outbox migration and real-data Today experience are live in production and verified. Legacy authorization remains active during the controlled cutover.
+- Phase 1 foundation: in progress; the organization/RBAC/audit/outbox migration, real-data Today experience, organization-aware authorization, and server-backed team/customer invitations are implemented. Legacy profile fields remain as a compatibility fallback during the controlled cutover.
 - Phases 2–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-25: 14 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the new `/today/` operating brief. Cloudflare deployed commit `3d56f33` to production. The atomic Supabase migration completed successfully and verification returned 3 organizations, 2 organization memberships, 10 permissions, and 39 role-permission mappings. All 8 new foundation tables have RLS enabled with 11 policies, and the organization linkage columns exist on both `clients` and `profiles`.
+On 2026-08-25: 16 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the new `/today/` operating brief. The atomic Supabase migration completed successfully and verification returned 3 organizations, 2 organization memberships, 10 permissions, and 39 role-permission mappings. All 8 new foundation tables have RLS enabled with 11 policies, and the organization linkage columns exist on both `clients` and `profiles`. The authorization cutover adds organization membership resolution, permission checks on protected Functions, server-backed team invitations, customer membership creation, invitation acceptance, and audit events.
 
 ## Known limitations
 
-- Tenant authorization still primarily uses `profiles.role` and `profiles.client_id` while the live organization model runs in parallel during the controlled cutover.
-- Team invitation controls in Settings are not yet a complete server-backed workflow.
+- Some legacy routes and browser data helpers still use `profiles.role` and `profiles.client_id`; protected Google, reports, and invitation Functions now prefer organization memberships and retain a compatibility fallback for unmigrated accounts.
+- Invitation links are generated securely by Supabase and presented to an administrator for delivery; branded transactional email delivery is not yet configured.
 - Some preferences remain browser-local and are not yet portable across devices.
 - Business Profile metrics cannot load until Google grants API quota.
 - CRM, jobs, communications, AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
