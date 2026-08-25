@@ -1,0 +1,49 @@
+# Supabase data guide
+
+Supabase is the Command Center's database, authentication, and protected data layer. The app is the normal place to create clients, invite customers, add contacts, connect Google, and change portal settings. The Supabase Table Editor is mainly for inspection and carefully correcting data.
+
+## What the tables mean
+
+| Table | Plain-language purpose | Normal place to manage it |
+| --- | --- | --- |
+| `clients` | One row for each business you manage. Contains the business name, industry, address, website, contact details, and health score. | Command Center → Clients |
+| `client_people` | Optional people/contacts at a business. These are not login accounts. | Client detail → Contacts |
+| `profiles` | Application users and access rules. Connects a Supabase Auth user to an owner, employee, or customer role and, for customers, to a client. | Settings/access and onboarding flow |
+| `customer_accounts` | Client portal activation status and billing status. | Client onboarding/settings |
+| `google_connections` | Private Google OAuth connection and the selected Business Profile, Search Console, and GA4 resources. | Integrations |
+
+## How the records connect
+
+```text
+profiles ── client_id ──> clients <── client_id ── client_people
+                              │
+                              ├── client_id ── customer_accounts
+                              └── client_id ── google_connections
+```
+
+The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
+
+## What an empty table means
+
+An empty `client_people` table simply means no contacts have been added yet. It does not mean the client record or client portal is broken. Add a contact from the client detail page when you have a real person to record.
+
+## Safe onboarding order
+
+1. Create the business in **Clients**.
+2. Add the client's real contacts, if needed.
+3. Send the activation link and let the client create their portal access.
+4. Confirm the customer's `profiles` row is assigned to the correct `client_id`.
+5. Connect Google from **Integrations** and map only that client's resources.
+6. Open **Reports** and verify the saved mapping and live metrics.
+
+## Important safety rules
+
+- Do not edit or expose `access_token` or `refresh_token` in `google_connections`.
+- Do not manually change a customer's `role`, `client_id`, `active`, `portal_enabled`, or `portal_status` unless you are intentionally correcting access and understand the effect.
+- Do not delete a `clients` row casually; related contacts, portal settings, and Google mappings reference it.
+- Never store passwords, API keys, OAuth secrets, or invitation tokens in contact notes.
+- Use the app for normal changes so validation and access controls run consistently.
+
+## Add descriptions inside Supabase
+
+Run [`schema_descriptions.sql`](./schema_descriptions.sql) in **Supabase → SQL Editor → New query**. It adds table and column comments only; it does not change rows, policies, authentication, or application behavior.
