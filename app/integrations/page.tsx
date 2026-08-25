@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
 import { BrandSelect } from "../../components/brand-select";
 import { fetchClients } from "../../lib/supabase-data";
+import { readStoredSession } from "../../lib/supabase-auth";
 import { ClientDetail } from "../../lib/types";
 
 type IntegrationDefinition = { id: string; name: string; category: string; icon: string; description: string; proof: string; unlocks: string[]; requirements: string[] };
@@ -77,7 +78,8 @@ export default function IntegrationsPage() {
     let active = true;
     setGoogleLoading(true);
     setGoogleProperties(null);
-    fetch(`/api/google/status?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store" })
+    const session = readStoredSession();
+    fetch(`/api/google/status?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store", headers: { Authorization: `Bearer ${session?.access_token ?? ""}` } })
       .then((response) => response.ok ? response.json() : { connected: false })
       .then((status: { connected?: boolean; googleEmail?: string }) => {
         if (!active) return;
@@ -94,7 +96,8 @@ export default function IntegrationsPage() {
     setPropertiesLoading(true);
     setPropertiesMessage("");
     try {
-      const response = await fetch(`/api/google/properties?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store" });
+      const session = readStoredSession();
+      const response = await fetch(`/api/google/properties?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store", headers: { Authorization: `Bearer ${session?.access_token ?? ""}` } });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Google properties could not be loaded.");
       setGoogleProperties(payload);
@@ -110,7 +113,8 @@ export default function IntegrationsPage() {
     if (!selectedClientId) return;
     setPropertiesLoading(true);
     try {
-      const response = await fetch("/api/google/properties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: selectedClientId, ...propertySelection }) });
+      const session = readStoredSession();
+      const response = await fetch("/api/google/properties", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: selectedClientId, ...propertySelection }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Google property selections could not be saved.");
       setPropertiesMessage("Google property mapping saved. Reports can use these resources after metric sync is enabled.");
@@ -135,7 +139,14 @@ export default function IntegrationsPage() {
   };
   const connectGoogle = () => {
     if (!selectedClientId) { setNotice("Choose a client first so Google is connected to the correct account."); return; }
-    window.location.href = `/api/google/start?client=${encodeURIComponent(selectedClientId)}`;
+    const session = readStoredSession();
+    void fetch(`/api/google/start?client=${encodeURIComponent(selectedClientId)}`, { headers: { Authorization: `Bearer ${session?.access_token ?? ""}`, Accept: "application/json" }, credentials: "same-origin" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as { authorizationUrl?: string; error?: string };
+        if (!response.ok || !payload.authorizationUrl) throw new Error(payload.error || "Google authorization could not be started.");
+        window.location.assign(payload.authorizationUrl);
+      })
+      .catch((error) => setNotice(error instanceof Error ? error.message : "Google authorization could not be started."));
   };
 
   return <Shell active="Integrations">

@@ -1,3 +1,5 @@
+import { requireAuth, getSupabaseUrl } from "../../_shared/auth";
+
 interface Env {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -17,7 +19,9 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const clientId = new URL(request.url).searchParams.get("client");
   if (!clientId || !/^[0-9a-f-]{36}$/i.test(clientId)) return json({ connected: false }, 400);
 
-  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+  const auth = await requireAuth(request, env, { staffOnly: true });
+  if ("response" in auth) return auth.response;
+  const supabaseUrl = getSupabaseUrl(env);
   if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ connected: false, configured: false }, 200);
 
   const response = await fetch(`${supabaseUrl}/rest/v1/google_connections?client_id=eq.${encodeURIComponent(clientId)}&select=google_email,access_token,refresh_token,expires_at,scopes,updated_at`, {

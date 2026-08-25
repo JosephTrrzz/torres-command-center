@@ -6,6 +6,7 @@ import { ClientCard } from "../components/client-card";
 import { Shell } from "../components/shell";
 import { fetchClients } from "../lib/supabase-data";
 import { ClientDetail } from "../lib/types";
+import { readStoredSession } from "../lib/supabase-auth";
 
 type OverviewReport = { clientId: string; analytics?: { totals?: { sessions: number } } | null; searchConsole?: { totals?: { clicks: number; impressions: number } } | null };
 
@@ -19,10 +20,11 @@ export default function DashboardPage() {
   const totals = useMemo(() => reportData.reduce((sum, report) => ({ sessions: sum.sessions + (report.analytics?.totals?.sessions || 0), clicks: sum.clicks + (report.searchConsole?.totals?.clicks || 0), impressions: sum.impressions + (report.searchConsole?.totals?.impressions || 0) }), { sessions: 0, clicks: 0, impressions: 0 }), [reportData]);
 
   useEffect(() => {
+    const session = readStoredSession();
     fetchClients().then(async (loadedClients) => {
       setClients(loadedClients);
       const results = await Promise.all(loadedClients.map(async (client) => {
-        try { const response = await fetch(`/api/reports?client=${encodeURIComponent(client.id)}`, { cache: "no-store" }); return response.ok ? await response.json() as OverviewReport : { clientId: client.id }; }
+        try { const response = await fetch(`/api/reports?client=${encodeURIComponent(client.id)}`, { cache: "no-store", headers: { Authorization: `Bearer ${session?.access_token ?? ""}` } }); return response.ok ? await response.json() as OverviewReport : { clientId: client.id }; }
         catch { return { clientId: client.id }; }
       }));
       setReportData(results);

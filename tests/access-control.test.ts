@@ -4,6 +4,8 @@ import {
   defaultRouteForRole,
   isSafeReturnTo,
 } from "../lib/access-control";
+import { canAccessClient } from "../functions/_shared/auth";
+import { buildNotificationInsert } from "../functions/_shared/notifications";
 
 describe("role access control", () => {
   it("keeps customers inside their portal", () => {
@@ -34,5 +36,30 @@ describe("role access control", () => {
   it("does not treat similar route names as protected routes", () => {
     expect(canAccessPath("employee", "/clients-archive/")).toBe(false);
     expect(canAccessPath("customer", "/login-legacy/")).toBe(false);
+  });
+
+  it("enforces client isolation at the Function boundary", () => {
+    expect(canAccessClient({ role: "owner", clientId: null }, "client-b")).toBe(true);
+    expect(canAccessClient({ role: "employee", clientId: null }, "client-b")).toBe(true);
+    expect(canAccessClient({ role: "customer", clientId: "client-a" }, "client-a")).toBe(true);
+    expect(canAccessClient({ role: "customer", clientId: "client-a" }, "client-b")).toBe(false);
+    expect(canAccessClient({ role: "customer", clientId: null }, "client-a")).toBe(false);
+  });
+
+  it("builds user-scoped notifications without undefined database fields", () => {
+    expect(buildNotificationInsert({
+      userId: "user-1",
+      clientId: "client-1",
+      type: "action",
+      title: "  Client activation ready  ",
+      body: "  A client can activate their portal.  ",
+    })).toEqual({
+      user_id: "user-1",
+      client_id: "client-1",
+      type: "action",
+      title: "Client activation ready",
+      body: "A client can activate their portal.",
+      href: null,
+    });
   });
 });

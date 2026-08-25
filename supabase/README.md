@@ -11,6 +11,7 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `profiles` | Application users and access rules. Connects a Supabase Auth user to an owner, employee, or customer role and, for customers, to a client. | Settings/access and onboarding flow |
 | `customer_accounts` | Client portal activation status and billing status. | Client onboarding/settings |
 | `google_connections` | Private Google OAuth connection and the selected Business Profile, Search Console, and GA4 resources. | Integrations |
+| `notifications` | User-specific workspace activity, such as a client activation link becoming ready. Read state is stored per user. | Notification bell in the app header |
 
 ## How the records connect
 
@@ -18,7 +19,8 @@ Supabase is the Command Center's database, authentication, and protected data la
 profiles ── client_id ──> clients <── client_id ── client_people
                               │
                               ├── client_id ── customer_accounts
-                              └── client_id ── google_connections
+                              ├── client_id ── google_connections
+                              └── client_id ── notifications <── user_id ── auth.users
 ```
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
@@ -42,6 +44,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Do not manually change a customer's `role`, `client_id`, `active`, `portal_enabled`, or `portal_status` unless you are intentionally correcting access and understand the effect.
 - Do not delete a `clients` row casually; related contacts, portal settings, and Google mappings reference it.
 - Never store passwords, API keys, OAuth secrets, or invitation tokens in contact notes.
+- Do not insert shared notifications without a specific `user_id`; every notification belongs to one authenticated user.
 - Use the app for normal changes so validation and access controls run consistently.
 
 ## Add descriptions inside Supabase

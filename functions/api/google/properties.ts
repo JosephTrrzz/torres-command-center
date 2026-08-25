@@ -1,3 +1,5 @@
+import { requireAuth, getSupabaseUrl } from "../../_shared/auth";
+
 interface Env {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -19,7 +21,9 @@ async function googleGet(url: string, accessToken: string) {
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
   const clientId = new URL(request.url).searchParams.get("client");
   if (!clientId || !/^[0-9a-f-]{36}$/i.test(clientId)) return json({ error: "Choose a valid client first." }, 400);
-  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+  const auth = await requireAuth(request, env, { staffOnly: true });
+  if ("response" in auth) return auth.response;
+  const supabaseUrl = getSupabaseUrl(env);
   if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Google connection storage is not configured." }, 500);
 
   const connectionResponse = await fetch(`${supabaseUrl}/rest/v1/google_connections?client_id=eq.${encodeURIComponent(clientId)}&select=access_token,google_email,scopes`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
@@ -50,7 +54,9 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
   const body = await request.json() as { clientId?: string; businessProfile?: string; searchConsole?: string; analytics?: string };
   if (!body.clientId || !/^[0-9a-f-]{36}$/i.test(body.clientId)) return json({ error: "Choose a valid client first." }, 400);
-  const supabaseUrl = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+  const auth = await requireAuth(request, env, { staffOnly: true });
+  if ("response" in auth) return auth.response;
+  const supabaseUrl = getSupabaseUrl(env);
   if (!supabaseUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Google connection storage is not configured." }, 500);
   const response = await fetch(`${supabaseUrl}/rest/v1/google_connections?client_id=eq.${encodeURIComponent(body.clientId)}`, { method: "PATCH", headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ business_profile_location: body.businessProfile || null, search_console_site: body.searchConsole || null, analytics_property: body.analytics || null, updated_at: new Date().toISOString() }) });
   if (!response.ok) return json({ error: "The Google property selections could not be saved." }, 500);

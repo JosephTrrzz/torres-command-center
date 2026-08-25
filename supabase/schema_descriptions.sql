@@ -113,3 +113,24 @@ comment on column public.google_connections.created_at is
   'Timestamp when the Google connection was first saved.';
 comment on column public.google_connections.updated_at is
   'Timestamp when the Google connection or mapped properties were last changed.';
+
+comment on table public.notifications is
+  'User-specific Command Center activity shown in the header notification bell. Each row is visible only to its assigned authenticated user.';
+comment on column public.notifications.id is
+  'Stable unique ID for the notification.';
+comment on column public.notifications.user_id is
+  'Authenticated user who can read and update this notification.';
+comment on column public.notifications.client_id is
+  'Optional client related to this activity.';
+comment on column public.notifications.type is
+  'Visual category: insight, action, report, or system.';
+comment on column public.notifications.title is
+  'Short notification heading.';
+comment on column public.notifications.body is
+  'Plain-language activity description. Do not store secrets or activation tokens here.';
+comment on column public.notifications.href is
+  'Optional internal Command Center path opened when the notification is selected.';
+comment on column public.notifications.read_at is
+  'Time the user marked the notification as read; blank means unread.';
+comment on column public.notifications.created_at is
+  'Timestamp when the notification was created.';

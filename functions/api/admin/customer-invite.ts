@@ -1,3 +1,5 @@
+import { createNotification } from "../../_shared/notifications";
+
 interface Env {
   SUPABASE_URL?: string;
   NEXT_PUBLIC_SUPABASE_URL?: string;
@@ -58,16 +60,41 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     appUrl = requestOrigin;
   }
   const redirectTo = `${appUrl}/login/?returnTo=/portal/`;
+  const notifyStaff = (message: string) => createNotification(env, {
+    userId: callerUser.id || "",
+    clientId,
+    type: "action",
+    title: "Client activation ready",
+    body: message,
+    href: `/clients/detail/?id=${encodeURIComponent(clientId)}`,
+  });
+  const notifyCustomer = (userId: string | undefined) => userId ? createNotification(env, {
+    userId,
+    clientId,
+    type: "action",
+    title: "Your Torres & Co. portal is ready",
+    body: "Activate your account to review reports and manage your business profile.",
+    href: "/portal/",
+  }) : Promise.resolve(false);
   if (input?.resend) {
     const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "magiclink", email, redirect_to: redirectTo }) });
-    const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; msg?: string; message?: string };
-    if (linkResponse.ok && linkBody.action_link) return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
+    const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; user?: { id?: string }; msg?: string; message?: string };
+    if (linkResponse.ok && linkBody.action_link) {
+      await Promise.allSettled([notifyStaff(`${fullName || email} has a fresh portal activation link.`), notifyCustomer(linkBody.user?.id || existingProfileId)]);
+      return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
+    }
     const inviteLinkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "invite", email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
-    const inviteLinkBody = await inviteLinkResponse.json().catch(() => ({})) as { action_link?: string; msg?: string; message?: string };
-    if (inviteLinkResponse.ok && inviteLinkBody.action_link) return json({ invited: true, email, activationLink: inviteLinkBody.action_link, message: "A new activation link is ready. Copy it and send it to the client." });
+    const inviteLinkBody = await inviteLinkResponse.json().catch(() => ({})) as { action_link?: string; user?: { id?: string }; msg?: string; message?: string };
+    if (inviteLinkResponse.ok && inviteLinkBody.action_link) {
+      await Promise.allSettled([notifyStaff(`${fullName || email} has a new portal activation link.`), notifyCustomer(inviteLinkBody.user?.id || existingProfileId)]);
+      return json({ invited: true, email, activationLink: inviteLinkBody.action_link, message: "A new activation link is ready. Copy it and send it to the client." });
+    }
     const inviteAgain = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
-    const inviteAgainBody = await inviteAgain.json().catch(() => ({})) as { msg?: string; message?: string };
-    if (inviteAgain.ok) return json({ invited: true, email, message: "A new activation invitation was sent by email." });
+    const inviteAgainBody = await inviteAgain.json().catch(() => ({})) as { user?: { id?: string }; msg?: string; message?: string };
+    if (inviteAgain.ok) {
+      await Promise.allSettled([notifyStaff(`${fullName || email} was sent a new portal invitation.`), notifyCustomer(inviteAgainBody.user?.id || existingProfileId)]);
+      return json({ invited: true, email, message: "A new activation invitation was sent by email." });
+    }
     return json({ error: inviteAgainBody.msg || inviteAgainBody.message || inviteLinkBody.msg || inviteLinkBody.message || linkBody.msg || linkBody.message || "Supabase could not prepare an activation link." }, 502);
   }
 
@@ -85,5 +112,9 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   const accountResponse = await fetch(`${supabaseUrl}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ client_id: clientId, portal_email: email, portal_enabled: true, portal_status: "invited", billing_email: email, billing_status: "not_connected", updated_at: new Date().toISOString() }) });
   if (!accountResponse.ok) return json({ error: "Invitation sent, but the customer portal account could not be saved." }, 502);
+  await Promise.allSettled([
+    notifyStaff(inviteResponse.ok ? `${fullName || email} was invited to activate their client portal.` : `${fullName || email}'s client portal is ready for activation.`),
+    notifyCustomer(userId),
+  ]);
   return json({ invited: inviteResponse.ok, email, message: inviteResponse.ok ? "Customer portal account created and activation email sent." : "Customer portal account is ready. Use Send activation link on this client to generate a fresh link." });
 };
