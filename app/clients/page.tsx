@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ClientCard } from "../../components/client-card";
 import { Shell } from "../../components/shell";
 import { createClient, fetchClients, updateClient } from "../../lib/supabase-data";
+import { readStoredSession } from "../../lib/supabase-auth";
 import { ClientDetail } from "../../lib/types";
 
 export default function ClientsPage() {
@@ -49,13 +50,20 @@ export default function ClientsPage() {
         const created = await createClient(input);
         setMessage("Client added successfully");
         const row = created?.[0];
-        if (row?.id) setOnboarding({
+        if (row?.id) {
+          const session = readStoredSession();
+          const inviteResponse = await fetch("/api/admin/customer-invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: row.id, email: input.email, fullName: input.name }) });
+          const inviteBody = await inviteResponse.json().catch(() => ({}));
+          if (!inviteResponse.ok) throw new Error(inviteBody.error || "Client was created, but the portal invitation could not be prepared.");
+          setMessage(inviteBody.message || "Client and portal invitation created successfully");
+          setOnboarding({
           id: row.id, name: input.name, initials: input.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
           industry: input.industry, location: input.location, website: input.website, email: input.email, phone: input.phone,
           health: input.health_score, status: input.health_score >= 80 ? "healthy" : "watch", owner: "Joseph Torres", services: [], lastUpdated: "Today",
           overview: "Client profile connected to the Torres & Co. Command Center.", traffic: [], opportunities: [],
           metrics: [{ label: "Health score", value: String(input.health_score), change: "—", trend: "flat" }],
-        });
+          });
+        }
       }
 
       closeForm();
