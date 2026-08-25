@@ -5,7 +5,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { ProfilePictureEditor } from "../../components/profile-picture-editor";
-import { fetchClients } from "../../lib/supabase-data";
+import { createClient, fetchClients } from "../../lib/supabase-data";
+import { readStoredSession } from "../../lib/supabase-auth";
 
 type CustomerStatus = "Active" | "Invited" | "Paused";
 type Customer = { id: string; name: string; email: string; status: CustomerStatus; phone?: string; industry?: string };
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const [modal, setModal] = useState<Modal>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: "", email: "", phone: "", industry: "" });
   const [newTeam, setNewTeam] = useState({ name: "", email: "", role: "Employee" });
   const [preferences, setPreferences] = useState({ company: "Torres & Co.", industry: "Technology Agency", location: "Dallas, TX", website: "https://torrescotechnology.com", email: "joseph@torrescotechnology.com", phone: "", timezone: "America/Los_Angeles", cadence: "Weekly", emailAlerts: true, weeklyDigest: true, explanations: true });
@@ -59,11 +61,25 @@ export default function SettingsPage() {
     window.localStorage.setItem("torres-settings-checklist", JSON.stringify(completed));
     setSaved(true); showNotice("Admin settings saved."); window.setTimeout(() => setSaved(false), 2000);
   }
-  function addCustomer(event: FormEvent<HTMLFormElement>) {
+  async function addCustomer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!newCustomer.name.trim() || !newCustomer.email.trim()) { showNotice("Add a company name and primary contact email first."); return; }
-    const customer = { id: `${newCustomer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`, name: newCustomer.name.trim(), email: newCustomer.email.trim(), phone: newCustomer.phone.trim(), industry: newCustomer.industry.trim(), status: "Invited" as const };
-    persistCustomers([...customers, customer]); setNewCustomer({ name: "", email: "", phone: "", industry: "" }); setModal(null); showNotice(`${customer.name} was added as an invited customer.`);
+    setOnboardingBusy(true);
+    try {
+      const input = { name: newCustomer.name.trim(), industry: newCustomer.industry.trim() || "Not specified", location: "", website: "", email: newCustomer.email.trim(), phone: newCustomer.phone.trim(), health_score: 0 };
+      const created = await createClient(input);
+      const row = created?.[0];
+      if (!row?.id) throw new Error("The customer record was not returned by Supabase.");
+      const session = readStoredSession();
+      const response = await fetch("/api/admin/customer-invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: row.id, email: input.email, fullName: input.name }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "The customer was created, but the portal invitation could not be prepared.");
+      const customer = { id: row.id, name: input.name, email: input.email, phone: input.phone, industry: input.industry, status: "Invited" as const };
+      persistCustomers([...customers.filter((item) => item.id !== row.id), customer]);
+      setNewCustomer({ name: "", email: "", phone: "", industry: "" }); setModal(null); showNotice(body.message || `${customer.name} was added and invited to the customer portal.`);
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "Unable to complete customer onboarding.");
+    } finally { setOnboardingBusy(false); }
   }
   function inviteTeam(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
