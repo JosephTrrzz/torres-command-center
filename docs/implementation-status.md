@@ -19,11 +19,11 @@ Updated 2026-08-25.
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Protected client creation | Ready for migration/deploy | Creates the client, active organization, profile, primary location, onboarding state, audit event, and outbox event. |
-| Resumable onboarding | Ready for migration/deploy | Five-step business, location, service, goal, and review flow for clients and authorized agency staff. |
-| Agency visibility | Ready for migration/deploy | Client list/detail surfaces onboarding progress and opens the same scoped workflow without impersonation. |
-| Client portal continuity | Ready for migration/deploy | Incomplete clients receive a continue-onboarding prompt and customer navigation includes Onboarding. |
-| Local verification | Passed | 21 tests, application and Function type checks, whitespace validation, and the production build pass. |
+| Protected client creation | Live | Creates the client, active organization, profile, primary location, onboarding state, audit event, and outbox event. |
+| Resumable onboarding | Live | Five-step business, location, service, goal, and review flow for clients and authorized agency staff. |
+| Agency visibility | Live | Client list/detail surfaces onboarding progress and opens the same scoped workflow without impersonation. |
+| Client portal continuity | Live | Incomplete clients receive a continue-onboarding prompt and customer navigation includes Onboarding. |
+| Verification | Passed | 21 tests, application and Function type checks, whitespace validation, production build, migration execution, route checks, and unauthenticated API-boundary checks pass. |
 
 ## Later phases
 
@@ -31,4 +31,4 @@ Client 360 enhancements, collaboration, calendar/newsletters/AI, billing, and ad
 
 ## Manual gates
 
-Google Business Profile provider approval/quota remains an external gate. The notifications migration was applied and verified on 2026-08-25. The onboarding migration must be applied before the Phase 2 routes can be used in production; production deployments and secrets remain auditable operator actions.
+Google Business Profile provider approval/quota remains an external gate. The notifications and client onboarding migrations were applied and verified on 2026-08-25; production deployments and secrets remain auditable operator actions.

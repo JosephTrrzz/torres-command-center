@@ -30,8 +30,8 @@ Status: complete for the controlled organization cutover.
 Status: in progress.
 
 - Agency/client workspace switcher and authorized preview mode: implemented and deployed. Direct organization switching is membership-bound; agency client previews remain explicitly labeled and do not impersonate or mutate the administrator session.
-- Client profile, locations, services, goals, activation handoff, and resumable onboarding: implemented locally as a protected vertical slice; production migration and deployment verification remain.
-- Protected client provisioning: implemented locally so future clients receive an organization, business records, and onboarding state instead of bypassing the tenant model.
+- Client profile, locations, services, goals, activation handoff, and resumable onboarding: implemented, migrated, and production-verified as a protected vertical slice.
+- Protected client provisioning: deployed so future clients receive an organization, business records, and onboarding state instead of bypassing the tenant model.
 - Agency project and implementation progress tracking.
 
 ## Phase 3 — CRM, customers, tasks, and calendar
