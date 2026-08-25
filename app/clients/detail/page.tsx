@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ClientProfileForm } from "../../../components/client-profile-form";
 import { CustomerAccountPanel } from "../../../components/customer-account-panel";
 import { PeoplePanel } from "../../../components/people-panel";
+import { OnboardingStatusPanel } from "../../../components/onboarding-status-panel";
 import { Shell } from "../../../components/shell";
 import { fetchClient } from "../../../lib/supabase-data";
 import { ClientDetail } from "../../../lib/types";
@@ -44,6 +45,7 @@ export default function ClientDetailPage() {
       <section className="detail-card"><p className="eyebrow">Business information</p><h2>Account overview</h2><p>{client.overview}</p><div className="contact-list">{client.email && <a href={`mailto:${client.email}`}>✉ {client.email}</a>}{client.phone && <a href={`tel:${client.phone}`}>☎ {client.phone}</a>}{client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer">↗ {client.website}</a>}</div></section>
       <section className="detail-card"><p className="eyebrow">Performance</p><h2>Health score</h2><div className="large-score">{client.health}</div><div className="health-track"><span style={{ width: `${client.health}%` }} /></div><div className="metric-list">{client.metrics.map((metric) => <div key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div></section>
     </div>
+    <OnboardingStatusPanel clientId={client.id} />
     <section className="detail-card integration-preview">
       <div className="section-heading">
         <div>

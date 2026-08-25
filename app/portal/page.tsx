@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { Shell } from "../../components/shell";
 import { fetchClient, fetchClientPeople, fetchCustomerAccount, fetchCustomerAccountByEmail } from "../../lib/supabase-data";
 import { readStoredSession } from "../../lib/supabase-auth";
+import { fetchOnboarding } from "../../lib/onboarding-api";
+import type { OnboardingSnapshot } from "../../lib/onboarding";
 import { ClientDetail, ClientPerson, CustomerAccount } from "../../lib/types";
 
 type PortalSession = { user?: { email?: string | null }; email?: string | null };
@@ -31,6 +33,7 @@ export default function PortalPage() {
   const [people, setPeople] = useState<ClientPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [onboarding, setOnboarding] = useState<OnboardingSnapshot | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +63,7 @@ export default function PortalPage() {
             setClient(customer);
             setPeople(contacts);
           }
+          fetchOnboarding(session, customer.id).then((result) => { if (!cancelled) setOnboarding(result); }).catch(() => undefined);
         } catch (error) {
           if (!cancelled) setMessage(error instanceof Error ? error.message : "Unable to load the client preview.");
         } finally {
@@ -96,6 +100,7 @@ export default function PortalPage() {
           setClient(customer);
           setPeople(contacts);
         }
+        if (session) fetchOnboarding(session, customer.id).then((result) => { if (!cancelled) setOnboarding(result); }).catch(() => undefined);
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : "Unable to load your customer portal.");
       } finally {
@@ -116,6 +121,7 @@ export default function PortalPage() {
       ) : client && account ? (
         <>
           {previewClientId && <div className="portal-preview-banner"><strong>Admin preview</strong><span>The portal content below is client-facing. Your admin navigation stays visible so you can exit safely.</span><Link href="/clients/">Exit preview →</Link></div>}
+          {onboarding && onboarding.status !== "complete" && <div className="onboarding-portal-banner"><div><span className="eyebrow">Finish account setup</span><strong>Your business profile is {onboarding.completionPercent}% complete.</strong><p>Complete the guided steps so reports, recommendations, and workspace details use accurate business information.</p></div><Link className="button button-dark" href={`/onboarding/${previewClientId ? `?client=${encodeURIComponent(client.id)}` : ""}`}>Continue onboarding <span>→</span></Link></div>}
           <section className="portal-hero">
             <div><span className="eyebrow">Customer portal</span><h1>Welcome to {client.name}</h1><p>Your private workspace for business health, website performance, contacts, and billing status.</p></div>
             <span className="portal-badge">Portal active</span>

@@ -24,6 +24,16 @@ Updated 2026-08-25.
 
 Existing clients receive a linked client organization through `clients.organization_id`. Existing staff are backfilled into the agency organization; customers are backfilled into their linked client organization. This migration is additive and does not remove `profiles.role` or `profiles.client_id`.
 
+## Phase 2 onboarding foundation
+
+- `business_profiles`: the client organization's canonical legal, display, contact, website, and vertical identity.
+- `business_locations`: one or more operating locations or service areas, including an explicit primary location.
+- `business_services`: normalized service or capability selections collected during onboarding.
+- `business_goals`: measurable client goals with optional target values and time horizons.
+- `organization_onboarding`: resumable workflow state, current step, completion timestamps, and skip decisions.
+
+New clients are provisioned through the protected `/api/clients` Function, which creates the legacy client record, active client organization, business profile, primary location, and onboarding state as one controlled workflow. Onboarding remains compatible with the existing UI by synchronizing approved business and location fields back to `clients` during the transition.
+
 ## Planned domain groups
 
 ### CRM and operations

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientCard } from "../../components/client-card";
 import { Shell } from "../../components/shell";
-import { createClient, fetchClients, updateClient } from "../../lib/supabase-data";
+import { fetchClients, updateClient } from "../../lib/supabase-data";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { ClientDetail } from "../../lib/types";
 
@@ -50,11 +50,14 @@ export default function ClientsPage() {
         await updateClient(editing.id, input);
         setMessage("Client updated successfully");
       } else {
-        const created = await createClient(input);
-        setMessage("Client added successfully");
-        const row = created?.[0];
+        const session = readStoredSession();
+        if (!session) throw new Error("Sign in again before creating a client.");
+        const createResponse = await fetch("/api/clients", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify(input) });
+        const createBody = await createResponse.json().catch(() => ({})) as { client?: { id?: string }; message?: string; error?: string };
+        if (!createResponse.ok || !createBody.client?.id) throw new Error(createBody.error || "The client workspace could not be created.");
+        setMessage(createBody.message || "Client workspace created successfully");
+        const row = createBody.client;
         if (row?.id) {
-          const session = readStoredSession();
           const inviteResponse = await fetch("/api/admin/customer-invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: row.id, email: input.email, fullName: input.name }) });
           const inviteBody = await inviteResponse.json().catch(() => ({}));
           if (!inviteResponse.ok) throw new Error(inviteBody.error || "Client was created, but the portal invitation could not be prepared.");
@@ -191,7 +194,7 @@ export default function ClientsPage() {
         {clients.map((client) => (
           <div key={client.id}>
             <ClientCard client={client} />
-            <div className="client-card-actions"><button className="text-link" type="button" onClick={() => openEdit(client)}>Edit client →</button><button className="text-link" type="button" onClick={() => void sendActivation(client)} disabled={activationBusyId === client.id}>{activationBusyId === client.id ? "Preparing activation…" : activationSent[client.id] ? "Resend activation link →" : "Send activation link →"}</button><Link className="text-link" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}>Preview client portal →</Link></div>
+            <div className="client-card-actions"><button className="text-link" type="button" onClick={() => openEdit(client)}>Edit client →</button><Link className="text-link" href={`/onboarding/?client=${encodeURIComponent(client.id)}`}>Open onboarding →</Link><button className="text-link" type="button" onClick={() => void sendActivation(client)} disabled={activationBusyId === client.id}>{activationBusyId === client.id ? "Preparing activation…" : activationSent[client.id] ? "Resend activation link →" : "Send activation link →"}</button><Link className="text-link" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}>Preview client portal →</Link></div>
           </div>
         ))}
       </section>

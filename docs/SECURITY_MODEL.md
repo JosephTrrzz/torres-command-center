@@ -33,6 +33,8 @@ Permissions, not labels, are the long-term contract. Default role permissions ar
 
 The current controlled cutover applies this sequence to Google connection/property routes, report data, team invitations, and customer invitations. A legacy profile fallback remains only for accounts without active organization memberships; once a membership is present, organization scope is authoritative.
 
+Client provisioning and onboarding use the same server boundary. Creating a client requires `clients.manage`; agency staff may update onboarding only for client organizations in their agency, while client members may update only their own organization. Browser sessions receive scoped snapshots through `/api/onboarding` and never receive direct write grants to onboarding tables. Completion, client creation, and related lifecycle changes produce audit and outbox records.
+
 ## Invitation lifecycle
 
 - Owners and administrators can invite agency team members through a server Function guarded by `organization.manage`.
@@ -47,6 +49,7 @@ The current controlled cutover applies this sequence to Google connection/proper
 - A user cannot read another organization's records without a membership or explicit agency relationship.
 - A client user cannot widen their own role, organization, or client assignment.
 - Browser clients cannot write memberships, role defaults, invitations, audit events, provider tokens, or outbox events directly.
+- Browser clients cannot write business profile, location, service, goal, or onboarding workflow tables directly; authorized Functions perform and audit those writes.
 - Service-role access is permitted only inside server Functions and controlled operator migrations.
 - Cross-tenant tests must cover reads and writes for each new domain table.
 

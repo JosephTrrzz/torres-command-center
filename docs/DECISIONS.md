@@ -49,3 +49,9 @@ Reason: this makes automation useful without obscuring responsibility or creatin
 Decision: continue Cloudflare Pages and Pages Functions; Vercel is not part of the production path.
 
 Reason: the active projects, domains, environment variables, and automatic GitHub deployments are already configured on Cloudflare.
+
+## D-009 — normalized, resumable onboarding
+
+Decision: store business identity, locations, services, goals, and onboarding progress in organization-scoped tables, with one resumable workflow exposed to both authorized agency staff and the client.
+
+Reason: onboarding must survive interrupted sessions, show the agency exactly what remains, and feed later CRM, reporting, recommendation, and automation domains. A temporary synchronization back to the legacy `clients` record keeps the current product operational while normalized reads are adopted incrementally.
