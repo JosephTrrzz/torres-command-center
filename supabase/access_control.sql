@@ -42,7 +42,7 @@ on conflict (id) do nothing;
 -- Establish the initial owner. Change this address first if your Supabase login differs.
 update public.profiles
 set role = 'owner', active = true, updated_at = now()
-where lower(email) = lower('joseph@torrescotechnology.com');
+where lower(email) = lower('jos.jt@icloud.com');
 
 create or replace function public.current_app_role()
 returns text language sql stable security definer set search_path = public
