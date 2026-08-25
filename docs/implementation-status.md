@@ -25,10 +25,21 @@ Updated 2026-08-25.
 | Client portal continuity | Live | Incomplete clients receive a continue-onboarding prompt and customer navigation includes Onboarding. |
 | Verification | Passed | 21 tests, application and Function type checks, whitespace validation, production build, migration execution, route checks, and unauthenticated API-boundary checks pass. |
 
+## Phase 2 — project delivery vertical slice
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Project workspace | Live | Role-aware agency and client workspace for real projects, milestones, deliverables, and requests. |
+| Transparent progress | Live | Progress is derived from persisted milestone completion and cannot be directly edited. |
+| Protected mutations | Live | `/api/projects` enforces tenant scope and permissions, recalculates progress, and writes audit/outbox events. |
+| Client visibility | Live | Clients can view delivery state and submit scoped requests without receiving agency management controls. |
+| Production migration | Applied | `supabase/client_projects.sql` was applied successfully on 2026-08-25 without seeded demo records. |
+| Verification | Passed | 24 tests, application and Function type checks, whitespace validation, production build, migration execution, route checks, and unauthenticated API-boundary checks pass. |
+
 ## Later phases
 
 Client 360 enhancements, collaboration, calendar/newsletters/AI, billing, and additional integrations remain planned or setup-only. They must not be described as production-complete until their backend contracts, permissions, empty/error states, and tests exist.
 
 ## Manual gates
 
-Google Business Profile provider approval/quota remains an external gate. The notifications and client onboarding migrations were applied and verified on 2026-08-25; production deployments and secrets remain auditable operator actions.
+Google Business Profile provider approval/quota remains an external gate. The notifications, client onboarding, and project delivery migrations were applied and verified on 2026-08-25; production deployments and secrets remain auditable operator actions.

@@ -32,7 +32,7 @@ Status: in progress.
 - Agency/client workspace switcher and authorized preview mode: implemented and deployed. Direct organization switching is membership-bound; agency client previews remain explicitly labeled and do not impersonate or mutate the administrator session.
 - Client profile, locations, services, goals, activation handoff, and resumable onboarding: implemented, migrated, and production-verified as a protected vertical slice.
 - Protected client provisioning: deployed so future clients receive an organization, business records, and onboarding state instead of bypassing the tenant model.
-- Agency project and implementation progress tracking.
+- Agency project and implementation progress tracking: implemented, migrated, and verified as a protected vertical slice with milestone-derived progress, deliverables, client requests, role-aware agency/client views, and auditable mutations.
 
 ## Phase 3 — CRM, customers, tasks, and calendar
 

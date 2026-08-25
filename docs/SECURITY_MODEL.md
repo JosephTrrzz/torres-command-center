@@ -35,6 +35,8 @@ The current controlled cutover applies this sequence to Google connection/proper
 
 Client provisioning and onboarding use the same server boundary. Creating a client requires `clients.manage`; agency staff may update onboarding only for client organizations in their agency, while client members may update only their own organization. Browser sessions receive scoped snapshots through `/api/onboarding` and never receive direct write grants to onboarding tables. Completion, client creation, and related lifecycle changes produce audit and outbox records.
 
+Project delivery uses the same boundary through `/api/projects`. Agency users require `clients.manage` to create or update projects, milestones, deliverables, assignments, or request status. Client members may read only their client organization's project snapshot and may submit requests for that organization; they cannot change delivery status or progress. Project progress is recalculated server-side from persisted milestone status rather than accepted from the browser.
+
 ## Invitation lifecycle
 
 - Owners and administrators can invite agency team members through a server Function guarded by `organization.manage`.
@@ -50,6 +52,7 @@ Client provisioning and onboarding use the same server boundary. Creating a clie
 - A client user cannot widen their own role, organization, or client assignment.
 - Browser clients cannot write memberships, role defaults, invitations, audit events, provider tokens, or outbox events directly.
 - Browser clients cannot write business profile, location, service, goal, or onboarding workflow tables directly; authorized Functions perform and audit those writes.
+- Browser clients cannot write project, milestone, deliverable, or client-request tables directly; authorized Functions perform and audit those writes.
 - Service-role access is permitted only inside server Functions and controlled operator migrations.
 - Cross-tenant tests must cover reads and writes for each new domain table.
 

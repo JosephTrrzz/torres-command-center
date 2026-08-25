@@ -49,6 +49,18 @@ export default function ClientDetailPage() {
     <section className="detail-card integration-preview">
       <div className="section-heading">
         <div>
+          <p className="eyebrow">Delivery workspace</p>
+          <h2>Projects, milestones, and requests</h2>
+          <p>Publish measurable progress, share deliverables, and respond to this client’s requests.</p>
+        </div>
+        <Link className="button button-dark" href={`/projects/?client=${encodeURIComponent(client.id)}`}>
+          Open projects <span>→</span>
+        </Link>
+      </div>
+    </section>
+    <section className="detail-card integration-preview">
+      <div className="section-heading">
+        <div>
           <p className="eyebrow">Evidence connections</p>
           <h2>Connect this client’s proof</h2>
           <p>Set up Google, website, traffic, and infrastructure sources for this account.</p>

@@ -55,3 +55,9 @@ Reason: the active projects, domains, environment variables, and automatic GitHu
 Decision: store business identity, locations, services, goals, and onboarding progress in organization-scoped tables, with one resumable workflow exposed to both authorized agency staff and the client.
 
 Reason: onboarding must survive interrupted sessions, show the agency exactly what remains, and feed later CRM, reporting, recommendation, and automation domains. A temporary synchronization back to the legacy `clients` record keeps the current product operational while normalized reads are adopted incrementally.
+
+## D-010 — milestone-derived delivery progress
+
+Decision: project progress is calculated from completed milestones and is never entered as an independent percentage.
+
+Reason: milestone-derived progress gives agency staff and clients the same explainable view, prevents optimistic or contradictory status, and provides an auditable foundation for notifications, reports, and automations.

@@ -34,6 +34,15 @@ Existing clients receive a linked client organization through `clients.organizat
 
 New clients are provisioned through the protected `/api/clients` Function, which creates the legacy client record, active client organization, business profile, primary location, and onboarding state as one controlled workflow. Onboarding remains compatible with the existing UI by synchronizing approved business and location fields back to `clients` during the transition.
 
+## Phase 2 project delivery foundation
+
+- `client_projects`: organization- and client-scoped delivery engagements with lifecycle dates, status, and a persisted milestone-derived progress percentage.
+- `project_milestones`: ordered, dated outcomes that provide the transparent source of project progress.
+- `project_deliverables`: milestone-linked or project-level work products with review, approval, delivery, and optional resource-link state.
+- `client_requests`: client-submitted or agency-recorded requests with priority, assignment, resolution, and optional project scope.
+
+Project progress is calculated as completed milestones divided by total milestones, rounded to a whole percentage. A project with no milestones reports zero progress. The protected `/api/projects` Function is the only mutation boundary; browser sessions receive organization-scoped snapshots and direct authenticated writes are revoked. Project changes create audit events and outbox events for later notification and automation consumers.
+
 ## Planned domain groups
 
 ### CRM and operations
