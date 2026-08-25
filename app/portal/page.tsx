@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Shell } from "../../components/shell";
-import { fetchClient, fetchClientPeople, fetchCustomerAccountByEmail } from "../../lib/supabase-data";
+import { fetchClient, fetchClientPeople, fetchCustomerAccount, fetchCustomerAccountByEmail } from "../../lib/supabase-data";
+import { readStoredSession } from "../../lib/supabase-auth";
 import { ClientDetail, ClientPerson, CustomerAccount } from "../../lib/types";
 
 type PortalSession = { user?: { email?: string | null }; email?: string | null };
@@ -24,6 +25,7 @@ function formatStatus(value: string) {
 }
 
 export default function PortalPage() {
+  const [previewClientId, setPreviewClientId] = useState("");
   const [account, setAccount] = useState<CustomerAccount | null>(null);
   const [client, setClient] = useState<ClientDetail | null>(null);
   const [people, setPeople] = useState<ClientPerson[]>([]);
@@ -34,6 +36,37 @@ export default function PortalPage() {
     let cancelled = false;
 
     async function loadPortal() {
+      const requestedPreviewClientId = new URLSearchParams(window.location.search).get("previewClient") || "";
+      setPreviewClientId(requestedPreviewClientId);
+      const session = readStoredSession();
+      if (requestedPreviewClientId) {
+        if (!session || session.profile.role === "customer") {
+          if (!cancelled) {
+            setMessage("Client preview is available to workspace administrators only.");
+            setLoading(false);
+          }
+          return;
+        }
+        try {
+          const customer = await fetchClient(requestedPreviewClientId);
+          const customerAccount = await fetchCustomerAccount(requestedPreviewClientId);
+          if (!customer || !customerAccount) {
+            if (!cancelled) setMessage("Set up this client’s customer portal account before previewing it.");
+            return;
+          }
+          const contacts = await fetchClientPeople(customer.id).catch(() => []);
+          if (!cancelled) {
+            setAccount(customerAccount);
+            setClient(customer);
+            setPeople(contacts);
+          }
+        } catch (error) {
+          if (!cancelled) setMessage(error instanceof Error ? error.message : "Unable to load the client preview.");
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+        return;
+      }
       const email = readPortalEmail();
       if (!email) {
         if (!cancelled) {
@@ -79,6 +112,7 @@ export default function PortalPage() {
         <section className="portal-empty"><span className="eyebrow">Customer portal</span><h1>Your workspace is almost ready</h1><p>{message}</p><Link className="button button-dark" href="/login/?returnTo=/portal/">Sign in to customer portal</Link></section>
       ) : client && account ? (
         <>
+          {previewClientId && <div className="portal-preview-banner"><strong>Admin preview</strong><span>You are viewing exactly what this client sees.</span><Link href="/clients/">Exit preview →</Link></div>}
           <section className="portal-hero">
             <div><span className="eyebrow">Customer portal</span><h1>Welcome to {client.name}</h1><p>Your private workspace for business health, website performance, contacts, and billing status.</p></div>
             <span className="portal-badge">Portal active</span>
