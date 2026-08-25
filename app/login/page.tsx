@@ -19,7 +19,8 @@ export default function LoginPage() {
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const accessToken = hash.get("access_token");
-    if (!accessToken || hash.get("type") !== "invite") return;
+    const linkType = hash.get("type");
+    if (!accessToken || !["invite", "magiclink"].includes(linkType || "")) return;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseKey) { setMessage("Customer activation is not configured."); return; }
