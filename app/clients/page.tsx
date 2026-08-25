@@ -159,9 +159,7 @@ export default function ClientsPage() {
         {clients.map((client) => (
           <div key={client.id}>
             <ClientCard client={client} />
-            <button className="text-link" type="button" onClick={() => openEdit(client)}>
-              Edit client →
-            </button>
+            <div className="client-card-actions"><button className="text-link" type="button" onClick={() => openEdit(client)}>Edit client →</button><Link className="text-link" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}>Preview client portal →</Link></div>
           </div>
         ))}
       </section>
