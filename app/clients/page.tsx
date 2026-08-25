@@ -16,6 +16,9 @@ export default function ClientsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [onboarding, setOnboarding] = useState<ClientDetail | null>(null);
+  const [activationBusyId, setActivationBusyId] = useState("");
+  const [activationSent, setActivationSent] = useState<Record<string, boolean>>({});
+  const [activationLink, setActivationLink] = useState("");
 
   useEffect(() => {
     fetchClients()
@@ -93,6 +96,25 @@ export default function ClientsPage() {
     setError("");
   }
 
+  async function sendActivation(client: ClientDetail) {
+    const session = readStoredSession();
+    setActivationBusyId(client.id);
+    setError("");
+    setActivationLink("");
+    try {
+      const response = await fetch("/api/admin/customer-invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: client.id, resend: true }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Unable to prepare an activation link.");
+      setActivationSent((current) => ({ ...current, [client.id]: true }));
+      if (typeof body.activationLink === "string") setActivationLink(body.activationLink);
+      setMessage(body.message || "Activation link prepared.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to prepare an activation link.");
+    } finally {
+      setActivationBusyId("");
+    }
+  }
+
   return (
     <Shell active="Clients">
       <div className="page-heading">
@@ -159,15 +181,17 @@ export default function ClientsPage() {
       )}
 
       {onboarding && <section className="detail-card onboarding-next" aria-live="polite">
-        <div><p className="eyebrow">Next step</p><h2>{onboarding.name} is connected.</h2><p>Finish the handoff by preparing integrations and opening the client site from this workspace.</p></div>
+        <div><p className="eyebrow">Next step</p><h2>{onboarding.name} is ready for activation.</h2><p>The client record is saved. Send the client their activation email, then prepare integrations and preview the portal from this workspace.</p></div>
         <div className="form-actions"><Link className="button button-dark" href={`/clients/detail/?id=${encodeURIComponent(onboarding.id)}`}>Open client account <span>→</span></Link><Link className="button button-light" href={`/integrations/?client=${encodeURIComponent(onboarding.id)}`}>Prepare integrations <span>→</span></Link>{onboarding.website && <a className="button button-outline" href={onboarding.website.startsWith("http") ? onboarding.website : `https://${onboarding.website}`} target="_blank" rel="noreferrer">Open client site ↗</a>}</div>
       </section>}
+
+      {activationLink && <section className="detail-card activation-link-card" aria-live="polite"><div><p className="eyebrow">Activation link ready</p><h2>Send this secure link to the client</h2><p>The link signs the client in and activates their assigned portal. Treat it like a password and share it privately.</p></div><div className="activation-link-row"><input aria-label="Client activation link" readOnly value={activationLink} /><button className="button button-dark" type="button" onClick={() => void navigator.clipboard?.writeText(activationLink)}>Copy link</button></div></section>}
 
       <section className="client-grid client-grid-wide">
         {clients.map((client) => (
           <div key={client.id}>
             <ClientCard client={client} />
-            <div className="client-card-actions"><button className="text-link" type="button" onClick={() => openEdit(client)}>Edit client →</button><Link className="text-link" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}>Preview client portal →</Link></div>
+            <div className="client-card-actions"><button className="text-link" type="button" onClick={() => openEdit(client)}>Edit client →</button><button className="text-link" type="button" onClick={() => void sendActivation(client)} disabled={activationBusyId === client.id}>{activationBusyId === client.id ? "Preparing activation…" : activationSent[client.id] ? "Resend activation link →" : "Send activation link →"}</button><Link className="text-link" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}>Preview client portal →</Link></div>
           </div>
         ))}
       </section>
