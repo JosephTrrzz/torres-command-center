@@ -28,13 +28,25 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const callerProfile = (await profileResponse.json() as Array<{ role?: string; active?: boolean }>)[0];
   if (!profileResponse.ok || !callerProfile || !callerProfile.active || !["owner", "employee"].includes(callerProfile.role || "")) return json({ error: "Only workspace staff can invite customers." }, 403);
 
-  const input = await request.json().catch(() => null) as { clientId?: string; email?: string; fullName?: string } | null;
+  const input = await request.json().catch(() => null) as { clientId?: string; email?: string; fullName?: string; resend?: boolean } | null;
   const clientId = input?.clientId || "";
-  const email = input?.email?.trim().toLowerCase() || "";
-  const fullName = input?.fullName?.trim() || "";
-  if (!/^[0-9a-f-]{36}$/i.test(clientId) || !email) return json({ error: "A valid client and email are required." }, 400);
+  if (!/^[0-9a-f-]{36}$/i.test(clientId)) return json({ error: "A valid client is required." }, 400);
 
-  const inviteResponse = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: `${env.PUBLIC_APP_URL || new URL(request.url).origin}/login/?returnTo=/portal/` }) });
+  const clientResponse = await fetch(`${supabaseUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=name,email&limit=1`, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
+  const clientRows = await clientResponse.json().catch(() => []) as Array<{ name?: string; email?: string }>;
+  const email = input?.email?.trim().toLowerCase() || clientRows[0]?.email?.trim().toLowerCase() || "";
+  const fullName = input?.fullName?.trim() || clientRows[0]?.name?.trim() || "";
+  if (!email) return json({ error: "This client needs a contact email before an activation link can be sent." }, 400);
+
+  const redirectTo = `${env.PUBLIC_APP_URL || new URL(request.url).origin}/login/?returnTo=/portal/`;
+  if (input?.resend) {
+    const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "magiclink", email, redirect_to: redirectTo }) });
+    const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; msg?: string; message?: string };
+    if (!linkResponse.ok || !linkBody.action_link) return json({ error: linkBody.msg || linkBody.message || "Supabase could not generate an activation link. The client may need a new invitation." }, 502);
+    return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
+  }
+
+  const inviteResponse = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
   const inviteBody = await inviteResponse.json().catch(() => ({})) as { user?: { id?: string }; msg?: string; message?: string };
   if (!inviteResponse.ok && inviteResponse.status !== 422) return json({ error: inviteBody.msg || inviteBody.message || "Supabase could not send the customer invitation." }, 502);
 
@@ -50,5 +62,5 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   const accountResponse = await fetch(`${supabaseUrl}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ client_id: clientId, portal_email: email, portal_enabled: true, portal_status: "invited", billing_email: email, billing_status: "not_connected", updated_at: new Date().toISOString() }) });
   if (!accountResponse.ok) return json({ error: "Invitation sent, but the customer portal account could not be saved." }, 502);
-  return json({ invited: inviteResponse.ok, email, message: inviteResponse.ok ? "Customer portal account created and invitation sent." : "Customer portal account is ready. The customer may already have an account; resend the invite from Supabase if needed." });
+  return json({ invited: inviteResponse.ok, email, message: inviteResponse.ok ? "Customer portal account created and activation email sent." : "Customer portal account is ready. Use Send activation link on this client to generate a fresh link." });
 };
