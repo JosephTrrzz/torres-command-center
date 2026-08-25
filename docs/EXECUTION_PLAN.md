@@ -16,7 +16,7 @@ Status: complete for the 2026-08-25 baseline.
 
 ## Phase 1 — foundation
 
-Status: in progress.
+Status: complete for the controlled organization cutover.
 
 - Add organizations, memberships, permissions, invitations, preferences, audit events, and event outbox additively.
 - Preserve and map the existing profile/client authorization model.
@@ -27,7 +27,9 @@ Status: in progress.
 
 ## Phase 2 — agency and client management
 
-- Agency/client workspace switcher and authorized preview mode.
+Status: in progress.
+
+- Agency/client workspace switcher and authorized preview mode. Direct organization switching is membership-bound; agency client previews remain explicitly labeled and do not impersonate or mutate the administrator session.
 - Client profile, locations, capabilities, team, goals, activation, and resumable onboarding.
 - Agency project and implementation progress tracking.
 

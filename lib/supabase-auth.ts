@@ -65,21 +65,26 @@ type MembershipRow = {
   } | null;
 };
 
-function organizationFromMemberships(rows: MembershipRow[], defaultOrganizationId?: string | null): OrganizationAccess | undefined {
+function organizationsFromMemberships(rows: MembershipRow[]): OrganizationAccess[] {
   const active = rows.filter((row) => row.status === "active" && isOrganizationRole(row.role) && row.organizations?.status === "active");
-  const selected = active.find((row) => row.organization_id === defaultOrganizationId)
-    ?? active.find((row) => row.organizations?.kind === "agency")
-    ?? active[0];
-  const organization = selected?.organizations;
-  if (!selected || !organization || typeof organization.id !== "string" || typeof organization.name !== "string" || typeof organization.slug !== "string" || !isOrganizationKind(organization.kind) || !isOrganizationRole(selected.role)) return undefined;
-  return {
-    id: organization.id,
-    name: organization.name,
-    slug: organization.slug,
-    kind: organization.kind,
-    role: selected.role,
-    permissions: [...ROLE_PERMISSIONS[selected.role]],
-  };
+  return active.flatMap((row) => {
+    const organization = row.organizations;
+    if (!organization || typeof organization.id !== "string" || typeof organization.name !== "string" || typeof organization.slug !== "string" || !isOrganizationKind(organization.kind) || !isOrganizationRole(row.role)) return [];
+    return [{
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      kind: organization.kind,
+      role: row.role,
+      permissions: [...ROLE_PERMISSIONS[row.role]],
+    }];
+  }).sort((left, right) => Number(right.kind === "agency") - Number(left.kind === "agency") || left.name.localeCompare(right.name));
+}
+
+function selectedOrganization(organizations: OrganizationAccess[], defaultOrganizationId?: string | null) {
+  return organizations.find((organization) => organization.id === defaultOrganizationId)
+    ?? organizations.find((organization) => organization.kind === "agency")
+    ?? organizations[0];
 }
 
 export async function createAuthSession(
@@ -131,13 +136,15 @@ export async function createAuthSessionFromTokens(
   }
 
   let organization: OrganizationAccess | undefined;
+  let organizations: OrganizationAccess[] = [];
   const membershipResponse = await fetch(
     `${url}/rest/v1/organization_memberships?user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&select=organization_id,role,status,organizations!inner(id,name,slug,kind,status)`,
     { headers: { apikey: key, Authorization: `Bearer ${accessToken}` } },
   );
   if (membershipResponse.ok) {
     const memberships = await membershipResponse.json().catch(() => []) as MembershipRow[];
-    organization = organizationFromMemberships(memberships, profile.default_organization_id);
+    organizations = organizationsFromMemberships(memberships);
+    organization = selectedOrganization(organizations, profile.default_organization_id);
   }
 
   return {
@@ -147,6 +154,23 @@ export async function createAuthSessionFromTokens(
     user,
     profile,
     organization,
+    organizations,
+  };
+}
+
+export async function switchOrganization(session: AuthSession, organizationId: string): Promise<AuthSession> {
+  const response = await fetch("/api/workspace/switch", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId }),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  const selected = (session.organizations || []).find((organization) => organization.id === organizationId);
+  if (!selected) throw new Error("That workspace is not available in this session.");
+  return {
+    ...session,
+    organization: selected,
+    profile: { ...session.profile, default_organization_id: selected.id },
   };
 }
 

@@ -115,7 +115,7 @@ export default function PortalPage() {
         <section className="portal-empty"><span className="eyebrow">Customer portal</span><h1>Your workspace is almost ready</h1><p>{message}</p><Link className="button button-dark" href="/login/?returnTo=/portal/">Sign in to customer portal</Link></section>
       ) : client && account ? (
         <>
-          {previewClientId && <div className="portal-preview-banner"><strong>Admin preview</strong><span>You are viewing exactly what this client sees.</span><Link href="/clients/">Exit preview →</Link></div>}
+          {previewClientId && <div className="portal-preview-banner"><strong>Admin preview</strong><span>The portal content below is client-facing. Your admin navigation stays visible so you can exit safely.</span><Link href="/clients/">Exit preview →</Link></div>}
           <section className="portal-hero">
             <div><span className="eyebrow">Customer portal</span><h1>Welcome to {client.name}</h1><p>Your private workspace for business health, website performance, contacts, and billing status.</p></div>
             <span className="portal-badge">Portal active</span>

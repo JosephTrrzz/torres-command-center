@@ -4,7 +4,7 @@ import {
   defaultRouteForRole,
   isSafeReturnTo,
 } from "../lib/access-control";
-import { canAccessClient } from "../functions/_shared/auth";
+import { canAccessClient, canSwitchOrganization } from "../functions/_shared/auth";
 import { buildNotificationInsert } from "../functions/_shared/notifications";
 
 describe("role access control", () => {
@@ -59,6 +59,16 @@ describe("role access control", () => {
     expect(canAccessClient({ role: "customer", clientId: null, memberships: clientMembership }, "client-2", otherTarget)).toBe(false);
     expect(canAccessClient({ role: "customer", clientId: "client-2", memberships: clientMembership }, "client-2", otherTarget)).toBe(false);
     expect(canAccessClient({ role: "employee", clientId: null, memberships: agencyMembership }, "client-1", null)).toBe(false);
+  });
+
+  it("switches only to an organization with an active resolved membership", () => {
+    const memberships = [
+      { organizationId: "agency-1", role: "owner" as const, kind: "agency" as const, parentOrganizationId: null, legacyClientId: null },
+      { organizationId: "client-org-1", role: "client" as const, kind: "client" as const, parentOrganizationId: "agency-1", legacyClientId: "client-1" },
+    ];
+    expect(canSwitchOrganization(memberships, "agency-1")).toBe(true);
+    expect(canSwitchOrganization(memberships, "client-org-1")).toBe(true);
+    expect(canSwitchOrganization(memberships, "client-org-2")).toBe(false);
   });
 
   it("builds user-scoped notifications without undefined database fields", () => {

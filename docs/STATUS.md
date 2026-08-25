@@ -11,6 +11,7 @@ Updated 2026-08-25.
 | Organization authorization | Live cutover | Active memberships and role permissions now drive shell access and protected Google/report/customer-invite Functions, with legacy profile fallback for unmigrated accounts. |
 | Client management | Live foundation | Create/edit clients, contacts, portal settings, and activation links. |
 | Customer portal | Live foundation | Customer-scoped portal and agency preview entry point. |
+| Workspace switching | Live foundation | Direct organization switching is active-membership-bound; agency client previews are explicitly labeled and leave the administrator session unchanged. |
 | Notifications | Live foundation | Persisted rows, RLS, popover states, mark-read, and onboarding producers. |
 | Google OAuth | Live | Authorized account, token refresh, and server-side validation. |
 | GA4 | Live | Property mapping and real reporting metrics. |
@@ -22,12 +23,13 @@ Updated 2026-08-25.
 ## Phase status
 
 - Phase 0 repository audit: complete.
-- Phase 1 foundation: in progress; the organization/RBAC/audit/outbox migration, real-data Today experience, organization-aware authorization, and server-backed team/customer invitations are implemented. Legacy profile fields remain as a compatibility fallback during the controlled cutover.
-- Phases 2–11: planned, not production-complete.
+- Phase 1 foundation: complete for the controlled organization cutover. Legacy profile fields remain only as a compatibility fallback for unmigrated accounts.
+- Phase 2 agency and client management: in progress; the membership-bound workspace selector and authorized client preview flow are implemented.
+- Phases 3–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-25: 16 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the new `/today/` operating brief. The atomic Supabase migration completed successfully and verification returned 3 organizations, 2 organization memberships, 10 permissions, and 39 role-permission mappings. All 8 new foundation tables have RLS enabled with 11 policies, and the organization linkage columns exist on both `clients` and `profiles`. The authorization cutover adds organization membership resolution, permission checks on protected Functions, server-backed team invitations, customer membership creation, invitation acceptance, and audit events.
+On 2026-08-25: 17 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 12 static routes, including the `/today/` operating brief. The atomic Supabase migration completed successfully and verification returned 3 organizations, 2 organization memberships, 10 permissions, and 39 role-permission mappings. All 8 new foundation tables have RLS enabled with 11 policies, and the organization linkage columns exist on both `clients` and `profiles`. The authorization cutover adds organization membership resolution, permission checks on protected Functions, server-backed team invitations, customer membership creation, invitation acceptance, audited workspace switching, and audit events.
 
 ## Known limitations
 

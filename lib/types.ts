@@ -35,6 +35,7 @@ export interface AuthSession {
   user: AuthUser;
   profile: UserProfile;
   organization?: OrganizationAccess;
+  organizations?: OrganizationAccess[];
 }
 
 export interface Metric { label: string; value: string; change: string; trend: Trend; }

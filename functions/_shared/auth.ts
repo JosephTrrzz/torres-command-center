@@ -101,6 +101,10 @@ export function hasOrganizationPermission(context: Pick<AuthContext, "permission
   return context.permissions.includes(permission);
 }
 
+export function canSwitchOrganization(memberships: AuthOrganizationMembership[], organizationId: string) {
+  return memberships.some((membership) => membership.organizationId === organizationId);
+}
+
 export async function requireAuth(
   request: Request,
   env: FunctionEnv,

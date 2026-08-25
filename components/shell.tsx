@@ -3,8 +3,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { APP_NAVIGATION, appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, organizationRoleLabel } from "../lib/access-control";
-import { clearAuthSession, readStoredSession } from "../lib/supabase-auth";
-import type { AuthSession } from "../lib/types";
+import { clearAuthSession, createAuthSessionFromTokens, readStoredSession, storeAuthSession, switchOrganization } from "../lib/supabase-auth";
+import type { AuthSession, ClientSummary, OrganizationAccess } from "../lib/types";
 import { readProfileAvatar } from "./profile-picture-editor";
 import { fetchClients } from "../lib/supabase-data";
 import { fetchNotifications, markNotificationsRead, type WorkspaceNotification } from "../lib/notifications";
@@ -33,10 +33,13 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const [workspaceNotifications, setWorkspaceNotifications] = useState<WorkspaceNotification[]>([]);
   const [notificationError, setNotificationError] = useState("");
   const [profile, setProfile] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceBusy, setWorkspaceBusy] = useState("");
+  const [workspaceError, setWorkspaceError] = useState("");
   const [session, setSession] = useState<AuthSession | null>(null);
   const [checked, setChecked] = useState(false);
   const [avatarImage, setAvatarImage] = useState("");
-  const [clientCount, setClientCount] = useState(0);
+  const [clients, setClients] = useState<ClientSummary[]>([]);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -58,6 +61,12 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
     }
     setSession(stored);
+    if (!Array.isArray(stored.organizations)) {
+      void createAuthSessionFromTokens(stored.access_token, stored.refresh_token, stored.expires_at, stored.user).then((freshSession) => {
+        storeAuthSession(freshSession);
+        setSession(freshSession);
+      }).catch(() => undefined);
+    }
     setNotificationError("");
     void fetchNotifications(stored).then(setWorkspaceNotifications).catch(() => setNotificationError("Notifications couldn’t be loaded."));
     setChecked(true);
@@ -65,7 +74,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   }, [pathname, router]);
 
   useEffect(() => {
-    fetchClients().then((rows) => setClientCount(rows.length)).catch(() => setClientCount(0));
+    fetchClients().then(setClients).catch(() => setClients([]));
   }, []);
 
   const logout = () => {
@@ -87,17 +96,50 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       setNotificationError("Those notifications couldn’t be updated. Try again.");
     });
   };
+  const chooseWorkspace = async (organization: OrganizationAccess) => {
+    if (!session || organization.id === session.organization?.id) {
+      setWorkspaceOpen(false);
+      return;
+    }
+    setWorkspaceBusy(organization.id);
+    setWorkspaceError("");
+    try {
+      const nextSession = await switchOrganization(session, organization.id);
+      storeAuthSession(nextSession);
+      setSession(nextSession);
+      setWorkspaceOpen(false);
+      const nextRole = appRoleForOrganizationRole(nextSession.organization?.role, nextSession.profile.role);
+      const nextPath = canAccessPath(nextRole, pathname || "/") ? pathname || defaultRouteForRole(nextRole) : defaultRouteForRole(nextRole);
+      router.push(nextPath);
+      router.refresh();
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "That workspace could not be opened.");
+    } finally {
+      setWorkspaceBusy("");
+    }
+  };
   if (!checked || !session) return <main className="auth-loading" aria-live="polite">Opening your secure workspace…</main>;
   const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
   const nav = APP_NAVIGATION[effectiveRole];
   const displayName = displayNameFor(session.profile);
   const avatar = initials(displayName);
   const accessLabel = organizationRoleLabel(session.organization?.role, session.profile.role);
+  const organizations = session.organizations?.length ? session.organizations : session.organization ? [session.organization] : [];
   return <div className="app-shell">
     <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="brand"><span className="brand-mark">T</span><span>Torres <i>&amp; Co.</i></span></div>
-      <div className="workspace"><span className="workspace-avatar">TC</span><div><small>Workspace</small><strong>{session.organization?.name || "Torres & Co."} <b>⌄</b></strong></div></div>
-      <nav aria-label="Main navigation">{nav.map((item) => <Link onClick={() => setOpen(false)} className={active === item.label ? "active" : ""} aria-current={active === item.label ? "page" : undefined} href={item.href} key={item.label}><span className="nav-icon" aria-hidden="true">{item.label === "Today" ? "☼" : item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Portal" || item.label === "My account" ? "↗" : item.label === "Integrations" ? "✦" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && effectiveRole !== "customer" && clientCount > 0 && <em aria-label={`${clientCount} clients`}>{clientCount}</em>}</Link>)}</nav>
+      <div className="workspace-control">
+        <button className="workspace" type="button" onClick={() => { setWorkspaceOpen(!workspaceOpen); setWorkspaceError(""); }} aria-haspopup="menu" aria-expanded={workspaceOpen}>
+          <span className="workspace-avatar">{initials(session.organization?.name || "Torres & Co.")}</span><span className="workspace-copy"><small>{session.organization?.kind === "client" ? "Client workspace" : "Agency workspace"}</small><strong>{session.organization?.name || "Torres & Co."}</strong></span><span className="workspace-chevron" aria-hidden="true">⌄</span>
+        </button>
+        {workspaceOpen && <div className="workspace-menu" role="menu" aria-label="Choose a workspace">
+          <div className="workspace-menu-heading"><strong>Switch workspace</strong><small>Only workspaces you can access are shown.</small></div>
+          <div className="workspace-options">{organizations.map((organization) => <button type="button" role="menuitemradio" aria-checked={organization.id === session.organization?.id} className="workspace-option" key={organization.id} onClick={() => void chooseWorkspace(organization)} disabled={Boolean(workspaceBusy)}><span>{initials(organization.name)}</span><div><strong>{organization.name}</strong><small>{organization.kind === "agency" ? "Agency" : "Client"} · {organizationRoleLabel(organization.role, session.profile.role)}</small></div><b>{workspaceBusy === organization.id ? "…" : organization.id === session.organization?.id ? "✓" : "→"}</b></button>)}</div>
+          {effectiveRole !== "customer" && clients.length > 0 && <div className="workspace-preview-section"><span>View as client</span><small>Preview mode is labeled and does not change your account.</small>{clients.map((client) => <Link href={`/portal/?previewClient=${encodeURIComponent(client.id)}`} onClick={() => { setWorkspaceOpen(false); setOpen(false); }} key={client.id}><i>{client.initials}</i><strong>{client.name}</strong><b>Preview →</b></Link>)}</div>}
+          {workspaceError && <p className="workspace-error" role="alert">{workspaceError}</p>}
+        </div>}
+      </div>
+      <nav aria-label="Main navigation">{nav.map((item) => <Link onClick={() => setOpen(false)} className={active === item.label ? "active" : ""} aria-current={active === item.label ? "page" : undefined} href={item.href} key={item.label}><span className="nav-icon" aria-hidden="true">{item.label === "Today" ? "☼" : item.label === "Overview" ? "◈" : item.label === "Clients" ? "◎" : item.label === "Portal" || item.label === "My account" ? "↗" : item.label === "Integrations" ? "✦" : item.label === "Reports" ? "▤" : "⚙"}</span>{item.label}{item.label === "Clients" && effectiveRole !== "customer" && clients.length > 0 && <em aria-label={`${clients.length} clients`}>{clients.length}</em>}</Link>)}</nav>
       <div className="sidebar-bottom"><div className="profile">{avatarImage ? <img className="avatar avatar-image" src={avatarImage} alt="" /> : <span className="avatar">{avatar}</span>}<div><strong>{displayName}</strong><small>{accessLabel}</small></div><button className="logout-button" onClick={logout}>Log out</button></div></div>
     </aside>
     <main className="main">
