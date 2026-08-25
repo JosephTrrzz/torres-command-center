@@ -62,10 +62,13 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "magiclink", email, redirect_to: redirectTo }) });
     const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; msg?: string; message?: string };
     if (linkResponse.ok && linkBody.action_link) return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
+    const inviteLinkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "invite", email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
+    const inviteLinkBody = await inviteLinkResponse.json().catch(() => ({})) as { action_link?: string; msg?: string; message?: string };
+    if (inviteLinkResponse.ok && inviteLinkBody.action_link) return json({ invited: true, email, activationLink: inviteLinkBody.action_link, message: "A new activation link is ready. Copy it and send it to the client." });
     const inviteAgain = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
     const inviteAgainBody = await inviteAgain.json().catch(() => ({})) as { msg?: string; message?: string };
-    if (inviteAgain.ok) return json({ invited: true, email, message: "The client does not have an account yet. A new activation invitation has been sent." });
-    return json({ error: inviteAgainBody.msg || inviteAgainBody.message || linkBody.msg || linkBody.message || "Supabase could not prepare an activation link." }, 502);
+    if (inviteAgain.ok) return json({ invited: true, email, message: "A new activation invitation was sent by email." });
+    return json({ error: inviteAgainBody.msg || inviteAgainBody.message || inviteLinkBody.msg || inviteLinkBody.message || linkBody.msg || linkBody.message || "Supabase could not prepare an activation link." }, 502);
   }
 
   const inviteResponse = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
