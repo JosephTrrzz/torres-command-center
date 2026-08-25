@@ -77,6 +77,9 @@ export default function PortalPage() {
       }
 
       try {
+        if (session?.profile.role === "customer") {
+          await fetch("/api/customer-activate", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` } });
+        }
         const customerAccount = await fetchCustomerAccountByEmail(email);
         if (!customerAccount) {
           if (!cancelled) setMessage("Your customer portal is not active yet. Please contact Torres & Co. Technology.");
