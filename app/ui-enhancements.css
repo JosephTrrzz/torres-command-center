@@ -160,6 +160,7 @@ select:not([multiple]):disabled,
 .portal-preview-banner span { color:var(--muted); }
 .portal-preview-banner a { margin-left:auto; color:#927342; font-weight:800; }
 .client-card-actions { display:flex; flex-wrap:wrap; gap:1rem; align-items:center; }
+.activation-link-card{display:grid;gap:1rem;margin-bottom:1.25rem}.activation-link-card h2{margin:.25rem 0 .5rem}.activation-link-card p{margin:0;color:var(--muted);font-size:12px}.activation-link-row{display:flex;gap:.75rem;align-items:center}.activation-link-row input{min-width:0;flex:1;padding:.85rem 1rem;border:1px solid var(--line);border-radius:10px;background:#faf9f6;color:var(--charcoal);font:12px 'DM Mono',monospace}.client-card-actions button:disabled{opacity:.55;cursor:wait}@media(max-width:640px){.activation-link-row{align-items:stretch;flex-direction:column}}
 @media(max-width:900px){ .portal-hero{align-items:flex-start; flex-direction:column}.portal-details{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media(max-width:680px){ .portal-grid{grid-template-columns:1fr}.portal-company-card{grid-column:auto}.portal-details,.portal-stat-grid,.portal-metrics{grid-template-columns:1fr}.portal-hero,.portal-card,.portal-empty{padding:1.2rem}.portal-badge{align-self:flex-start}.portal-preview-banner{align-items:flex-start; flex-direction:column}.portal-preview-banner a{margin-left:0} }
 
