@@ -192,10 +192,20 @@ export default function ClientsPage() {
 
       <section className="client-grid client-grid-wide">
         {clients.map((client) => (
-          <div key={client.id}>
+          <article className="client-account-card" key={client.id}>
             <ClientCard client={client} />
-            <div className="client-card-actions"><button className="text-link" type="button" onClick={() => openEdit(client)}>Edit client →</button><Link className="text-link" href={`/onboarding/?client=${encodeURIComponent(client.id)}`}>Open onboarding →</Link><button className="text-link" type="button" onClick={() => void sendActivation(client)} disabled={activationBusyId === client.id}>{activationBusyId === client.id ? "Preparing activation…" : activationSent[client.id] ? "Resend activation link →" : "Send activation link →"}</button><Link className="text-link" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}>Preview client portal →</Link></div>
-          </div>
+            <div className="client-account-actions">
+              <Link className="client-account-primary" href={`/clients/detail/?id=${encodeURIComponent(client.id)}`}>
+                <span><small>Account workspace</small>Manage client</span><b>→</b>
+              </Link>
+              <div className="client-account-action-grid">
+                <button className="client-account-action" type="button" onClick={() => openEdit(client)}><span>Edit profile</span><b>→</b></button>
+                <Link className="client-account-action" href={`/onboarding/?client=${encodeURIComponent(client.id)}`}><span>Onboarding</span><b>→</b></Link>
+                <button className="client-account-action" type="button" onClick={() => void sendActivation(client)} disabled={activationBusyId === client.id}><span>{activationBusyId === client.id ? "Preparing…" : activationSent[client.id] ? "Resend activation" : "Send activation"}</span><b>→</b></button>
+                <Link className="client-account-action" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}><span>Preview portal</span><b>→</b></Link>
+              </div>
+            </div>
+          </article>
         ))}
       </section>
     </Shell>

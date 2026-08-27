@@ -729,3 +729,34 @@ form textarea:disabled {
   .operations-next-actions .operations-composer summary{min-height:60px;padding:12px 13px}
   .operations-website-link{width:100%;justify-content:center}
 }
+
+/* Clients workspace: keep each account summary and every related action in one card. */
+.client-grid-wide{gap:18px;align-items:stretch}
+.client-grid-wide>article{min-width:0}
+.client-account-card{display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 12px 34px rgba(19,34,56,.045);transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.client-account-card:hover{border-color:#cfb98f;box-shadow:0 17px 40px rgba(19,34,56,.08);transform:translateY(-2px)}
+.client-account-card .client-card-wrap{display:flex;flex:1;gap:0}
+.client-account-card .client-card{display:flex;flex:1;flex-direction:column;width:100%;min-height:255px;padding:20px;border:0;border-radius:0;background:#fff;box-shadow:none}
+.client-account-card .client-card:hover{transform:none;box-shadow:none}
+.client-card-status{display:inline-flex;align-items:center;gap:7px;padding:6px 8px;border-radius:999px;background:#f6f5f0;color:#66726b;font:700 7px 'DM Mono',monospace;letter-spacing:.045em;text-transform:uppercase}
+.client-card-status .status-dot{position:static;width:7px;height:7px;flex:0 0 auto}
+.client-account-card .health-row{margin-top:auto}
+.client-account-card .card-footer{margin-top:18px}
+.client-account-card .card-footer strong{font-size:9px;color:var(--ink)}
+.client-account-card .client-site-link{min-height:42px;padding:0 20px;border-top:1px solid var(--line);background:#fcfbf8;color:#8f6d35;font-size:9px}
+.client-account-card .client-site-link:hover,.client-account-card .client-site-link:focus-visible{background:#fff8ea;outline:none}
+.client-account-card .client-site-link.disabled{color:var(--muted)}
+.client-account-actions{display:grid;gap:8px;padding:12px;border-top:1px solid var(--line);background:#f5f1e8}
+.client-account-primary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:11px 14px;border-radius:12px;background:var(--ink);color:#fff;transition:background .18s ease,transform .18s ease}
+.client-account-primary:hover,.client-account-primary:focus-visible{background:#21334b;outline:none;transform:translateY(-1px)}
+.client-account-primary>span{display:grid;gap:3px;font-size:10px;font-weight:800}
+.client-account-primary small{color:var(--lime);font:700 7px 'DM Mono',monospace;letter-spacing:.055em;text-transform:uppercase}
+.client-account-primary>b{color:var(--lime);font-size:16px}
+.client-account-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.client-account-action{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;min-height:40px;padding:9px 11px;border:1px solid #ded8cd;border-radius:10px;background:#fff;color:var(--ink);text-align:left;transition:border-color .18s ease,background .18s ease}
+.client-account-action:hover,.client-account-action:focus-visible{border-color:#b08d57;background:#fffaf0;outline:none}
+.client-account-action span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;font-weight:800}
+.client-account-action b{color:#9a7335;font-size:11px}
+.client-account-action:disabled{cursor:wait;opacity:.58}
+@media(max-width:680px){.client-account-card{border-radius:16px}.client-account-card .client-card{min-height:230px}.client-account-action-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:380px){.client-account-action-grid{grid-template-columns:1fr}}
