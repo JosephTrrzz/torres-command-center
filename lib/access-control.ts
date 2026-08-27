@@ -12,6 +12,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
     { href: "/clients/", label: "Clients" },
     { href: "/crm/", label: "CRM" },
     { href: "/projects/", label: "Projects" },
+    { href: "/operations/", label: "Operations" },
     { href: "/portal/", label: "Portal" },
     { href: "/integrations/", label: "Integrations" },
     { href: "/reports/", label: "Reports" },
@@ -23,6 +24,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
     { href: "/clients/", label: "Clients" },
     { href: "/crm/", label: "CRM" },
     { href: "/projects/", label: "Projects" },
+    { href: "/operations/", label: "Operations" },
     { href: "/integrations/", label: "Integrations" },
     { href: "/reports/", label: "Reports" },
   ],
@@ -30,6 +32,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
     { href: "/today/", label: "Today" },
     { href: "/onboarding/", label: "Onboarding" },
     { href: "/projects/", label: "Projects" },
+    { href: "/operations/", label: "Operations" },
     { href: "/portal/", label: "My account" },
   ],
 };
@@ -70,8 +73,8 @@ function matchesRoute(pathname: string, route: string) {
 export function canAccessPath(role: AppRole, pathname: string) {
   if (matchesRoute(pathname, "/login")) return true;
   if (role === "owner") return true;
-  if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects");
+  if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects") || matchesRoute(pathname, "/operations");
 
-  const employeeRoots = ["/today", "/clients", "/crm", "/projects", "/integrations", "/reports", "/portal"];
+  const employeeRoots = ["/today", "/clients", "/crm", "/projects", "/operations", "/integrations", "/reports", "/portal"];
   return pathname === "/" || employeeRoots.some((root) => matchesRoute(pathname, root));
 }

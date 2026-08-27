@@ -1,6 +1,6 @@
 # Torres OS status
 
-Updated 2026-08-25.
+Updated 2026-08-26.
 
 ## Production foundation
 
@@ -19,6 +19,7 @@ Updated 2026-08-25.
 | Business Profile | External gate | Google project quota remains 0 QPM pending API approval. |
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
 | CRM | Live vertical slice | Client-scoped lead capture, assignment, pipeline updates, appointments, follow-up tasks, and activity history. |
+| Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, and customer-safe visibility. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |
 
 ## Phase status
@@ -26,12 +27,12 @@ Updated 2026-08-25.
 - Phase 0 repository audit: complete.
 - Phase 1 foundation: complete for the controlled organization cutover. Legacy profile fields remain only as a compatibility fallback for unmigrated accounts.
 - Phase 2 agency and client management: in progress; the membership-bound workspace selector and authorized client preview flow are implemented.
-- Phase 3 CRM and operations: in progress; the lead-to-appointment vertical slice is implemented and production-migrated.
+- Phase 3 CRM and operations: implementation complete; the lead-to-appointment workflow now continues into customer 360, jobs, scheduling, estimates, documents, tasks, activity, and client-visible approvals.
 - Phases 4–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-25: 27 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 15 static routes, including `/today/`, `/projects/`, and `/crm/`. The Phase 1 organization, Phase 2 onboarding/project delivery, and Phase 3 CRM migrations completed successfully. The CRM migration added four RLS-protected tenant tables and two permission keys without seeded demo records. Protected Functions now cover organization access, invitations, onboarding, projects, reports, Google resources, and the lead-to-appointment CRM workflow.
+On 2026-08-26: 30 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 16 static routes, including `/today/`, `/projects/`, `/crm/`, and `/operations/`. Phase 3 adds RLS-protected operational tables and permissions without seeded demo records. Protected Functions now cover organization access, invitations, onboarding, projects, reports, Google resources, CRM, jobs, schedules, estimates, documents, and customer approvals.
 
 ## Known limitations
 
@@ -39,6 +40,6 @@ On 2026-08-25: 27 unit tests passed, application TypeScript passed, Cloudflare F
 - Invitation links are generated securely by Supabase and presented to an administrator for delivery; branded transactional email delivery is not yet configured.
 - Some preferences remain browser-local and are not yet portable across devices.
 - Business Profile metrics cannot load until Google grants API quota.
-- CRM has a production lead-to-appointment foundation; customer 360 expansion, jobs, estimates, documents, and broader calendar workflows remain planned.
+- Operational documents currently use validated HTTPS resource links; managed file uploads and storage lifecycle controls remain a later enhancement.
 - Communications, AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
 - Reports are live but still need persisted snapshots, provenance display, scheduled delivery, and broader tests.

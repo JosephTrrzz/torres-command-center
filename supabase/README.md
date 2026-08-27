@@ -19,6 +19,11 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `user_preferences` | User settings synchronized per organization and device. | User settings |
 | `audit_events` | Immutable organization-scoped security and business history. | Audit history |
 | `event_outbox` | Durable background work for providers, notifications, analytics, AI, and automations. | Server workers only |
+| `service_jobs` | The operational record for scheduled or active client work, including status, priority, location, assignment, and client visibility. | Operations |
+| `job_activities` | Timeline notes and system events for a service job. | Operations → Job activity |
+| `job_estimates` | Estimate lifecycle, totals, approval state, and client-facing message for a job. | Operations → Estimates |
+| `job_estimate_items` | Server-validated line items that produce an estimate subtotal, tax, and total. | Operations → Estimate builder |
+| `job_documents` | Customer-safe links to proposals, agreements, photos, invoices, and other job records. | Operations → Documents |
 
 ## How the records connect
 
@@ -27,7 +32,12 @@ profiles ── client_id ──> clients <── client_id ── client_people
                               │
                               ├── client_id ── customer_accounts
                               ├── client_id ── google_connections
-                              └── client_id ── notifications <── user_id ── auth.users
+                              ├── client_id ── notifications <── user_id ── auth.users
+                              └── client_id ── service_jobs
+                                                   ├── job_activities
+                                                   ├── crm_tasks
+                                                   ├── job_estimates ── job_estimate_items
+                                                   └── job_documents
 ```
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
@@ -46,6 +56,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 4. Confirm the customer's `profiles` row is assigned to the correct `client_id`.
 5. Connect Google from **Integrations** and map only that client's resources.
 6. Open **Reports** and verify the saved mapping and live metrics.
+7. Open **Operations** to create real service jobs, schedule work, prepare estimates, and choose which updates the client may see.
 
 ## Important safety rules
 
@@ -56,6 +67,8 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Do not insert shared notifications without a specific `user_id`; every notification belongs to one authenticated user.
 - Use the app for normal changes so validation and access controls run consistently.
 - Do not insert `audit_events`, `organization_memberships`, `organization_invitations`, or `event_outbox` rows directly from browser code. Those mutations belong behind authenticated server boundaries.
+- Do not calculate or overwrite estimate totals directly. The Operations Function validates line items and calculates totals server-side.
+- Mark job notes, documents, and estimates client-visible only when they are ready for the customer portal.
 
 ## Add descriptions inside Supabase
 

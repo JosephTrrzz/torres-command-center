@@ -1,6 +1,6 @@
 # Torres OS architecture
 
-Updated 2026-08-25.
+Updated 2026-08-26.
 
 ## Current runtime
 
@@ -47,3 +47,21 @@ Torres AI receives an explicit organization and user context. Retrieval is tenan
 - Database and auth: Supabase project documented in the operator checklist
 
 No browser bundle may contain the Supabase service role, Google client secret, provider access token, or AI provider secret.
+
+## Phase 3 operations domain
+
+The operations workspace extends a won lead or active project into an auditable service workflow:
+
+```text
+client + locations + contacts
+            │
+            └── service job ── activities
+                    ├── tasks
+                    ├── estimates ── line items
+                    ├── documents
+                    └── calendar schedule
+```
+
+Customer 360 is assembled server-side from the client master record, contacts, locations, CRM history, projects, tasks, and service jobs. All operational writes go through the authenticated `/api/operations` boundary. The Function checks the caller's organization permission and requested client before writing, calculates estimate totals on the server, records activity and audit events, and emits user notifications when an approval or customer-visible update needs attention.
+
+RLS applies both tenant membership and explicit client scope. Customer roles can read only records marked client-visible for their own `current_client_id()` and can respond only to estimates awaiting a decision. Owners and authorized employees manage scheduling, assignments, status, estimates, documents, and tasks. Operational documents are represented as validated HTTPS resources; secrets and provider tokens are never stored as document URLs.
