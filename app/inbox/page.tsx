@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { appRoleForOrganizationRole } from "../../lib/access-control";
@@ -41,6 +41,8 @@ function relativeDateLabel(value: string) {
 function lastMessage(conversation: Conversation) {
   return conversation.messages[conversation.messages.length - 1] || null;
 }
+
+type WorkspaceLoadMode = "initial" | "manual" | "background";
 
 function ConversationListItem({ conversation, active, onChoose }: { conversation: Conversation; active: boolean; onChoose: (id: string) => void }) {
   const latest = lastMessage(conversation);
@@ -88,37 +90,46 @@ export default function InboxPage() {
   const [snapshot, setSnapshot] = useState<CommunicationsSnapshot | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [newThreadOpen, setNewThreadOpen] = useState(false);
   const [newThread, setNewThread] = useState({ subject: "", channel: "internal", recipients: "", body: "" });
   const [replyBody, setReplyBody] = useState("");
+  const loadSequence = useRef(0);
 
   const selectedConversation = snapshot?.conversations.find((conversation) => conversation.id === selectedConversationId)
     || snapshot?.conversations[0]
     || null;
   const canWrite = Boolean(snapshot?.canManage || snapshot?.isClient);
 
-  async function loadWorkspace(activeSession: AuthSession, clientId?: string) {
-    setLoading(true);
-    setError("");
+  const loadWorkspace = useCallback(async (activeSession: AuthSession, clientId?: string, mode: WorkspaceLoadMode = "initial") => {
+    const requestId = ++loadSequence.current;
+    if (mode === "initial") setLoading(true);
+    if (mode === "manual") setRefreshing(true);
+    if (mode !== "background") setError("");
     try {
       const next = await fetchCommunications(activeSession, clientId);
+      if (requestId !== loadSequence.current) return;
       const requestedConversation = new URLSearchParams(window.location.search).get("conversation") || "";
       setSnapshot(next);
+      setLastRefreshedAt(new Date());
       setSelectedConversationId((current) => next.conversations.some((conversation) => conversation.id === requestedConversation)
         ? requestedConversation
         : next.conversations.some((conversation) => conversation.id === current)
           ? current
           : next.conversations[0]?.id || "");
     } catch (loadError) {
-      setSnapshot(null);
+      if (requestId !== loadSequence.current || mode === "background") return;
+      if (mode === "initial") setSnapshot(null);
       setError(loadError instanceof Error ? loadError.message : "The inbox could not be loaded.");
     } finally {
-      setLoading(false);
+      if (mode === "initial") setLoading(false);
+      if (mode === "manual") setRefreshing(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     const stored = readStoredSession();
@@ -143,7 +154,28 @@ export default function InboxPage() {
       setLoading(false);
       setError("Client workspaces could not be loaded.");
     });
-  }, []);
+  }, [loadWorkspace]);
+
+  useEffect(() => {
+    if (!session || !snapshot) return;
+    const clientId = snapshot.isClient ? undefined : selectedClientId;
+    const refreshVisibleInbox = () => {
+      if (document.visibilityState === "visible" && !busy && !refreshing) {
+        void loadWorkspace(session, clientId, "background");
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshVisibleInbox();
+    };
+    const intervalId = window.setInterval(refreshVisibleInbox, 3000);
+    window.addEventListener("focus", refreshVisibleInbox);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshVisibleInbox);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [busy, loadWorkspace, refreshing, selectedClientId, session, snapshot]);
 
   function chooseClient(clientId: string) {
     if (!session) return;
@@ -174,6 +206,7 @@ export default function InboxPage() {
       const response = await changeCommunications(session, { clientId: snapshot.client.id || selectedClientId, ...input });
       if (!response.snapshot) throw new Error("The inbox returned an incomplete response.");
       setSnapshot(response.snapshot);
+      setLastRefreshedAt(new Date());
       setSelectedConversationId((current) => response.snapshot?.conversations.some((conversation) => conversation.id === current)
         ? current
         : response.snapshot?.conversations[0]?.id || "");
@@ -216,6 +249,11 @@ export default function InboxPage() {
     });
   }
 
+  function refreshInbox() {
+    if (!session || !snapshot) return;
+    void loadWorkspace(session, snapshot.isClient ? undefined : selectedClientId, "manual");
+  }
+
   return (
     <Shell active="Inbox">
       <div className="page-heading communications-heading">
@@ -224,7 +262,21 @@ export default function InboxPage() {
           <h1>Shared inbox</h1>
           <p className="lede">Keep client questions, delivery updates, and future outbound campaigns attached to the correct account.</p>
         </div>
-        {clients.length > 0 && snapshot?.canManage && <BrandSelect label="Client" value={selectedClientId} onChange={chooseClient} options={clients.map((client) => ({ value: client.id, label: client.name, description: [client.industry, client.location].filter(Boolean).join(" · ") || "Client workspace" }))} />}
+        {snapshot && (
+          <div className="communications-heading-actions">
+            {clients.length > 0 && snapshot?.canManage && <BrandSelect label="Client" value={selectedClientId} onChange={chooseClient} options={clients.map((client) => ({ value: client.id, label: client.name, description: [client.industry, client.location].filter(Boolean).join(" · ") || "Client workspace" }))} />}
+            <div className="inbox-live-control">
+              <span className="inbox-live-status">
+                <i aria-hidden="true" />
+                <span>{lastRefreshedAt ? `Updated ${lastRefreshedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" })} · Live every 3 sec` : "Live updates every 3 sec"}</span>
+              </span>
+              <button className="inbox-refresh-button" type="button" onClick={refreshInbox} disabled={refreshing || loading} aria-label="Refresh inbox messages">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M18.1 9A7 7 0 0 0 6.4 6.4L4 9m16 6-2.4 2.6A7 7 0 0 1 5.9 15" /></svg>
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="communications-feedback" aria-live="polite">
