@@ -52,6 +52,14 @@ Project progress is calculated as completed milestones divided by total mileston
 
 The protected `/api/crm` Function is the CRM mutation boundary. It validates organization and client scope, requires CRM permissions, creates appointment follow-up tasks as one workflow, and emits audit, notification, and outbox records. Direct authenticated writes are revoked; RLS preserves tenant-scoped reads. The migration contains no demo records.
 
+## Phase 4 communications foundation
+
+- `conversations`: client-scoped inbox threads with explicit channel, priority, lifecycle status, and client visibility.
+- `message_participants`: normalized staff, client, external, and system participants attached to a conversation.
+- `messages`: immutable communication records with direction, delivery truth, recipients, content, and client visibility.
+
+The protected `/api/communications` Function is the only mutation boundary. Staff and client users can exchange secure internal messages inside the Command Center; email can be prepared as an explicit draft but is never shown as sent until a delivery provider returns a real provider message ID. SMS and voice are marked not configured. Client RLS requires both a client-visible message and a client-visible parent conversation for the caller's assigned client. Each shared message produces audit/outbox history and a persisted notification for the other party.
+
 ## Planned domain groups
 
 ### CRM and operations
@@ -62,9 +70,9 @@ The protected `/api/crm` Function is the CRM mutation boundary. It validates org
 
 `goals`, `goal_progress`, `opportunities`, `opportunity_evidence`, `recommendations`, `daily_briefings`, `weekly_reports`, `ai_threads`, `ai_messages`, `ai_citations`, and `ai_approvals`.
 
-### Communications and marketing
+### Communications and marketing expansion
 
-`conversations`, `messages`, `message_participants`, `campaigns`, `campaign_deliveries`, `newsletter_issues`, `review_requests`, `call_records`, and `receptionist_actions`.
+`campaigns`, `campaign_deliveries`, `newsletter_issues`, `review_requests`, `call_records`, and `receptionist_actions`. The live `conversations`, `messages`, and `message_participants` tables provide the secure inbox foundation for these later adapters and workflows.
 
 ### Integrations and analytics
 

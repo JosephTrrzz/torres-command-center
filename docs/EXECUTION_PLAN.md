@@ -36,15 +36,19 @@ Status: in progress.
 
 ## Phase 3 — CRM, customers, tasks, and calendar
 
-Status: in progress.
+Status: complete for the protected operations vertical slice.
 
 - Lead capture, assignment, explicit pipeline status, appointments, follow-up tasks, and activity history: implemented, migrated, and production-verified as the first protected vertical slice.
 - The completed workflow runs website/referral lead → assignment → appointment → follow-up task without seeded demo data.
-- Customer 360 expansion, jobs, estimates, documents, and broader calendar operations remain for the next Phase 3 slices.
+- Customer 360, jobs, schedules, estimates, documents, client approvals, activity, and task/calendar operations are implemented, migrated, and production-verified.
 
 ## Phase 4 — communications and marketing
 
-- Shared inbox, email/SMS/voice adapters, campaigns, newsletters, review requests, and AI receptionist foundations.
+Status: in progress.
+
+- Secure shared inbox with client-scoped conversations, staff/client replies, visibility controls, lifecycle status, priority, notifications, and audit/outbox history: implemented as the first vertical slice.
+- Outbound email: draft-only by design until a provider is connected and delivery/webhook truth is implemented.
+- Next slices: transactional email, SMS/voice adapters, campaigns, newsletters, review requests, and AI receptionist foundations.
 
 ## Phase 5 — integrations and normalization
 

@@ -20,6 +20,7 @@ Updated 2026-08-26.
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
 | CRM | Live vertical slice | Client-scoped lead capture, assignment, pipeline updates, appointments, follow-up tasks, and activity history. |
 | Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, and customer-safe visibility. |
+| Shared inbox | Phase 4 vertical slice | Client-scoped secure conversations, agency/client replies, priorities, statuses, notifications, audit/outbox history, and explicit email-draft state. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |
 
 ## Phase status
@@ -28,11 +29,12 @@ Updated 2026-08-26.
 - Phase 1 foundation: complete for the controlled organization cutover. Legacy profile fields remain only as a compatibility fallback for unmigrated accounts.
 - Phase 2 agency and client management: in progress; the membership-bound workspace selector and authorized client preview flow are implemented.
 - Phase 3 CRM and operations: implementation complete; the lead-to-appointment workflow now continues into customer 360, jobs, scheduling, estimates, documents, tasks, activity, and client-visible approvals.
-- Phases 4–11: planned, not production-complete.
+- Phase 4 communications and marketing: in progress; the secure shared-inbox vertical slice is implemented, while provider-backed email, SMS/voice, campaigns, review requests, and AI receptionist workflows remain.
+- Phases 5–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-26: 30 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 16 static routes, including `/today/`, `/projects/`, `/crm/`, and `/operations/`. Phase 3 adds RLS-protected operational tables and permissions without seeded demo records. Protected Functions now cover organization access, invitations, onboarding, projects, reports, Google resources, CRM, jobs, schedules, estimates, documents, and customer approvals.
+On 2026-08-26: 32 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated 17 static routes including `/inbox/`. The Phase 4 migration creates no seeded conversations or messages.
 
 ## Known limitations
 
@@ -41,5 +43,6 @@ On 2026-08-26: 30 unit tests passed, application TypeScript passed, Cloudflare F
 - Some preferences remain browser-local and are not yet portable across devices.
 - Business Profile metrics cannot load until Google grants API quota.
 - Operational documents currently use validated HTTPS resource links; managed file uploads and storage lifecycle controls remain a later enhancement.
-- Communications, AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
+- Secure in-app communications are implemented. Branded outbound email remains draft-only until a delivery provider is connected; SMS, voice, campaigns, review requests, and AI receptionist workflows remain roadmap capabilities.
+- AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
 - Reports are live but still need persisted snapshots, provenance display, scheduled delivery, and broader tests.

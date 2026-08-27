@@ -65,3 +65,22 @@ client + locations + contacts
 Customer 360 is assembled server-side from the client master record, contacts, locations, CRM history, projects, tasks, and service jobs. All operational writes go through the authenticated `/api/operations` boundary. The Function checks the caller's organization permission and requested client before writing, calculates estimate totals on the server, records activity and audit events, and emits user notifications when an approval or customer-visible update needs attention.
 
 RLS applies both tenant membership and explicit client scope. Customer roles can read only records marked client-visible for their own `current_client_id()` and can respond only to estimates awaiting a decision. Owners and authorized employees manage scheduling, assignments, status, estimates, documents, and tasks. Operational documents are represented as validated HTTPS resources; secrets and provider tokens are never stored as document URLs.
+
+## Phase 4 communications domain
+
+The shared Inbox is a provider-independent communication boundary:
+
+```text
+staff or client browser
+        │ signed Supabase session
+        ▼
+/api/communications
+        ├── conversation + immutable message
+        ├── audit event + event outbox
+        ├── recipient notification
+        └── future provider adapter
+```
+
+Internal messages are real client-visible records and are available immediately in the customer portal's Inbox. Email is deliberately draft-only until an approved provider is configured; SMS and voice remain visibly unavailable. This prevents the interface from implying that an external message was delivered when no provider accepted it.
+
+The API enforces organization permission and client scope before every read or mutation. Customer users may read and reply only to client-visible conversations for their assigned client. Staff may manage thread priority and status. Direct authenticated table writes are revoked, and RLS repeats the tenant/client visibility boundary as defense in depth.
