@@ -27,6 +27,8 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `conversations` | One client-scoped shared Inbox thread with channel, priority, status, and client visibility. | Inbox |
 | `message_participants` | Staff, client, external, or system participants associated with an Inbox thread. | Inbox (server-managed) |
 | `messages` | Immutable secure messages or unsent email drafts, including real delivery state and client visibility. | Inbox |
+| `email_deliveries` | Server-owned outbound email attempts. Stores the provider ID, idempotency key, recipient list, and truthful sent/delivered/failed state. | Inbox (server-managed) |
+| `email_delivery_events` | Signed, deduplicated provider webhook events for delivery, delay, bounce, complaint, failure, and suppression history. | Inbox (server-managed) |
 
 ## How the records connect
 
@@ -43,7 +45,7 @@ profiles ── client_id ──> clients <── client_id ── client_people
                                                    └── job_documents
                               └── client_id ── conversations
                                                    ├── message_participants
-                                                   └── messages
+                                                   └── messages ── email_deliveries ── email_delivery_events
 ```
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
@@ -63,7 +65,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 5. Connect Google from **Integrations** and map only that client's resources.
 6. Open **Reports** and verify the saved mapping and live metrics.
 7. Open **Operations** to create real service jobs, schedule work, prepare estimates, and choose which updates the client may see.
-8. Open **Inbox** to start a secure client-visible conversation. Email is saved as a draft until an outbound provider is connected.
+8. Open **Inbox** to start a secure client-visible conversation. Email is saved as a draft first; when the verified provider is configured, staff review and send it from the thread while delivery state updates automatically.
 
 ## Important safety rules
 
@@ -81,7 +83,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 
 ## Phase migration order
 
-Apply migrations in the documented dependency order. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. The migration is additive, creates no example conversations, revokes browser writes, and includes table comments for the Supabase editor.
+Apply migrations in the documented dependency order. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql) before enabling the outbound email provider. Both migrations are additive, create no example conversations or delivery records, revoke browser writes, and include table comments for the Supabase editor.
 
 ## Add descriptions inside Supabase
 

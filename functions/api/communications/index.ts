@@ -7,12 +7,18 @@ import {
   type FunctionEnv,
 } from "../../_shared/auth";
 import { createNotification } from "../../_shared/notifications";
+import {
+  buildTransactionalEmailHtml,
+  emailConfigured,
+  sendTransactionalEmail,
+  type EmailEnv,
+} from "../../_shared/email";
 
-interface Env extends FunctionEnv {}
+interface Env extends FunctionEnv, EmailEnv {}
 
 type ClientRow = { id: string; organization_id: string | null; name: string; industry: string; location: string };
 type ConversationRow = { id: string; subject: string; channel: string; status: string; priority: string; client_visible: boolean; last_message_at: string; created_at: string };
-type MessageRow = { id: string; conversation_id: string; direction: string; channel: string; status: string; sender_name: string; sender_address: string; recipients: unknown; subject: string; body: string; client_visible: boolean; sent_at: string | null; created_at: string };
+type MessageRow = { id: string; conversation_id: string; direction: string; channel: string; status: string; sender_name: string; sender_address: string; recipients: unknown; subject: string; body: string; provider_message_id: string | null; error_detail: string; client_visible: boolean; sent_at: string | null; created_at: string };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -70,7 +76,7 @@ async function writeLifecycle(url: string, serviceKey: string, input: { organiza
   ]);
 }
 
-async function readSnapshot(url: string, serviceKey: string, context: AuthContext, client: ClientRow) {
+async function readSnapshot(url: string, serviceKey: string, context: AuthContext, client: ClientRow, env: Env) {
   const clientView = isClientContext(context);
   const visibility = clientView ? "&client_visible=eq.true" : "";
   const conversationResponse = await fetch(`${url}/rest/v1/conversations?client_id=eq.${encodeURIComponent(client.id)}${visibility}&select=id,subject,channel,status,priority,client_visible,last_message_at,created_at&order=last_message_at.desc`, { headers: serviceHeaders(serviceKey) });
@@ -78,7 +84,7 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
   const conversations = await conversationResponse.json().catch(() => []) as ConversationRow[];
   let messages: MessageRow[] = [];
   if (conversations.length) {
-    const messageResponse = await fetch(`${url}/rest/v1/messages?conversation_id=in.(${conversations.map((conversation) => conversation.id).join(",")})${visibility}&select=id,conversation_id,direction,channel,status,sender_name,sender_address,recipients,subject,body,client_visible,sent_at,created_at&order=created_at.asc`, { headers: serviceHeaders(serviceKey) });
+    const messageResponse = await fetch(`${url}/rest/v1/messages?conversation_id=in.(${conversations.map((conversation) => conversation.id).join(",")})${visibility}&select=id,conversation_id,direction,channel,status,sender_name,sender_address,recipients,subject,body,provider_message_id,error_detail,client_visible,sent_at,created_at&order=created_at.asc`, { headers: serviceHeaders(serviceKey) });
     if (!messageResponse.ok) return null;
     messages = await messageResponse.json().catch(() => []) as MessageRow[];
   }
@@ -91,7 +97,7 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     client: { id: client.id, name: client.name, industry: client.industry || "", location: client.location || "" },
     canManage: hasOrganizationPermission(context, "communications.manage") && !clientView,
     isClient: clientView,
-    delivery: { internal: "ready", email: "draft_only", sms: "not_configured", voice: "not_configured" },
+    delivery: { internal: "ready", email: emailConfigured(env) ? "ready" : "draft_only", sms: "not_configured", voice: "not_configured" },
     conversations: normalized,
     summary: {
       openConversations: normalized.filter((conversation) => conversation.status === "open").length,
@@ -136,7 +142,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   if (requestedClientId && !uuidPattern.test(requestedClientId)) return authJson({ error: "Choose a valid client." }, 400);
   const resolved = await authenticatedClient(request, env, requestedClientId);
   if ("response" in resolved) return resolved.response;
-  const snapshot = await readSnapshot(resolved.url, resolved.serviceKey, resolved.context, resolved.client);
+  const snapshot = await readSnapshot(resolved.url, resolved.serviceKey, resolved.context, resolved.client, env);
   if (!snapshot) return authJson({ error: "Communications storage is not ready. Apply supabase/communications.sql first." }, 503);
   return authJson({ snapshot });
 };
@@ -164,8 +170,93 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const rows = response.ok ? await response.json().catch(() => []) as ConversationRow[] : [];
     if (!response.ok || !rows[0]) return authJson({ error: "That conversation could not be updated." }, 400);
     await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.conversation_updated", entityType: "conversation", entityId: conversationId, clientId: client.id, metadata: { status, priority } });
-    const snapshot = await readSnapshot(url, serviceKey, context, client);
+    const snapshot = await readSnapshot(url, serviceKey, context, client, env);
     return authJson({ message: "Conversation updated.", snapshot });
+  }
+
+  if (action === "send_email") {
+    if (clientView) return authJson({ error: "Only workspace staff can send transactional email." }, 403);
+    if (!emailConfigured(env)) return authJson({ error: "Transactional email is not configured. Add the verified provider secrets before sending." }, 503);
+    const messageId = clean(input?.messageId, 36);
+    if (!uuidPattern.test(messageId)) return authJson({ error: "Choose a valid email draft." }, 400);
+    const messageResponse = await fetch(
+      `${url}/rest/v1/messages?id=eq.${encodeURIComponent(messageId)}&client_id=eq.${encodeURIComponent(client.id)}&channel=eq.email&direction=eq.outbound&select=id,conversation_id,direction,channel,status,sender_name,sender_address,recipients,subject,body,provider_message_id,error_detail,client_visible,sent_at,created_at&limit=1`,
+      { headers: serviceHeaders(serviceKey) },
+    );
+    const messageRows = messageResponse.ok ? await messageResponse.json().catch(() => []) as MessageRow[] : [];
+    const draft = messageRows[0];
+    if (!draft) return authJson({ error: "That email draft is not available for this client." }, 404);
+    if (draft.provider_message_id || (draft.status !== "draft" && draft.status !== "failed")) return authJson({ error: "This email has already been submitted. Create a new draft instead of sending it twice." }, 409);
+    const draftRecipients = recipients(draft.recipients);
+    if (!draftRecipients.length || draftRecipients.some((recipient) => !emailPattern.test(recipient))) return authJson({ error: "This draft needs at least one valid email recipient." }, 400);
+    const idempotencyKey = `communications-email-${draft.id}`;
+    const now = new Date().toISOString();
+    const deliveryResponse = await fetch(`${url}/rest/v1/email_deliveries?on_conflict=message_id`, {
+      method: "POST",
+      headers: serviceHeaders(serviceKey, "resolution=merge-duplicates,return=representation"),
+      body: JSON.stringify({
+        organization_id: organizationId,
+        client_id: client.id,
+        message_id: draft.id,
+        template_key: "inbox_email",
+        recipients: draftRecipients,
+        subject: draft.subject,
+        status: "queued",
+        provider: "resend",
+        idempotency_key: idempotencyKey,
+        error_detail: "",
+        updated_at: now,
+      }),
+    });
+    const deliveryRows = deliveryResponse.ok ? await deliveryResponse.json().catch(() => []) as Array<{ id?: string }> : [];
+    if (!deliveryResponse.ok || !deliveryRows[0]?.id) return authJson({ error: "Transactional email storage is not ready. Apply supabase/transactional_email.sql first." }, 503);
+    await fetch(`${url}/rest/v1/messages?id=eq.${encodeURIComponent(draft.id)}`, {
+      method: "PATCH",
+      headers: serviceHeaders(serviceKey, "return=minimal"),
+      body: JSON.stringify({ status: "queued", error_detail: "" }),
+    });
+    try {
+      const provider = await sendTransactionalEmail(env, {
+        to: draftRecipients,
+        subject: draft.subject || "Update from Torres & Co. Technology",
+        text: draft.body,
+        html: buildTransactionalEmailHtml({ heading: draft.subject || "Client update", body: draft.body }),
+        idempotencyKey,
+      });
+      const sentAt = new Date().toISOString();
+      await Promise.all([
+        fetch(`${url}/rest/v1/email_deliveries?id=eq.${encodeURIComponent(deliveryRows[0].id || "")}`, {
+          method: "PATCH",
+          headers: serviceHeaders(serviceKey, "return=minimal"),
+          body: JSON.stringify({ status: "sent", provider_message_id: provider.id, sent_at: sentAt, error_detail: "", updated_at: sentAt }),
+        }),
+        fetch(`${url}/rest/v1/messages?id=eq.${encodeURIComponent(draft.id)}`, {
+          method: "PATCH",
+          headers: serviceHeaders(serviceKey, "return=minimal"),
+          body: JSON.stringify({ status: "sent", provider_message_id: provider.id, sent_at: sentAt, error_detail: "" }),
+        }),
+      ]);
+      await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.email_sent", entityType: "message", entityId: draft.id, clientId: client.id, metadata: { conversation_id: draft.conversation_id, provider: "resend", provider_message_id: provider.id } });
+      const snapshot = await readSnapshot(url, serviceKey, context, client, env);
+      return authJson({ message: "Email accepted by the provider. Delivery status will update automatically.", snapshot });
+    } catch (sendError) {
+      const detail = sendError instanceof Error ? sendError.message.slice(0, 500) : "Email provider rejected the request.";
+      const failedAt = new Date().toISOString();
+      await Promise.allSettled([
+        fetch(`${url}/rest/v1/email_deliveries?id=eq.${encodeURIComponent(deliveryRows[0].id || "")}`, {
+          method: "PATCH",
+          headers: serviceHeaders(serviceKey, "return=minimal"),
+          body: JSON.stringify({ status: "failed", error_detail: detail, updated_at: failedAt }),
+        }),
+        fetch(`${url}/rest/v1/messages?id=eq.${encodeURIComponent(draft.id)}`, {
+          method: "PATCH",
+          headers: serviceHeaders(serviceKey, "return=minimal"),
+          body: JSON.stringify({ status: "failed", error_detail: detail }),
+        }),
+      ]);
+      await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.email_failed", entityType: "message", entityId: draft.id, clientId: client.id, metadata: { conversation_id: draft.conversation_id, provider: "resend", error: detail } });
+      return authJson({ error: `Email was not sent: ${detail}` }, 502);
+    }
   }
 
   if (action !== "create_conversation" && action !== "add_message") return authJson({ error: "That communications action is not supported." }, 400);
@@ -217,6 +308,6 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ last_message_at: now, updated_at: now }) });
   await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: channel === "email" ? "communications.email_draft_created" : "communications.message_shared", entityType: "message", entityId: messageRows[0].id, clientId: client.id, metadata: { conversation_id: conversationId, channel, status } });
   if (channel === "internal") await notifyParticipants(url, serviceKey, context, client, conversationId, conversationSubject, body);
-  const snapshot = await readSnapshot(url, serviceKey, context, client);
-  return authJson({ message: channel === "email" ? "Email draft saved. Connect an email provider before sending." : "Message shared securely.", snapshot }, 201);
+  const snapshot = await readSnapshot(url, serviceKey, context, client, env);
+  return authJson({ message: channel === "email" ? (emailConfigured(env) ? "Email draft saved for review. Send it when ready." : "Email draft saved. Connect an email provider before sending.") : "Message shared securely.", snapshot }, 201);
 };

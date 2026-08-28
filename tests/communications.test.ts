@@ -5,6 +5,7 @@ import {
   labelCommunicationValue,
   type Conversation,
 } from "../lib/communications";
+import { buildTransactionalEmailHtml, deliveryStatusForResendEvent, escapeEmailHtml } from "../functions/_shared/email";
 
 const baseConversation: Conversation = {
   id: "conversation-1",
@@ -34,6 +35,8 @@ describe("communications summaries", () => {
           recipients: [],
           subject: baseConversation.subject,
           body: "The website is ready for review.",
+          provider_message_id: null,
+          error_detail: "",
           client_visible: true,
           sent_at: "2026-08-26T18:00:00.000Z",
           created_at: "2026-08-26T18:00:00.000Z",
@@ -56,6 +59,8 @@ describe("communications summaries", () => {
           recipients: ["client@example.com"],
           subject: "Launch reminder",
           body: "This message has not been sent.",
+          provider_message_id: null,
+          error_detail: "",
           client_visible: false,
           sent_at: null,
           created_at: "2026-08-26T19:00:00.000Z",
@@ -73,8 +78,24 @@ describe("communications summaries", () => {
 
   it("uses honest, readable delivery labels", () => {
     expect(communicationDeliveryLabel("internal")).toBe("Shared securely");
-    expect(communicationDeliveryLabel("email")).toBe("Email draft");
+    expect(communicationDeliveryLabel("email")).toBe("Email");
     expect(communicationDeliveryLabel("sms")).toBe("Sms not configured");
     expect(labelCommunicationValue("awaiting_review")).toBe("Awaiting Review");
+  });
+});
+
+describe("transactional email safety", () => {
+  it("escapes user content before rendering email HTML", () => {
+    expect(escapeEmailHtml(`<script>alert("x")</script>`)).toBe("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
+    const html = buildTransactionalEmailHtml({ heading: "Client <update>", body: "Hello & welcome" });
+    expect(html).toContain("Client &lt;update&gt;");
+    expect(html).toContain("Hello &amp; welcome");
+    expect(html).not.toContain("<update>");
+  });
+
+  it("maps only supported provider lifecycle events", () => {
+    expect(deliveryStatusForResendEvent("email.delivered")).toBe("delivered");
+    expect(deliveryStatusForResendEvent("email.bounced")).toBe("bounced");
+    expect(deliveryStatusForResendEvent("email.opened")).toBeNull();
   });
 });

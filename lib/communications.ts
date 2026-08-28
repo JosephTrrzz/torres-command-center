@@ -19,6 +19,8 @@ export interface CommunicationMessage {
   recipients: string[];
   subject: string;
   body: string;
+  provider_message_id: string | null;
+  error_detail: string;
   client_visible: boolean;
   sent_at: string | null;
   created_at: string;
@@ -42,7 +44,7 @@ export interface CommunicationsSnapshot {
   isClient: boolean;
   delivery: {
     internal: "ready";
-    email: "draft_only";
+    email: "ready" | "draft_only";
     sms: "not_configured";
     voice: "not_configured";
   };
@@ -73,6 +75,6 @@ export function buildCommunicationsSummary(conversations: Conversation[]): Commu
 
 export function communicationDeliveryLabel(channel: CommunicationChannel) {
   if (channel === "internal") return "Shared securely";
-  if (channel === "email") return "Email draft";
+  if (channel === "email") return "Email";
   return `${labelCommunicationValue(channel)} not configured`;
 }

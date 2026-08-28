@@ -65,7 +65,7 @@ function ConversationListItem({ conversation, active, onChoose }: { conversation
 function MessageBubble({ message, clientView }: { message: CommunicationMessage; clientView: boolean }) {
   const ownMessage = clientView ? message.direction === "inbound" : message.direction === "outbound";
   return (
-    <article className={`message-bubble ${ownMessage ? "is-own" : "is-other"} ${message.status === "draft" ? "is-draft" : ""}`}>
+    <article className={`message-bubble ${ownMessage ? "is-own" : "is-other"} is-${message.status}`}>
       <header>
         <div>
           <strong>{message.sender_name || "Workspace member"}</strong>
@@ -75,6 +75,7 @@ function MessageBubble({ message, clientView }: { message: CommunicationMessage;
       </header>
       {message.recipients.length > 0 && <p className="message-recipients"><b>To:</b> {message.recipients.join(", ")}</p>}
       <p className="message-body">{message.body}</p>
+      {message.status === "failed" && message.error_detail && <p className="message-error-detail" role="alert"><strong>Delivery failed:</strong> {message.error_detail}</p>}
       <footer>
         <span>{message.client_visible ? "Visible to client" : "Staff only"}</span>
         <strong>{message.status === "draft" ? "Draft — not sent" : labelCommunicationValue(message.status)}</strong>
@@ -249,6 +250,10 @@ export default function InboxPage() {
     });
   }
 
+  async function sendEmail(messageId: string) {
+    await mutate(`send-${messageId}`, { action: "send_email", messageId });
+  }
+
   function refreshInbox() {
     if (!session || !snapshot) return;
     void loadWorkspace(session, snapshot.isClient ? undefined : selectedClientId, "manual");
@@ -299,7 +304,7 @@ export default function InboxPage() {
 
           <section className="communications-readiness" aria-label="Channel readiness">
             <div><span className="readiness-mark is-ready">✓</span><p><strong>Secure inbox</strong><small>Ready for staff and client updates.</small></p></div>
-            <div><span className="readiness-mark">✉</span><p><strong>Email</strong><small>Draft-only until a delivery provider is connected.</small></p></div>
+            <div><span className={`readiness-mark ${snapshot.delivery.email === "ready" ? "is-ready" : ""}`}>{snapshot.delivery.email === "ready" ? "✓" : "✉"}</span><p><strong>Email</strong><small>{snapshot.delivery.email === "ready" ? "Provider connected. Draft, send, and track delivery." : "Draft-only until a delivery provider is connected."}</small></p></div>
             <div><span className="readiness-mark">·</span><p><strong>SMS &amp; voice</strong><small>Planned for a later Phase 4 connection.</small></p></div>
           </section>
 
@@ -317,7 +322,7 @@ export default function InboxPage() {
                   {!snapshot.isClient && <label>Channel<select value={newThread.channel} onChange={(event) => setNewThread({ ...newThread, channel: event.target.value })}>{COMMUNICATION_CHANNELS.filter((channel) => channel === "internal" || channel === "email").map((channel) => <option key={channel} value={channel}>{communicationDeliveryLabel(channel)}</option>)}</select></label>}
                   {newThread.channel === "email" && !snapshot.isClient && <label>Email recipient(s)<input required type="text" value={newThread.recipients} onChange={(event) => setNewThread({ ...newThread, recipients: event.target.value })} placeholder="client@example.com" /><small>Separate multiple addresses with commas.</small></label>}
                   <label>Message<textarea required value={newThread.body} onChange={(event) => setNewThread({ ...newThread, body: event.target.value })} placeholder={newThread.channel === "email" ? "Write the email draft…" : "Write the first shared update…"} /></label>
-                  {newThread.channel === "email" && <p className="draft-warning"><strong>Draft only.</strong> This will be saved for review and will not be sent.</p>}
+                  {newThread.channel === "email" && <p className="draft-warning"><strong>{snapshot.delivery.email === "ready" ? "Review before sending." : "Draft only."}</strong> {snapshot.delivery.email === "ready" ? "This saves a draft. Open the thread and send it when the recipient and content are correct." : "This will be saved for review and will not be sent."}</p>}
                   <button className="button button-dark" disabled={busy === "new-thread"}>{busy === "new-thread" ? "Saving…" : newThread.channel === "email" ? "Save email draft →" : "Share conversation →"}</button>
                 </form>
               )}
@@ -356,8 +361,22 @@ export default function InboxPage() {
                       <label>Reply to this conversation<textarea required value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder="Write a secure update…" /></label>
                       <div className="reply-form-footer"><small>This reply is shared with the client workspace.</small><button className="button button-dark" disabled={busy === "reply"}>{busy === "reply" ? "Sharing…" : "Share reply →"}</button></div>
                     </form>
-                  ) : selectedConversation.channel === "email" ? (
-                    <div className="email-draft-boundary"><strong>Email delivery is not connected.</strong><p>These messages remain reviewable drafts. A future provider connection will add sending, delivery, bounce, and reply tracking.</p></div>
+                  ) : selectedConversation.channel === "email" ? snapshot.delivery.email === "ready" && snapshot.canManage ? (
+                    <div className="email-draft-boundary is-ready">
+                      <strong>Transactional email is ready.</strong>
+                      <p>Review the recipient and message before sending. Status changes to sent only after the provider accepts it, then updates automatically when delivery succeeds or fails.</p>
+                      <div className="email-delivery-actions">
+                        {selectedConversation.messages.filter((emailMessage) => emailMessage.channel === "email" && (emailMessage.status === "draft" || emailMessage.status === "failed") && !emailMessage.provider_message_id).map((emailMessage) => (
+                          <button className="email-delivery-action" type="button" key={emailMessage.id} onClick={() => void sendEmail(emailMessage.id)} disabled={busy === `send-${emailMessage.id}`}>
+                            <span><strong>{emailMessage.status === "failed" ? "Retry email" : "Send email"}</strong><small>{emailMessage.recipients.join(", ")}</small></span>
+                            <b>{busy === `send-${emailMessage.id}` ? "Sending…" : "→"}</b>
+                          </button>
+                        ))}
+                        {!selectedConversation.messages.some((emailMessage) => emailMessage.channel === "email" && (emailMessage.status === "draft" || emailMessage.status === "failed") && !emailMessage.provider_message_id) && <small className="email-delivery-empty">No drafts are waiting to send. Delivery status will continue updating automatically.</small>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="email-draft-boundary"><strong>Email delivery is not connected.</strong><p>These messages remain reviewable drafts. Add the verified provider configuration before the app will offer a Send action.</p></div>
                   ) : null}
                 </>
               ) : (
