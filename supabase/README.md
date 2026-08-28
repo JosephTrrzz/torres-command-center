@@ -7,6 +7,7 @@ Supabase is the Command Center's database, authentication, and protected data la
 | Table | Plain-language purpose | Normal place to manage it |
 | --- | --- | --- |
 | `clients` | One row for each business you manage. Contains the business name, industry, address, website, contact details, and health score. | Command Center → Clients |
+| `crm_leads` | Client-scoped sales leads from protected CRM workflows and verified website intake, including source and deduplication provenance. | Command Center → CRM |
 | `client_people` | Optional people/contacts at a business. These are not login accounts. | Client detail → Contacts |
 | `profiles` | Application users and access rules. Connects a Supabase Auth user to an owner, employee, or customer role and, for customers, to a client. | Settings/access and onboarding flow |
 | `customer_accounts` | Client portal activation status and billing status. | Client onboarding/settings |
@@ -111,7 +112,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 
 ## Phase migration order
 
-Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql), [`communication_attachments.sql`](./communication_attachments.sql), [`marketing.sql`](./marketing.sql), and [`sms_voice.sql`](./sms_voice.sql). Provider credentials are configured separately in Cloudflare after the schema is installed. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
+Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. Run [`formspree_crm.sql`](./formspree_crm.sql) after [`crm.sql`](./crm.sql) before enabling verified website lead intake. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql), [`communication_attachments.sql`](./communication_attachments.sql), [`marketing.sql`](./marketing.sql), and [`sms_voice.sql`](./sms_voice.sql). Provider credentials are configured separately in Cloudflare after the schema is installed. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
 
 ## Add descriptions inside Supabase
 

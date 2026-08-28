@@ -18,7 +18,7 @@ Updated 2026-08-28.
 | Search Console | Live | Site mapping and real clicks/impressions. |
 | Business Profile | External gate | Google project quota remains 0 QPM pending API approval. |
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
-| CRM | Live vertical slice | Client-scoped lead capture, assignment, pipeline updates, appointments, follow-up tasks, and activity history. |
+| CRM | Live vertical slice | Client-scoped lead capture, assignment, pipeline updates, appointments, follow-up tasks, activity history, and a secure Formspree website-intake endpoint ready for provider configuration. |
 | Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, customer-safe visibility, and provider-tracked estimate approvals. |
 | Shared inbox | Phase 4 vertical slice | Client-scoped secure conversations, agency/client replies, priorities, statuses, notifications, audit/outbox history, provider-backed email delivery, private attachments, and automatic signature/confidentiality notices. |
 | SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
@@ -48,3 +48,4 @@ On 2026-08-28: the unit suite, application TypeScript, Cloudflare Function TypeS
 - Secure in-app communications, branded transactional email, controlled campaign/review-request delivery, and the consent-safe SMS/voice data and webhook foundation are implemented. Live SMS/voice delivery requires Twilio credentials and a verified sender; AI receptionist workflows remain roadmap capabilities.
 - AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
 - Reports are live but still need persisted snapshots, provenance display, scheduled delivery, and broader tests.
+- Website lead intake is implemented, but it remains inactive until `formspree_crm.sql` is applied and the signed Formspree webhook variables are configured in Cloudflare.
