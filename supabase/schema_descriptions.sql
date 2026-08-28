@@ -48,7 +48,7 @@ comment on table public.profiles is
 comment on column public.profiles.id is
   'Matches the user ID in auth.users. Do not invent or manually replace this value.';
 comment on column public.profiles.email is
-  'Email associated with the authenticated user.';
+  'Supabase Auth sign-in email synchronized from auth.users. This is separate from business, portal, billing, and contact email fields.';
 comment on column public.profiles.full_name is
   'Name displayed for the signed-in user.';
 comment on column public.profiles.role is

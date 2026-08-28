@@ -47,8 +47,8 @@ export default function ClientsPage() {
       };
 
       if (editing) {
-        await updateClient(editing.id, input);
-        setMessage("Client updated successfully");
+        const result = await updateClient(editing.id, input);
+        setMessage(result.message || "Client updated successfully in Supabase");
       } else {
         const session = readStoredSession();
         if (!session) throw new Error("Sign in again before creating a client.");

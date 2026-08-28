@@ -23,6 +23,7 @@ const checklistLabels = [
 export default function SettingsPage() {
   const [compact, setCompact] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [completed, setCompleted] = useState([true, true, false, false]);
   const [modal, setModal] = useState<Modal>(null);
@@ -52,16 +53,47 @@ export default function SettingsPage() {
       if (storedSecurity) setSecurity(JSON.parse(storedSecurity));
       if (storedChecklist) setCompleted(JSON.parse(storedChecklist));
     } catch { /* Keep safe starter defaults. */ }
+    const session = readStoredSession();
+    if (session?.access_token) {
+      fetch("/api/settings", { headers: { Authorization: `Bearer ${session.access_token}` } })
+        .then(async (response) => {
+          const body = await response.json().catch(() => ({})) as { settings?: { preferences?: Partial<typeof preferences>; security?: Partial<typeof security>; compact?: boolean; completed?: boolean[] } };
+          if (!response.ok || !body.settings) return;
+          if (body.settings.preferences) setPreferences((current) => ({ ...current, ...body.settings?.preferences }));
+          if (body.settings.security) setSecurity((current) => ({ ...current, ...body.settings?.security }));
+          if (typeof body.settings.compact === "boolean") setCompact(body.settings.compact);
+          if (Array.isArray(body.settings.completed)) setCompleted(body.settings.completed.slice(0, 4));
+        })
+        .catch(() => undefined);
+    }
   }, []);
 
   function showNotice(message: string) { setNotice(message); window.setTimeout(() => setNotice(""), 3500); }
   function persistCustomers(next: Customer[]) { setCustomers(next); window.localStorage.setItem("torres-admin-customers", JSON.stringify(next)); }
-  function saveSettings() {
-    window.localStorage.setItem("torres-compact-view", String(compact));
-    window.localStorage.setItem("torres-settings-preferences", JSON.stringify(preferences));
-    window.localStorage.setItem("torres-settings-security", JSON.stringify(security));
-    window.localStorage.setItem("torres-settings-checklist", JSON.stringify(completed));
-    setSaved(true); showNotice("Admin settings saved."); window.setTimeout(() => setSaved(false), 2000);
+  async function saveSettings() {
+    const session = readStoredSession();
+    if (!session?.access_token) { showNotice("Sign in again before saving settings."); return; }
+    setSaving(true);
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ preferences, security, compact, completed }),
+      });
+      const body = await response.json().catch(() => ({})) as { error?: string; message?: string };
+      if (!response.ok) throw new Error(body.error || "Supabase could not confirm the settings update.");
+      window.localStorage.setItem("torres-compact-view", String(compact));
+      window.localStorage.setItem("torres-settings-preferences", JSON.stringify(preferences));
+      window.localStorage.setItem("torres-settings-security", JSON.stringify(security));
+      window.localStorage.setItem("torres-settings-checklist", JSON.stringify(completed));
+      setSaved(true);
+      showNotice(body.message || "Admin settings saved to Supabase.");
+      window.setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "Unable to save admin settings.");
+    } finally {
+      setSaving(false);
+    }
   }
   async function addCustomer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,12 +148,12 @@ export default function SettingsPage() {
 
   return (
     <Shell active="Settings">
-      <div className="page-heading settings-page-heading"><div><p className="eyebrow">Admin console</p><h1>Settings</h1><p className="lede">Run your company from one place: onboard customers, manage access, personalize their workspace, connect reporting, and keep your team aligned.</p></div><button className="button button-dark" onClick={saveSettings}>{saved ? "Saved" : "Save settings"}</button></div>
+      <div className="page-heading settings-page-heading"><div><p className="eyebrow">Admin console</p><h1>Settings</h1><p className="lede">Run your company from one place: onboard customers, manage access, personalize their workspace, connect reporting, and keep your team aligned.</p></div><button className="button button-dark" onClick={() => void saveSettings()} disabled={saving}>{saving ? "Saving…" : saved ? "Saved" : "Save settings"}</button></div>
       {notice && <p className="success-message settings-notice">{notice}</p>}
       <nav className="settings-nav" aria-label="Settings sections"><a href="#customer-workspace">Customer workspace</a><a href="#admin-console">Admin console</a><a href="#security-roles">Security &amp; roles</a></nav>
 
       <section className="settings-section" id="customer-workspace"><div className="settings-section-head"><div><p className="eyebrow">Customer workspace</p><h2>Make each account feel personal</h2><p>These details shape the customer-facing workspace, report labels, alerts, and explanations.</p></div></div><ProfilePictureEditor /><div className="settings-grid-2">
-        <section className="detail-card"><p className="eyebrow">Profile and preferences</p><h2>Your company defaults</h2><div className="settings-form-grid">{([ ["company", "Company name"], ["industry", "Industry"], ["location", "Primary location"], ["website", "Company website"], ["email", "Admin email"], ["phone", "Admin phone"] ] as const).map(([key, label]) => <label key={key}>{label}<input value={preferences[key]} onChange={(event) => updatePreference(key, event.target.value)} /></label>)}<BrandSelect label="Timezone" value={preferences.timezone} onChange={(value) => updatePreference("timezone", value)} options={[{ value: "America/Los_Angeles", label: "Pacific Time", description: "Los Angeles and West Coast" }, { value: "America/Denver", label: "Mountain Time", description: "Denver and Mountain region" }, { value: "America/Chicago", label: "Central Time", description: "Dallas and Central region" }, { value: "America/New_York", label: "Eastern Time", description: "New York and East Coast" }]} /><BrandSelect label="Report cadence" value={preferences.cadence} onChange={(value) => updatePreference("cadence", value)} options={[{ value: "Weekly", label: "Weekly", description: "A fresh report every week" }, { value: "Monthly", label: "Monthly", description: "A focused monthly summary" }, { value: "Quarterly", label: "Quarterly", description: "A strategic quarterly review" }]} /></div><div className="settings-list"><label className="toggle-row"><span><strong>Customer profile editing</strong><small>Let customers update their own company contact details.</small></span><input type="checkbox" checked={security.customerEdit} onChange={(event) => updateSecurity("customerEdit", event.target.checked)} /></label><label className="toggle-row"><span><strong>Explain every metric</strong><small>Show plain-language help next to scores, traffic, reviews, and opportunities.</small></span><input type="checkbox" checked={preferences.explanations} onChange={(event) => updatePreference("explanations", event.target.checked)} /></label></div></section>
+        <section className="detail-card"><p className="eyebrow">Profile and preferences</p><h2>Your company defaults</h2><div className="settings-form-grid">{([ ["company", "Company name"], ["industry", "Industry"], ["location", "Primary location"], ["website", "Company website"], ["email", "Admin contact email"], ["phone", "Admin phone"] ] as const).map(([key, label]) => <label key={key}>{label}<input type={key === "email" ? "email" : key === "website" ? "url" : "text"} value={preferences[key]} onChange={(event) => updatePreference(key, event.target.value)} /></label>)}<BrandSelect label="Timezone" value={preferences.timezone} onChange={(value) => updatePreference("timezone", value)} options={[{ value: "America/Los_Angeles", label: "Pacific Time", description: "Los Angeles and West Coast" }, { value: "America/Denver", label: "Mountain Time", description: "Denver and Mountain region" }, { value: "America/Chicago", label: "Central Time", description: "Dallas and Central region" }, { value: "America/New_York", label: "Eastern Time", description: "New York and East Coast" }]} /><BrandSelect label="Report cadence" value={preferences.cadence} onChange={(value) => updatePreference("cadence", value)} options={[{ value: "Weekly", label: "Weekly", description: "A fresh report every week" }, { value: "Monthly", label: "Monthly", description: "A focused monthly summary" }, { value: "Quarterly", label: "Quarterly", description: "A strategic quarterly review" }]} /></div><p className="info-callout">The admin contact email is shared across the organization and saved in Supabase. It does not change the email used to sign in.</p><div className="settings-list"><label className="toggle-row"><span><strong>Customer profile editing</strong><small>Let customers update their own company contact details.</small></span><input type="checkbox" checked={security.customerEdit} onChange={(event) => updateSecurity("customerEdit", event.target.checked)} /></label><label className="toggle-row"><span><strong>Explain every metric</strong><small>Show plain-language help next to scores, traffic, reviews, and opportunities.</small></span><input type="checkbox" checked={preferences.explanations} onChange={(event) => updatePreference("explanations", event.target.checked)} /></label></div></section>
         <section className="detail-card"><p className="eyebrow">Connections</p><h2>Proof for every business</h2><p className="card-explanation">Connect the services that prove performance. Each connection can power reporting, recommendations, and customer-facing explanations.</p><div className="settings-list"><div><strong>Google Business Profile</strong><span>Reviews, rating, calls, direction requests, and listing health.</span><span className="status-chip status-invited">Managed per client</span></div><div><strong>Google Analytics + Search Console</strong><span>Traffic, engagement, search clicks, impressions, and queries.</span><span className="status-chip status-active">Mapped in integrations</span></div><div><strong>Website health and Cloudflare</strong><span>Uptime, performance, DNS, security, and deployment status.</span><span className="status-chip status-active">Cloudflare connected</span></div></div><Link className="button button-light" href="/integrations/">Open integrations hub</Link></section>
       </div></section>
 

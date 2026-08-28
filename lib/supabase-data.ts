@@ -1,4 +1,5 @@
 import { BillingStatus, ClientDetail, ClientPerson, CustomerAccount, PortalStatus } from "./types";
+import { isValidEmail, normalizeEmail } from "./email";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -36,10 +37,16 @@ function headersForWrite(session: { access_token?: string } | null) {
 }
 
 export async function updateClient(id: string, input: Record<string, string | number>) {
-  if (!url || !key) throw new Error("Supabase is not configured yet.");
   const session = getSession();
-  const response = await fetch(`${url}/rest/v1/clients?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { ...headersForWrite(session), "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(input) });
-  if (!response.ok) throw new Error("Unable to update client. Check your Supabase permissions.");
+  if (!session?.access_token) throw new Error("Sign in again before updating this client.");
+  const response = await fetch("/api/clients", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ clientId: id, ...input }),
+  });
+  const body = await response.json().catch(() => ({})) as { client?: Record<string, unknown>; error?: string; message?: string };
+  if (!response.ok) throw new Error(body.error || "Unable to update this client in Supabase.");
+  return body;
 }
 
 export async function fetchClientPeople(clientId: string): Promise<ClientPerson[]> {
@@ -77,7 +84,10 @@ export async function fetchCustomerAccountByEmail(email: string): Promise<Custom
 
 export async function upsertCustomerAccount(input: { client_id: string; portal_email: string; portal_enabled: boolean; portal_status: PortalStatus; billing_email: string; billing_status: BillingStatus; }) {
   if (!url || !key) throw new Error("Supabase is not configured yet.");
-  const response = await fetch(`${url}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify(input) });
+  const portalEmail = normalizeEmail(input.portal_email);
+  const billingEmail = normalizeEmail(input.billing_email);
+  if (!isValidEmail(portalEmail) || !isValidEmail(billingEmail)) throw new Error("Enter valid portal and billing email addresses.");
+  const response = await fetch(`${url}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify({ ...input, portal_email: portalEmail, billing_email: billingEmail }) });
   if (!response.ok) throw new Error("Unable to save customer portal settings. Check the customer_accounts table and permissions.");
   const rows = await response.json();
   return rows[0] ? mapCustomerAccount(rows[0]) : null;
@@ -85,14 +95,16 @@ export async function upsertCustomerAccount(input: { client_id: string; portal_e
 
 export async function createClientPerson(input: Omit<ClientPerson, "id" | "created_at">) {
   if (!url || !key) throw new Error("Supabase is not configured yet.");
-  const response = await fetch(`${url}/rest/v1/client_people`, { method: "POST", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(input) });
+  const email = normalizeOptionalEmail(input.email);
+  const response = await fetch(`${url}/rest/v1/client_people`, { method: "POST", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify({ ...input, email }) });
   if (!response.ok) throw new Error("Unable to add this person. Check the client_people table and permissions.");
   return response.json();
 }
 
 export async function updateClientPerson(id: string, input: Partial<Omit<ClientPerson, "id" | "client_id" | "created_at">>) {
   if (!url || !key) throw new Error("Supabase is not configured yet.");
-  const response = await fetch(`${url}/rest/v1/client_people?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(input) });
+  const body = input.email === undefined ? input : { ...input, email: normalizeOptionalEmail(input.email) };
+  const response = await fetch(`${url}/rest/v1/client_people?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { ...headersForWrite(getSession()), "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(body) });
   if (!response.ok) throw new Error("Unable to update this person.");
 }
 
@@ -111,4 +123,10 @@ function getSession(): { access_token?: string } | null {
 function headersForRead() {
   const session = getSession();
   return { apikey: key ?? "", Authorization: `Bearer ${session?.access_token ?? key ?? ""}` };
+}
+
+function normalizeOptionalEmail(value: unknown) {
+  const email = normalizeEmail(value);
+  if (email && !isValidEmail(email)) throw new Error("Enter a valid contact email address.");
+  return email;
 }

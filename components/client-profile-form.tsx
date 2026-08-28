@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { updateClient } from "../lib/supabase-data";
+import { normalizeEmail } from "../lib/email";
 import { ClientDetail } from "../lib/types";
 
 type ProfileFields = Pick<ClientDetail, "name" | "industry" | "location" | "website" | "email" | "phone">;
@@ -26,9 +27,11 @@ export function ClientProfileForm({ client, onSaved }: { client: ClientDetail; o
     setBusy(true);
     setMessage("");
     try {
-      await updateClient(client.id, form);
-      onSaved(form);
-      setMessage("Profile saved.");
+      const result = await updateClient(client.id, form);
+      const savedForm = { ...form, email: normalizeEmail(form.email) };
+      onSaved(savedForm);
+      setForm(savedForm);
+      setMessage(result.message || "Profile saved to Supabase.");
       setOpen(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save this profile.");

@@ -75,6 +75,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Never store passwords, API keys, OAuth secrets, or invitation tokens in contact notes.
 - Do not insert shared notifications without a specific `user_id`; every notification belongs to one authenticated user.
 - Use the app for normal changes so validation and access controls run consistently.
+- Treat email fields by purpose: `profiles.email` is the Supabase Auth sign-in identity; `clients.email` and `business_profiles.primary_email` are business contact addresses; `customer_accounts` stores portal and billing addresses; `client_people.email` is a contact address. Editing a contact address must not silently change a sign-in identity.
 - Do not insert `audit_events`, `organization_memberships`, `organization_invitations`, or `event_outbox` rows directly from browser code. Those mutations belong behind authenticated server boundaries.
 - Do not calculate or overwrite estimate totals directly. The Operations Function validates line items and calculates totals server-side.
 - Mark job notes, documents, and estimates client-visible only when they are ready for the customer portal.
@@ -83,7 +84,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 
 ## Phase migration order
 
-Apply migrations in the documented dependency order. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql) before enabling the outbound email provider. Both migrations are additive, create no example conversations or delivery records, revoke browser writes, and include table comments for the Supabase editor.
+Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql) before enabling the outbound email provider. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
 
 ## Add descriptions inside Supabase
 
