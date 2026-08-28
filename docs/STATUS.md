@@ -19,7 +19,7 @@ Updated 2026-08-27.
 | Business Profile | External gate | Google project quota remains 0 QPM pending API approval. |
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
 | CRM | Live vertical slice | Client-scoped lead capture, assignment, pipeline updates, appointments, follow-up tasks, and activity history. |
-| Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, and customer-safe visibility. |
+| Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, customer-safe visibility, and provider-tracked estimate approvals. |
 | Shared inbox | Phase 4 vertical slice | Client-scoped secure conversations, agency/client replies, priorities, statuses, notifications, audit/outbox history, and provider-ready email delivery with truthful sent/delivered/failed state. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |
 
@@ -29,7 +29,7 @@ Updated 2026-08-27.
 - Phase 1 foundation: complete for the controlled organization cutover. Legacy profile fields remain only as a compatibility fallback for unmigrated accounts.
 - Phase 2 agency and client management: in progress; the membership-bound workspace selector and authorized client preview flow are implemented.
 - Phase 3 CRM and operations: implementation complete; the lead-to-appointment workflow now continues into customer 360, jobs, scheduling, estimates, documents, tasks, activity, and client-visible approvals.
-- Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded customer activation emails, and team invitation emails are implemented. SMS/voice, campaigns, review requests, and AI receptionist workflows remain.
+- Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded customer activation emails, team invitation emails, and estimate approval/decision emails are implemented. SMS/voice, campaigns, review requests, and AI receptionist workflows remain.
 - Phases 5–11: planned, not production-complete.
 
 ## Verified baseline

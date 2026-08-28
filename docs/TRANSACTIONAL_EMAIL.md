@@ -1,6 +1,15 @@
 # Phase 4 transactional email
 
-The Inbox always saves email as a draft first. It offers **Send email** only when the server has both a valid Resend API key and a verified From address. Customer-portal and team invitations use the same provider-backed delivery ledger and retain a secure copy-link fallback. A message is never marked sent from a browser click alone: the provider must return a real message ID, and signed webhooks advance it to delivered or failed.
+The Inbox always saves email as a draft first. It offers **Send email** only when the server has both a valid Resend API key and a verified From address. Customer-portal invitations, team invitations, and estimate approvals use the same provider-backed delivery ledger. A message is never marked sent from a browser click alone: the provider must return a real message ID, and signed webhooks advance it to delivered or failed.
+
+## Estimate approval workflow
+
+- **Send estimate** resolves the active client portal member first, then the active customer account, client email, or first client contact as a controlled fallback.
+- The client receives a branded `estimate_review` email with a secure sign-in link scoped to the correct client and service job.
+- A draft becomes client-visible and sent only when a real recipient and Resend configuration exist. If every provider delivery fails, the estimate is returned to draft and remains private.
+- Estimate state and `email_deliveries.idempotency_key` prevent duplicate sends during retries or repeated clicks.
+- When an authorized client accepts or rejects the estimate, the response is saved atomically. The assigned or creating staff member then receives an `estimate_decision` email, with owner/admin fallback.
+- A notification failure never reverses a valid client decision; the UI reports that the response saved and whether the team email was delivered.
 
 ## One-time production setup
 
@@ -25,5 +34,7 @@ Do not expose these secrets with a `NEXT_PUBLIC_` prefix. The browser never call
 5. Confirm the client portal does not expose staff-only email drafts.
 6. From Clients, prepare a customer activation and confirm the UI says **email accepted** only after Resend returns a provider message ID.
 7. From Settings, invite a team member and confirm the same tracked-email behavior and fallback link.
+8. From Operations, send a real draft estimate and confirm it stays draft when no client email exists, changes to Sent only after provider acceptance, and opens the correct estimate after sign-in.
+9. Accept or reject the estimate as the client and confirm the decision persists and the responsible staff mailbox receives the decision email.
 
 Resend webhook delivery is at least once. `email_delivery_events.provider_event_id` deduplicates retries, and `email_deliveries.idempotency_key` prevents duplicate sends during request retries.

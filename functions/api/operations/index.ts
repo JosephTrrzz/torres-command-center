@@ -6,18 +6,23 @@ import {
   type AuthContext,
   type FunctionEnv,
 } from "../../_shared/auth";
+import { emailConfigured, type EmailEnv } from "../../_shared/email";
 import { createNotification } from "../../_shared/notifications";
+import { estimateDecisionEmail, estimateReviewEmail, normalizeEmailRecipients, operationsSignInLink } from "../../_shared/operations-email";
+import { activationEmailKey, sendTrackedEmail } from "../../_shared/tracked-email";
 
-interface Env extends FunctionEnv {}
+interface Env extends FunctionEnv, EmailEnv {
+  PUBLIC_APP_URL?: string;
+}
 
-type ClientRow = { id: string; organization_id: string | null; name: string; industry: string; location: string; website: string };
+type ClientRow = { id: string; organization_id: string | null; name: string; industry: string; location: string; website: string; email: string };
 type LocationRow = { id: string; name: string; street_address: string; city: string; region: string; postal_code: string; country_code: string; service_area: string; is_primary: boolean };
 type ContactRow = { id: string; name: string; role: string; email: string; phone: string };
 type LeadRow = { id: string; full_name: string; service_interest: string; status: string; converted_at: string | null; assigned_to?: string | null };
 type ProjectRow = { id: string; name: string; status: string; progress_percent: number };
 type JobRow = { id: string; lead_id: string | null; project_id: string | null; job_number: string; title: string; description: string; status: string; priority: string; scheduled_start: string | null; scheduled_end: string | null; location_id: string | null; assigned_to: string | null; client_visible: boolean; created_at: string; updated_at: string };
 type ActivityRow = { id: string; job_id: string; activity_type: string; title: string; detail: string; client_visible: boolean; created_at: string };
-type EstimateRow = { id: string; job_id: string; estimate_number: string; title: string; status: string; currency: string; subtotal: number | string; tax: number | string; total: number | string; expires_at: string | null; notes: string; client_visible: boolean; responded_at: string | null; created_at: string };
+type EstimateRow = { id: string; job_id: string; estimate_number: string; title: string; status: string; currency: string; subtotal: number | string; tax: number | string; total: number | string; expires_at: string | null; notes: string; client_visible: boolean; responded_at: string | null; created_at: string; created_by?: string | null };
 type EstimateItemRow = { id: string; estimate_id: string; description: string; quantity: number | string; unit_price: number | string; amount: number | string; sort_order: number };
 type DocumentRow = { id: string; job_id: string; estimate_id: string | null; title: string; description: string; document_type: string; status: string; resource_url: string; version: number; client_visible: boolean; created_at: string };
 type TaskRow = { id: string; job_id: string | null; title: string; description: string; due_at: string | null; priority: string; status: string; assigned_to: string | null; completed_at: string | null; created_at: string };
@@ -73,7 +78,7 @@ function numberValue(value: number | string) {
 async function resolveClient(url: string, serviceKey: string, context: AuthContext, requestedClientId: string) {
   const clientId = requestedClientId || context.clientId || "";
   if (!uuidPattern.test(clientId)) return null;
-  const response = await fetch(`${url}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id,organization_id,name,industry,location,website&limit=1`, { headers: serviceHeaders(serviceKey) });
+  const response = await fetch(`${url}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id,organization_id,name,industry,location,website,email&limit=1`, { headers: serviceHeaders(serviceKey) });
   const rows = response.ok ? await response.json().catch(() => []) as ClientRow[] : [];
   return rows[0] || null;
 }
@@ -99,6 +104,29 @@ async function clientMemberIds(url: string, serviceKey: string, organizationId: 
   const response = await fetch(`${url}/rest/v1/organization_memberships?organization_id=eq.${encodeURIComponent(organizationId)}&status=eq.active&role=eq.client&select=user_id`, { headers: serviceHeaders(serviceKey) });
   const rows = response.ok ? await response.json().catch(() => []) as Array<{ user_id?: string }> : [];
   return rows.map((row) => row.user_id).filter((id): id is string => Boolean(id && uuidPattern.test(id)));
+}
+
+async function clientEmailRecipients(url: string, serviceKey: string, client: ClientRow) {
+  const memberIds = await clientMemberIds(url, serviceKey, client.organization_id || "");
+  let memberEmails: string[] = [];
+  if (memberIds.length) {
+    const profileResponse = await fetch(`${url}/rest/v1/profiles?id=in.(${memberIds.join(",")})&active=eq.true&select=email`, { headers: serviceHeaders(serviceKey) });
+    const profiles = profileResponse.ok ? await profileResponse.json().catch(() => []) as Array<{ email?: string }> : [];
+    memberEmails = normalizeEmailRecipients(profiles.map((profile) => profile.email));
+  }
+  if (memberEmails.length) return memberEmails;
+
+  const accountResponse = await fetch(`${url}/rest/v1/customer_accounts?client_id=eq.${encodeURIComponent(client.id)}&portal_enabled=eq.true&portal_status=eq.active&select=portal_email&limit=1`, { headers: serviceHeaders(serviceKey) });
+  const accounts = accountResponse.ok ? await accountResponse.json().catch(() => []) as Array<{ portal_email?: string }> : [];
+  const accountEmails = normalizeEmailRecipients(accounts.map((account) => account.portal_email));
+  if (accountEmails.length) return accountEmails;
+
+  const primary = normalizeEmailRecipients([client.email]);
+  if (primary.length) return primary;
+
+  const contactResponse = await fetch(`${url}/rest/v1/client_people?client_id=eq.${encodeURIComponent(client.id)}&email=not.is.null&select=email&order=created_at.asc&limit=1`, { headers: serviceHeaders(serviceKey) });
+  const contacts = contactResponse.ok ? await contactResponse.json().catch(() => []) as Array<{ email?: string }> : [];
+  return normalizeEmailRecipients(contacts.map((contact) => contact.email));
 }
 
 async function writeLifecycle(url: string, serviceKey: string, input: { organizationId: string; userId: string; action: string; entityType: string; entityId: string; clientId: string; jobId?: string; metadata?: Record<string, unknown> }) {
@@ -251,22 +279,54 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   let entityType = "service_job";
   let lifecycleAction = "";
   let lifecycleJobId = "";
+  let successMessage = "Operations workspace updated.";
 
   if (action === "respond_estimate") {
     const estimateId = clean(input?.estimateId, 36);
     const responseStatus = clean(input?.response, 20);
     if (!uuidPattern.test(estimateId) || !estimateResponses.has(responseStatus)) return authJson({ error: "Choose an estimate and an accepted or rejected response." }, 400);
     if (!(context.organizationRole === "client" || context.role === "customer")) return authJson({ error: "Only an authorized client member can respond to this estimate." }, 403);
-    const estimateResponse = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimateId)}&client_id=eq.${encodeURIComponent(client.id)}&client_visible=eq.true&status=eq.sent&select=id,job_id,title&limit=1`, { headers: serviceHeaders(serviceKey) });
-    const estimates = estimateResponse.ok ? await estimateResponse.json().catch(() => []) as Array<{ id?: string; job_id?: string; title?: string }> : [];
+    const estimateResponse = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimateId)}&client_id=eq.${encodeURIComponent(client.id)}&client_visible=eq.true&status=eq.sent&select=id,job_id,title,estimate_number,total,currency,created_by&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const estimates = estimateResponse.ok ? await estimateResponse.json().catch(() => []) as Array<{ id?: string; job_id?: string; title?: string; estimate_number?: string; total?: string | number; currency?: string; created_by?: string | null }> : [];
     const estimate = estimates[0];
     if (!estimate?.id || !estimate.job_id) return authJson({ error: "That estimate is no longer awaiting a response." }, 404);
-    const updateResponse = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimate.id)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ status: responseStatus, responded_by: context.userId, responded_at: now, updated_at: now }) });
+    const updateResponse = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimate.id)}&status=eq.sent`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=representation"), body: JSON.stringify({ status: responseStatus, responded_by: context.userId, responded_at: now, updated_at: now }) });
     if (!updateResponse.ok) return authJson({ error: "Your estimate response could not be saved." }, 502);
+    const updatedEstimates = await updateResponse.json().catch(() => []) as Array<{ id?: string }>;
+    if (!updatedEstimates[0]?.id) return authJson({ error: "That estimate is no longer awaiting a response." }, 409);
     await writeJobActivity(url, serviceKey, { organizationId, clientId: client.id, jobId: estimate.job_id, type: "estimate.responded", title: `Estimate ${responseStatus}`, detail: `${estimate.title || "Estimate"} was ${responseStatus} by the client.`, clientVisible: true, userId: context.userId, metadata: { estimate_id: estimate.id, status: responseStatus } });
     entityId = estimate.id; entityType = "job_estimate"; lifecycleAction = `operations.estimate.${responseStatus}`; lifecycleJobId = estimate.job_id;
     const job = await readJob(url, serviceKey, client.id, estimate.job_id);
     if (job?.assigned_to) await createNotification(env, { userId: job.assigned_to, clientId: client.id, type: "action", title: `Estimate ${responseStatus}`, body: `${client.name} ${responseStatus} ${estimate.title || "an estimate"}.`, href: `/operations/?client=${encodeURIComponent(client.id)}&job=${encodeURIComponent(estimate.job_id)}` });
+    const team = await readTeam(url, serviceKey, organizationId);
+    const directIds = new Set([job?.assigned_to, estimate.created_by].filter((id): id is string => Boolean(id)));
+    const directRecipients = normalizeEmailRecipients(team.filter((member) => directIds.has(member.id)).map((member) => member.email));
+    const fallbackRecipients = normalizeEmailRecipients(team.filter((member) => ["owner", "admin"].includes(member.role)).map((member) => member.email));
+    const staffRecipients = directRecipients.length ? directRecipients : fallbackRecipients.length ? fallbackRecipients : normalizeEmailRecipients(team.map((member) => member.email).slice(0, 1));
+    if (!staffRecipients.length) {
+      successMessage = `Estimate ${responseStatus}. The response was saved; no staff email recipient is configured.`;
+    } else if (!emailConfigured(env)) {
+      successMessage = `Estimate ${responseStatus}. The response was saved, but team email is not configured.`;
+    } else {
+      const actionUrl = operationsSignInLink(request.url, env.PUBLIC_APP_URL, { clientId: client.id, jobId: estimate.job_id });
+      const content = estimateDecisionEmail({ clientName: client.name, estimateNumber: estimate.estimate_number, estimateTitle: estimate.title, response: responseStatus as "accepted" | "rejected", responder: context.email || "an authorized client member", actionUrl });
+      const deliveries = await Promise.all(staffRecipients.map(async (recipient) => sendTrackedEmail(env, {
+        supabaseUrl: url,
+        serviceKey,
+        organizationId,
+        clientId: client.id,
+        recipient,
+        subject: content.subject,
+        text: content.text,
+        html: content.html,
+        templateKey: "estimate_decision",
+        idempotencyKey: await activationEmailKey(`estimate-decision:${estimate.id}:${responseStatus}`, recipient),
+      })));
+      const sentCount = deliveries.filter((delivery) => delivery.sent).length;
+      successMessage = sentCount
+        ? `Estimate ${responseStatus}. The operations team was notified.`
+        : `Estimate ${responseStatus}. The response was saved, but the team email could not be sent.`;
+    }
   } else {
     if (!canManage) return authJson({ error: "Your role cannot change operational records." }, 403);
     const team = await readTeam(url, serviceKey, organizationId);
@@ -389,16 +449,43 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     } else if (action === "send_estimate") {
       const estimateId = clean(input?.estimateId, 36);
       if (!uuidPattern.test(estimateId)) return authJson({ error: "Choose an estimate to send." }, 400);
-      const estimateResponse = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimateId)}&client_id=eq.${encodeURIComponent(client.id)}&status=eq.draft&select=id,job_id,title,total&limit=1`, { headers: serviceHeaders(serviceKey) });
-      const estimates = estimateResponse.ok ? await estimateResponse.json().catch(() => []) as Array<{ id?: string; job_id?: string; title?: string; total?: string | number }> : [];
+      if (!emailConfigured(env)) return authJson({ error: "Transactional email is not configured. Add the Resend API key and verified sender before sending estimates." }, 503);
+      const estimateResponse = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimateId)}&client_id=eq.${encodeURIComponent(client.id)}&status=eq.draft&select=id,job_id,title,estimate_number,total,currency,expires_at,created_by&limit=1`, { headers: serviceHeaders(serviceKey) });
+      const estimates = estimateResponse.ok ? await estimateResponse.json().catch(() => []) as Array<{ id?: string; job_id?: string; title?: string; estimate_number?: string; total?: string | number; currency?: string; expires_at?: string | null; created_by?: string | null }> : [];
       const estimate = estimates[0];
       if (!estimate?.id || !estimate.job_id) return authJson({ error: "Only a draft estimate can be sent." }, 400);
-      const response = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimate.id)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ status: "sent", client_visible: true, updated_at: now }) });
+      const recipients = await clientEmailRecipients(url, serviceKey, client);
+      if (!recipients.length) return authJson({ error: "Add an active client portal email or client contact email before sending this estimate." }, 400);
+      const actionUrl = operationsSignInLink(request.url, env.PUBLIC_APP_URL, { clientId: client.id, jobId: estimate.job_id });
+      const content = estimateReviewEmail({ clientName: client.name, estimateNumber: estimate.estimate_number, estimateTitle: estimate.title, total: estimate.total, currency: estimate.currency, expiresAt: estimate.expires_at, actionUrl });
+      const response = await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimate.id)}&status=eq.draft`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=representation"), body: JSON.stringify({ status: "sent", client_visible: true, updated_at: now }) });
       if (!response.ok) return authJson({ error: "The estimate could not be sent." }, 502);
+      const updatedEstimates = await response.json().catch(() => []) as Array<{ id?: string }>;
+      if (!updatedEstimates[0]?.id) return authJson({ error: "That estimate was already sent or changed. Refresh Operations before trying again." }, 409);
+      const deliveries = await Promise.all(recipients.map(async (recipient) => sendTrackedEmail(env, {
+        supabaseUrl: url,
+        serviceKey,
+        organizationId,
+        clientId: client.id,
+        recipient,
+        subject: content.subject,
+        text: content.text,
+        html: content.html,
+        templateKey: "estimate_review",
+        idempotencyKey: await activationEmailKey(`estimate-review:${estimate.id}`, recipient),
+      })));
+      const sentCount = deliveries.filter((delivery) => delivery.sent).length;
+      const failedCount = deliveries.length - sentCount;
+      if (!sentCount) {
+        await fetch(`${url}/rest/v1/job_estimates?id=eq.${encodeURIComponent(estimate.id)}&status=eq.sent`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ status: "draft", client_visible: false, updated_at: new Date().toISOString() }) });
+        const detail = deliveries.find((delivery) => delivery.error)?.error || "The email provider did not accept the message.";
+        return authJson({ error: `The estimate email could not be sent, so it remains a draft. ${detail}` }, 502);
+      }
       entityId = estimate.id; entityType = "job_estimate"; lifecycleJobId = estimate.job_id; lifecycleAction = "operations.estimate.sent";
       await writeJobActivity(url, serviceKey, { organizationId, clientId: client.id, jobId: estimate.job_id, type: "estimate.sent", title: "Estimate sent", detail: `${estimate.title || "Estimate"} is ready for client review.`, clientVisible: true, userId: context.userId, metadata: { estimate_id: estimate.id } });
       const members = await clientMemberIds(url, serviceKey, organizationId);
       await Promise.allSettled(members.map((userId) => createNotification(env, { userId, clientId: client.id, type: "action", title: "Estimate ready for review", body: `${estimate.title || "A new estimate"} is ready in your client workspace.`, href: `/operations/?job=${encodeURIComponent(estimate.job_id || "")}` })));
+      successMessage = `Estimate sent securely to ${sentCount} recipient${sentCount === 1 ? "" : "s"}.${failedCount ? ` ${failedCount} additional delivery${failedCount === 1 ? "" : "ies"} could not be sent.` : ""}`;
     } else if (action === "add_document") {
       const jobId = clean(input?.jobId, 36);
       const job = await readJob(url, serviceKey, client.id, jobId);
@@ -440,5 +527,5 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: lifecycleAction, entityType, entityId, clientId: client.id, jobId: lifecycleJobId || undefined });
   const snapshot = await readSnapshot(url, serviceKey, context, client);
   if (!snapshot) return authJson({ error: "The change saved, but the refreshed operations view is unavailable." }, 502);
-  return authJson({ snapshot, message: "Operations workspace updated." });
+  return authJson({ snapshot, message: successMessage });
 };
