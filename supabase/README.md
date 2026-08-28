@@ -33,6 +33,11 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `marketing_campaigns` | Client-scoped announcement, newsletter, and review-request drafts with an explicit send lifecycle. | Campaigns |
 | `marketing_campaign_recipients` | The reviewed audience and truthful delivery result for each campaign email. Includes consent basis and a private unsubscribe token. | Campaigns (server-managed) |
 | `marketing_suppressions` | Organization-wide do-not-send records created by unsubscribes, complaints, bounces, or an administrator. | Campaigns (server-managed) |
+| `communication_provider_connections` | Organization-scoped SMS and voice provider readiness. Stores provider references and status, never raw provider secrets. | Inbox → Provider foundation |
+| `communication_consents` | A client contact's explicit SMS or voice consent, including purpose, evidence, source, and revocation time. | Inbox → Consent controls |
+| `communication_suppressions` | Durable SMS/voice do-not-contact records created by opt-out keywords, provider events, or an administrator. | Inbox (server-managed) |
+| `sms_events` | Append-only outbound and inbound SMS lifecycle events, including provider IDs and truthful delivery status. | Inbox (server-managed) |
+| `call_records` | Voice call history and provider state. The table is ready before live calling is enabled. | Inbox → Call history |
 
 ## How the records connect
 
@@ -55,6 +60,11 @@ profiles ── client_id ──> clients <── client_id ── client_people
                                                    └── marketing_campaign_recipients ── email_deliveries
 
 organizations ── marketing_suppressions (one durable suppression per email address)
+              ├── communication_provider_connections
+              ├── communication_consents ── client_id ──> clients
+              ├── communication_suppressions
+              ├── sms_events ── conversation_id ──> conversations
+              └── call_records ── conversation_id ──> conversations
 ```
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
@@ -76,6 +86,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 7. Open **Operations** to create real service jobs, schedule work, prepare estimates, and choose which updates the client may see.
 8. Open **Inbox** to start a secure client-visible conversation. Email is saved as a draft first; when the verified provider is configured, staff review and send it from the thread while delivery state updates automatically.
 9. Open **Campaigns** to create a client-scoped draft, review eligible contacts, send a staff test, and type `SEND` only when the recipient list and content are ready.
+10. Before sending SMS, record the client's real E.164 phone number and explicit consent evidence in **Inbox**. A configured provider, granted consent, and no active suppression are all required.
 
 ## Important safety rules
 
@@ -94,10 +105,13 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Upload email files only through Inbox. The `communication-attachments` bucket is private and must not receive public object policies or public URLs.
 - Never bypass `marketing_suppressions` or manually change a campaign recipient to sent. The protected Campaigns Function rechecks suppression immediately before delivery, and provider webhooks own delivery truth.
 - Review requests may reference only completed service jobs and require a valid review URL. Campaigns are intentionally limited to 25 recipients while the controlled delivery foundation is being proven.
+- Never infer SMS or voice consent from an email address, client relationship, or saved phone number. Consent must be explicit, purpose-specific, and revocable.
+- Do not remove SMS/voice suppressions to force a message through. `STOP` and equivalent opt-outs must remain authoritative until the recipient explicitly opts back in.
+- Keep Twilio credentials in Cloudflare encrypted secrets. The database stores only provider status and non-secret identifiers.
 
 ## Phase migration order
 
-Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql), [`communication_attachments.sql`](./communication_attachments.sql), and [`marketing.sql`](./marketing.sql) before enabling campaign delivery. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
+Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql), [`communication_attachments.sql`](./communication_attachments.sql), [`marketing.sql`](./marketing.sql), and [`sms_voice.sql`](./sms_voice.sql). Provider credentials are configured separately in Cloudflare after the schema is installed. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
 
 ## Add descriptions inside Supabase
 

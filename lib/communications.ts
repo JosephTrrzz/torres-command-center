@@ -55,11 +55,55 @@ export interface CommunicationsSnapshot {
   delivery: {
     internal: "ready";
     email: "ready" | "draft_only";
-    sms: "not_configured";
-    voice: "not_configured";
+    sms: "ready" | "setup_required" | "migration_required";
+    voice: "ready" | "setup_required" | "migration_required";
   };
+  smsVoice: SmsVoiceSnapshot;
   conversations: Conversation[];
   summary: CommunicationsSummary;
+}
+
+export interface CommunicationConsent {
+  id: string;
+  channel: "sms" | "voice";
+  address: string;
+  status: "pending" | "granted" | "revoked";
+  source: string;
+  evidence: string;
+  granted_at: string | null;
+  revoked_at: string | null;
+  updated_at: string;
+}
+
+export interface SmsEvent {
+  id: string;
+  direction: "inbound" | "outbound" | "system";
+  status: string;
+  from_address: string;
+  to_address: string;
+  error_detail: string;
+  occurred_at: string;
+}
+
+export interface CallRecord {
+  id: string;
+  direction: "inbound" | "outbound";
+  status: string;
+  from_address: string;
+  to_address: string;
+  duration_seconds: number;
+  voicemail_url: string;
+  transcript: string;
+  created_at: string;
+}
+
+export interface SmsVoiceSnapshot {
+  migrationReady: boolean;
+  provider: "twilio";
+  senderAddress: string;
+  consents: CommunicationConsent[];
+  recentSmsEvents: SmsEvent[];
+  recentCalls: CallRecord[];
 }
 
 export interface CommunicationsSummary {
@@ -86,5 +130,5 @@ export function buildCommunicationsSummary(conversations: Conversation[]): Commu
 export function communicationDeliveryLabel(channel: CommunicationChannel) {
   if (channel === "internal") return "Shared securely";
   if (channel === "email") return "Email";
-  return `${labelCommunicationValue(channel)} not configured`;
+  return labelCommunicationValue(channel);
 }

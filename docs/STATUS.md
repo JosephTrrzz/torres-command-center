@@ -20,7 +20,8 @@ Updated 2026-08-28.
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
 | CRM | Live vertical slice | Client-scoped lead capture, assignment, pipeline updates, appointments, follow-up tasks, and activity history. |
 | Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, customer-safe visibility, and provider-tracked estimate approvals. |
-| Shared inbox | Phase 4 vertical slice | Client-scoped secure conversations, agency/client replies, priorities, statuses, notifications, audit/outbox history, provider-backed delivery, private email attachments, and automatic signature/confidentiality notices. |
+| Shared inbox | Phase 4 vertical slice | Client-scoped secure conversations, agency/client replies, priorities, statuses, notifications, audit/outbox history, provider-backed email delivery, private attachments, and automatic signature/confidentiality notices. |
+| SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
 | Campaigns and review requests | Phase 4B ready to migrate | Client-scoped drafts, consent basis, recipient review, durable suppression, staff test sends, explicit production confirmation, unsubscribe handling, and provider delivery truth. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |
 
@@ -30,12 +31,12 @@ Updated 2026-08-28.
 - Phase 1 foundation: complete for the controlled organization cutover. Legacy profile fields remain only as a compatibility fallback for unmigrated accounts.
 - Phase 2 agency and client management: in progress; the membership-bound workspace selector and authorized client preview flow are implemented.
 - Phase 3 CRM and operations: implementation complete; the lead-to-appointment workflow now continues into customer 360, jobs, scheduling, estimates, documents, tasks, activity, and client-visible approvals.
-- Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded transactional emails, private draft attachments, automatic legal footer, and controlled campaigns/newsletters/review requests are implemented. SMS/voice and AI receptionist workflows remain.
+- Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded transactional emails, private draft attachments, automatic legal footer, controlled campaigns/newsletters/review requests, and consent-safe SMS/voice foundation are implemented. Live Twilio provider configuration and AI receptionist workflows remain.
 - Phases 5–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-28: the unit suite, application TypeScript, Cloudflare Function TypeScript, and Next.js production build passed. The communications, transactional-email, and attachment migrations create no seeded conversations, messages, deliveries, provider events, or files.
+On 2026-08-28: the unit suite, application TypeScript, Cloudflare Function TypeScript, and Next.js production build passed. The communications, transactional-email, attachment, marketing, and SMS/voice migrations create no seeded conversations, messages, deliveries, provider events, calls, or files.
 
 ## Known limitations
 
@@ -44,6 +45,6 @@ On 2026-08-28: the unit suite, application TypeScript, Cloudflare Function TypeS
 - Some preferences remain browser-local and are not yet portable across devices.
 - Business Profile metrics cannot load until Google grants API quota.
 - Operational documents currently use validated HTTPS resource links; managed file uploads and storage lifecycle controls remain a later enhancement.
-- Secure in-app communications, branded transactional email, and controlled campaign/review-request delivery are implemented. SMS, voice, and AI receptionist workflows remain roadmap capabilities.
+- Secure in-app communications, branded transactional email, controlled campaign/review-request delivery, and the consent-safe SMS/voice data and webhook foundation are implemented. Live SMS/voice delivery requires Twilio credentials and a verified sender; AI receptionist workflows remain roadmap capabilities.
 - AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
 - Reports are live but still need persisted snapshots, provenance display, scheduled delivery, and broader tests.

@@ -49,7 +49,9 @@ Status: in progress.
 - Secure shared inbox with client-scoped conversations, staff/client replies, visibility controls, lifecycle status, priority, notifications, and audit/outbox history: implemented as the first vertical slice.
 - Transactional email, signed delivery webhooks, private attachments, automatic signatures, and confidentiality notices: implemented.
 - Campaigns, newsletters, and completed-service review requests: implemented with consent basis, durable suppression, test sends, explicit send confirmation, unsubscribe links, and provider delivery truth.
-- Next slices: SMS/voice adapters and AI receptionist foundations.
+- SMS/voice foundation: implemented with explicit consent evidence, durable opt-out suppression, E.164 validation, truthful provider readiness, signed Twilio webhook handling, SMS lifecycle events, and call-history records.
+- External activation: configure Twilio credentials, a verified messaging sender, and webhook URL before live SMS/voice is enabled.
+- Next slice: AI receptionist foundations after the live communications provider is proven.
 
 ## Phase 5 — integrations and normalization
 

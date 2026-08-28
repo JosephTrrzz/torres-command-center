@@ -19,6 +19,12 @@ import {
   sanitizeCommunicationAttachmentName,
   validateCommunicationAttachment,
 } from "../functions/_shared/communication-attachments";
+import {
+  normalizeE164,
+  twilioMessageStatus,
+  twilioSmsConfigured,
+  twilioVoiceConfigured,
+} from "../functions/_shared/twilio";
 
 const baseConversation: Conversation = {
   id: "conversation-1",
@@ -94,7 +100,7 @@ describe("communications summaries", () => {
   it("uses honest, readable delivery labels", () => {
     expect(communicationDeliveryLabel("internal")).toBe("Shared securely");
     expect(communicationDeliveryLabel("email")).toBe("Email");
-    expect(communicationDeliveryLabel("sms")).toBe("Sms not configured");
+    expect(communicationDeliveryLabel("sms")).toBe("Sms");
     expect(labelCommunicationValue("awaiting_review")).toBe("Awaiting Review");
   });
 });
@@ -173,5 +179,34 @@ describe("communication attachment safety", () => {
   it("normalizes attachment names before storage or download", () => {
     expect(sanitizeCommunicationAttachmentName("../../Client Proposal (final).pdf"))
       .toBe("Client Proposal -final-.pdf");
+  });
+});
+
+describe("SMS and voice provider safety", () => {
+  it("accepts only normalized E.164 phone numbers", () => {
+    expect(normalizeE164("+1 (503) 555-0123")).toBe("+15035550123");
+    expect(normalizeE164("503-555-0123")).toBe("+15035550123");
+    expect(normalizeE164("+0000000")).toBe("");
+  });
+
+  it("reports provider readiness from the required credentials", () => {
+    expect(twilioSmsConfigured({})).toBe(false);
+    expect(twilioSmsConfigured({
+      TWILIO_ACCOUNT_SID: "AC123",
+      TWILIO_AUTH_TOKEN: "secret",
+      TWILIO_MESSAGING_SERVICE_SID: "MG123",
+    })).toBe(true);
+    expect(twilioVoiceConfigured({
+      TWILIO_ACCOUNT_SID: "AC123",
+      TWILIO_AUTH_TOKEN: "secret",
+      TWILIO_PHONE_NUMBER: "+15035550123",
+    })).toBe(true);
+  });
+
+  it("maps Twilio lifecycle states without overstating delivery", () => {
+    expect(twilioMessageStatus("queued")).toBe("queued");
+    expect(twilioMessageStatus("delivered")).toBe("delivered");
+    expect(twilioMessageStatus("undelivered")).toBe("failed");
+    expect(twilioMessageStatus("unknown")).toBe("queued");
   });
 });

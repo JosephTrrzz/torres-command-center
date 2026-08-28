@@ -14,13 +14,23 @@ import {
   type EmailEnv,
 } from "../../_shared/email";
 import { MAX_COMMUNICATION_ATTACHMENTS_TOTAL_BYTES } from "../../_shared/communication-attachments";
+import {
+  normalizeE164,
+  sendTwilioSms,
+  twilioSmsConfigured,
+  twilioVoiceConfigured,
+  type TwilioEnv,
+} from "../../_shared/twilio";
 
-interface Env extends FunctionEnv, EmailEnv {}
+interface Env extends FunctionEnv, EmailEnv, TwilioEnv {}
 
 type ClientRow = { id: string; organization_id: string | null; name: string; industry: string; location: string };
 type ConversationRow = { id: string; subject: string; channel: string; status: string; priority: string; client_visible: boolean; last_message_at: string; created_at: string };
 type MessageRow = { id: string; conversation_id: string; direction: string; channel: string; status: string; sender_name: string; sender_address: string; recipients: unknown; subject: string; body: string; provider_message_id: string | null; error_detail: string; client_visible: boolean; sent_at: string | null; created_at: string };
 type AttachmentRow = { id: string; message_id: string; file_name: string; content_type: string; byte_size: number; storage_bucket: string; storage_path: string; created_at: string };
+type ConsentRow = { id: string; channel: "sms" | "voice"; address: string; status: "pending" | "granted" | "revoked"; source: string; evidence: string; granted_at: string | null; revoked_at: string | null; updated_at: string };
+type SmsEventRow = { id: string; direction: "inbound" | "outbound" | "system"; status: string; from_address: string; to_address: string; error_detail: string; occurred_at: string };
+type CallRecordRow = { id: string; direction: "inbound" | "outbound"; status: string; from_address: string; to_address: string; duration_seconds: number; voicemail_url: string; transcript: string; created_at: string };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,6 +57,32 @@ function isClientContext(context: AuthContext) {
 function recipients(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => typeof item === "string" && item.trim() ? [item.trim().slice(0, 320)] : []).slice(0, 25);
+}
+
+async function readSmsVoiceSnapshot(url: string, serviceKey: string, client: ClientRow, env: Env) {
+  const [consentResponse, smsResponse, callsResponse] = await Promise.all([
+    fetch(`${url}/rest/v1/communication_consents?client_id=eq.${encodeURIComponent(client.id)}&select=id,channel,address,status,source,evidence,granted_at,revoked_at,updated_at&order=updated_at.desc`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/sms_events?client_id=eq.${encodeURIComponent(client.id)}&select=id,direction,status,from_address,to_address,error_detail,occurred_at&order=occurred_at.desc&limit=12`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/call_records?client_id=eq.${encodeURIComponent(client.id)}&select=id,direction,status,from_address,to_address,duration_seconds,voicemail_url,transcript,created_at&order=created_at.desc&limit=12`, { headers: serviceHeaders(serviceKey) }),
+  ]);
+  const migrationReady = ![consentResponse, smsResponse, callsResponse].some((response) => response.status === 404);
+  if (!migrationReady) return {
+    migrationReady: false,
+    provider: "twilio" as const,
+    senderAddress: normalizeE164(env.TWILIO_FROM_NUMBER || env.TWILIO_PHONE_NUMBER),
+    consents: [] as ConsentRow[],
+    recentSmsEvents: [] as SmsEventRow[],
+    recentCalls: [] as CallRecordRow[],
+  };
+  if (![consentResponse, smsResponse, callsResponse].every((response) => response.ok)) throw new Error("SMS and voice records could not be loaded.");
+  return {
+    migrationReady: true,
+    provider: "twilio" as const,
+    senderAddress: normalizeE164(env.TWILIO_FROM_NUMBER || env.TWILIO_PHONE_NUMBER),
+    consents: await consentResponse.json().catch(() => []) as ConsentRow[],
+    recentSmsEvents: await smsResponse.json().catch(() => []) as SmsEventRow[],
+    recentCalls: await callsResponse.json().catch(() => []) as CallRecordRow[],
+  };
 }
 
 function storageObjectUrl(url: string, bucket: string, path: string) {
@@ -154,11 +190,18 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     })),
   }));
   const allMessages = normalized.flatMap((conversation) => conversation.messages);
+  const smsVoice = await readSmsVoiceSnapshot(url, serviceKey, client, env);
   return {
     client: { id: client.id, name: client.name, industry: client.industry || "", location: client.location || "" },
     canManage: hasOrganizationPermission(context, "communications.manage") && !clientView,
     isClient: clientView,
-    delivery: { internal: "ready", email: emailConfigured(env) ? "ready" : "draft_only", sms: "not_configured", voice: "not_configured" },
+    delivery: {
+      internal: "ready",
+      email: emailConfigured(env) ? "ready" : "draft_only",
+      sms: !smsVoice.migrationReady ? "migration_required" : twilioSmsConfigured(env) ? "ready" : "setup_required",
+      voice: !smsVoice.migrationReady ? "migration_required" : twilioVoiceConfigured(env) ? "ready" : "setup_required",
+    },
+    smsVoice,
     conversations: normalized,
     summary: {
       openConversations: normalized.filter((conversation) => conversation.status === "open").length,
@@ -328,15 +371,102 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     }
   }
 
+  if (action === "set_channel_consent") {
+    if (clientView) return authJson({ error: "Only workspace staff can record communication consent." }, 403);
+    const channel = clean(input?.channel, 20);
+    const address = normalizeE164(input?.address);
+    const status = clean(input?.status, 20);
+    const evidence = clean(input?.evidence, 500);
+    if ((channel !== "sms" && channel !== "voice") || !address || !["pending", "granted", "revoked"].includes(status)) {
+      return authJson({ error: "Choose SMS or voice, enter a valid mobile number, and select a consent status." }, 400);
+    }
+    if (status === "granted" && !evidence) return authJson({ error: "Add a short consent note before marking this number as granted." }, 400);
+    const now = new Date().toISOString();
+    const response = await fetch(`${url}/rest/v1/communication_consents?on_conflict=organization_id,client_id,channel,address`, {
+      method: "POST",
+      headers: serviceHeaders(serviceKey, "resolution=merge-duplicates,return=representation"),
+      body: JSON.stringify({
+        organization_id: organizationId,
+        client_id: client.id,
+        channel,
+        address,
+        status,
+        source: "admin_recorded",
+        evidence,
+        granted_at: status === "granted" ? now : null,
+        revoked_at: status === "revoked" ? now : null,
+        created_by: context.userId,
+        updated_at: now,
+      }),
+    });
+    if (response.status === 404) return authJson({ error: "SMS and voice storage is not ready. Apply supabase/sms_voice.sql first." }, 503);
+    if (!response.ok) return authJson({ error: "The consent record could not be saved." }, 400);
+    if (status === "revoked") {
+      await fetch(`${url}/rest/v1/communication_suppressions?on_conflict=organization_id,channel,address`, {
+        method: "POST",
+        headers: serviceHeaders(serviceKey, "resolution=merge-duplicates,return=minimal"),
+        body: JSON.stringify({ organization_id: organizationId, client_id: client.id, channel, address, reason: "consent_revoked", source: "admin_recorded", active: true, updated_at: now }),
+      });
+    } else if (status === "granted") {
+      await fetch(`${url}/rest/v1/communication_suppressions?organization_id=eq.${encodeURIComponent(organizationId)}&channel=eq.${encodeURIComponent(channel)}&address=eq.${encodeURIComponent(address)}`, {
+        method: "PATCH",
+        headers: serviceHeaders(serviceKey, "return=minimal"),
+        body: JSON.stringify({ active: false, updated_at: now }),
+      });
+    }
+    await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.consent_updated", entityType: "client", entityId: client.id, clientId: client.id, metadata: { channel, address, status } });
+    const snapshot = await readSnapshot(url, serviceKey, context, client, env);
+    return authJson({ message: `${channel.toUpperCase()} consent saved as ${status}.`, snapshot });
+  }
+
+  if (action === "send_sms") {
+    if (clientView) return authJson({ error: "Only workspace staff can send SMS messages." }, 403);
+    if (!twilioSmsConfigured(env)) return authJson({ error: "SMS is not connected. Add the Twilio production secrets before sending." }, 503);
+    const messageId = clean(input?.messageId, 36);
+    if (!uuidPattern.test(messageId)) return authJson({ error: "Choose a valid SMS draft." }, 400);
+    const messageResponse = await fetch(`${url}/rest/v1/messages?id=eq.${encodeURIComponent(messageId)}&client_id=eq.${encodeURIComponent(client.id)}&channel=eq.sms&direction=eq.outbound&select=id,conversation_id,direction,channel,status,sender_name,sender_address,recipients,subject,body,provider_message_id,error_detail,client_visible,sent_at,created_at&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const messageRows = messageResponse.ok ? await messageResponse.json().catch(() => []) as MessageRow[] : [];
+    const draft = messageRows[0];
+    if (!draft) return authJson({ error: "That SMS draft is not available for this client." }, 404);
+    if (draft.provider_message_id || (draft.status !== "draft" && draft.status !== "failed")) return authJson({ error: "This SMS has already been submitted." }, 409);
+    const recipient = normalizeE164(recipients(draft.recipients)[0]);
+    if (!recipient) return authJson({ error: "This SMS draft needs one valid mobile recipient." }, 400);
+    const [consentResponse, suppressionResponse] = await Promise.all([
+      fetch(`${url}/rest/v1/communication_consents?client_id=eq.${encodeURIComponent(client.id)}&channel=eq.sms&address=eq.${encodeURIComponent(recipient)}&status=eq.granted&select=id&limit=1`, { headers: serviceHeaders(serviceKey) }),
+      fetch(`${url}/rest/v1/communication_suppressions?organization_id=eq.${encodeURIComponent(organizationId)}&channel=eq.sms&address=eq.${encodeURIComponent(recipient)}&active=eq.true&select=id&limit=1`, { headers: serviceHeaders(serviceKey) }),
+    ]);
+    const consentRows = consentResponse.ok ? await consentResponse.json().catch(() => []) as Array<{ id?: string }> : [];
+    const suppressionRows = suppressionResponse.ok ? await suppressionResponse.json().catch(() => []) as Array<{ id?: string }> : [];
+    if (!consentRows[0]?.id || suppressionRows[0]?.id) return authJson({ error: "SMS was not sent because this number does not have active consent or has opted out." }, 403);
+    const callbackBase = (env.PUBLIC_APP_URL || new URL(request.url).origin).replace(/\/$/, "");
+    try {
+      const provider = await sendTwilioSms(env, { to: recipient, body: draft.body, statusCallback: `${callbackBase}/api/webhooks/twilio` });
+      const sentAt = new Date().toISOString();
+      const senderAddress = normalizeE164(env.TWILIO_FROM_NUMBER || env.TWILIO_PHONE_NUMBER);
+      await Promise.all([
+        fetch(`${url}/rest/v1/messages?id=eq.${encodeURIComponent(draft.id)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ status: provider.status, provider_message_id: provider.id, sent_at: sentAt, error_detail: "" }) }),
+        fetch(`${url}/rest/v1/sms_events`, { method: "POST", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ organization_id: organizationId, client_id: client.id, conversation_id: draft.conversation_id, message_id: draft.id, provider: "twilio", provider_message_id: provider.id, direction: "outbound", event_type: "submitted", status: provider.status, from_address: senderAddress, to_address: recipient, occurred_at: sentAt }) }),
+      ]);
+      await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.sms_sent", entityType: "message", entityId: draft.id, clientId: client.id, metadata: { conversation_id: draft.conversation_id, provider_message_id: provider.id } });
+      const snapshot = await readSnapshot(url, serviceKey, context, client, env);
+      return authJson({ message: "SMS accepted by Twilio. Delivery status will update automatically.", snapshot });
+    } catch (sendError) {
+      const detail = sendError instanceof Error ? sendError.message.slice(0, 500) : "Twilio rejected the request.";
+      await fetch(`${url}/rest/v1/messages?id=eq.${encodeURIComponent(draft.id)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ status: "failed", error_detail: detail }) });
+      return authJson({ error: `SMS was not sent: ${detail}` }, 502);
+    }
+  }
+
   if (action !== "create_conversation" && action !== "add_message") return authJson({ error: "That communications action is not supported." }, 400);
   const requestedChannel = clean(input?.channel, 20);
-  const channel = clientView ? "internal" : requestedChannel === "email" ? "email" : "internal";
+  const channel = clientView ? "internal" : requestedChannel === "email" || requestedChannel === "sms" ? requestedChannel : "internal";
   const subject = clean(input?.subject, 180);
   const body = clean(input?.body, 8000);
   const messageRecipients = recipients(input?.recipients);
   if (!body) return authJson({ error: "Write a message before saving." }, 400);
   if (channel === "email" && !messageRecipients.length) return authJson({ error: "Add at least one email recipient before saving the draft." }, 400);
   if (channel === "email" && messageRecipients.some((recipient) => !emailPattern.test(recipient))) return authJson({ error: "Use a valid email address for every recipient." }, 400);
+  if (channel === "sms" && (messageRecipients.length !== 1 || !normalizeE164(messageRecipients[0]))) return authJson({ error: "Add one valid mobile number including its country code." }, 400);
   const now = new Date().toISOString();
   let conversationId = clean(input?.conversationId, 36);
   let conversationSubject = subject;
@@ -362,7 +492,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const senderName = clean(input?.senderName, 160) || context.email || (clientView ? "Client" : "Torres & Co. team");
   const senderAddress = clean(input?.senderAddress, 320) || context.email || "";
   const direction = clientView ? "inbound" : "outbound";
-  const status = channel === "email" ? "draft" : clientView ? "received" : "sent";
+  const status = channel === "email" || channel === "sms" ? "draft" : clientView ? "received" : "sent";
   const clientVisible = channel === "internal";
   const messageResponse = await fetch(`${url}/rest/v1/messages`, {
     method: "POST",
@@ -375,8 +505,8 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     return authJson({ error: "The message could not be saved." }, 400);
   }
   await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ last_message_at: now, updated_at: now }) });
-  await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: channel === "email" ? "communications.email_draft_created" : "communications.message_shared", entityType: "message", entityId: messageRows[0].id, clientId: client.id, metadata: { conversation_id: conversationId, channel, status } });
+  await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: channel === "email" ? "communications.email_draft_created" : channel === "sms" ? "communications.sms_draft_created" : "communications.message_shared", entityType: "message", entityId: messageRows[0].id, clientId: client.id, metadata: { conversation_id: conversationId, channel, status } });
   if (channel === "internal") await notifyParticipants(url, serviceKey, context, client, conversationId, conversationSubject, body);
   const snapshot = await readSnapshot(url, serviceKey, context, client, env);
-  return authJson({ message: channel === "email" ? (emailConfigured(env) ? "Email draft saved for review. Send it when ready." : "Email draft saved. Connect an email provider before sending.") : "Message shared securely.", snapshot }, 201);
+  return authJson({ message: channel === "email" ? (emailConfigured(env) ? "Email draft saved for review. Send it when ready." : "Email draft saved. Connect an email provider before sending.") : channel === "sms" ? (twilioSmsConfigured(env) ? "SMS draft saved for consent and delivery review." : "SMS draft saved. Connect Twilio before sending.") : "Message shared securely.", snapshot }, 201);
 };

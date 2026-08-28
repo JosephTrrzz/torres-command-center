@@ -126,6 +126,7 @@ export default function InboxPage() {
   const [message, setMessage] = useState("");
   const [newThreadOpen, setNewThreadOpen] = useState(false);
   const [newThread, setNewThread] = useState({ subject: "", channel: "internal", recipients: "", body: "" });
+  const [consentForm, setConsentForm] = useState({ channel: "sms", address: "", status: "pending", evidence: "" });
   const [replyBody, setReplyBody] = useState("");
   const loadSequence = useRef(0);
 
@@ -282,6 +283,16 @@ export default function InboxPage() {
     await mutate(`send-${messageId}`, { action: "send_email", messageId });
   }
 
+  async function sendSms(messageId: string) {
+    await mutate(`send-${messageId}`, { action: "send_sms", messageId });
+  }
+
+  async function saveChannelConsent(event: FormEvent) {
+    event.preventDefault();
+    const next = await mutate("channel-consent", { action: "set_channel_consent", ...consentForm });
+    if (next) setConsentForm((current) => ({ ...current, address: "", evidence: "" }));
+  }
+
   async function reloadAfterAttachmentChange() {
     if (!session || !snapshot) return;
     await loadWorkspace(session, snapshot.isClient ? undefined : selectedClientId, "background");
@@ -386,8 +397,46 @@ export default function InboxPage() {
           <section className="communications-readiness" aria-label="Channel readiness">
             <div><span className="readiness-mark is-ready">✓</span><p><strong>Secure inbox</strong><small>Ready for staff and client updates.</small></p></div>
             <div><span className={`readiness-mark ${snapshot.delivery.email === "ready" ? "is-ready" : ""}`}>{snapshot.delivery.email === "ready" ? "✓" : "✉"}</span><p><strong>Email</strong><small>{snapshot.delivery.email === "ready" ? "Provider connected. Draft, send, and track delivery." : "Draft-only until a delivery provider is connected."}</small></p></div>
-            <div><span className="readiness-mark">·</span><p><strong>SMS &amp; voice</strong><small>Planned for a later Phase 4 connection.</small></p></div>
+            <div><span className={`readiness-mark ${snapshot.delivery.sms === "ready" ? "is-ready" : ""}`}>{snapshot.delivery.sms === "ready" ? "✓" : "S"}</span><p><strong>SMS</strong><small>{snapshot.delivery.sms === "ready" ? `Twilio connected${snapshot.smsVoice.senderAddress ? ` · ${snapshot.smsVoice.senderAddress}` : ""}.` : snapshot.delivery.sms === "migration_required" ? "Storage migration required." : "Consent records are ready; provider setup remains."}</small></p></div>
+            <div><span className={`readiness-mark ${snapshot.delivery.voice === "ready" ? "is-ready" : ""}`}>{snapshot.delivery.voice === "ready" ? "✓" : "V"}</span><p><strong>Voice</strong><small>{snapshot.delivery.voice === "ready" ? "Call records and provider are ready." : snapshot.delivery.voice === "migration_required" ? "Storage migration required." : "Call history is ready; provider setup remains."}</small></p></div>
           </section>
+
+          {snapshot.canManage && snapshot.smsVoice.migrationReady && (
+            <section className="communications-provider-foundation" aria-label="SMS and voice controls">
+              <header>
+                <div><p className="eyebrow">SMS &amp; voice foundation</p><h2>Consent first, delivery second.</h2><p>Record permission for each mobile number before sending. Opt-outs suppress future messages automatically.</p></div>
+                <span className={snapshot.delivery.sms === "ready" ? "is-ready" : ""}>{snapshot.delivery.sms === "ready" ? "SMS connected" : "Provider setup required"}</span>
+              </header>
+              <div className="communications-provider-grid">
+                <form className="communications-form consent-form" onSubmit={saveChannelConsent}>
+                  <strong>Record communication consent</strong>
+                  <div>
+                    <label>Channel<select value={consentForm.channel} onChange={(event) => setConsentForm({ ...consentForm, channel: event.target.value })}><option value="sms">SMS</option><option value="voice">Voice</option></select></label>
+                    <label>Mobile number<input required type="tel" value={consentForm.address} onChange={(event) => setConsentForm({ ...consentForm, address: event.target.value })} placeholder="+15035551234" /></label>
+                    <label>Status<select value={consentForm.status} onChange={(event) => setConsentForm({ ...consentForm, status: event.target.value })}><option value="pending">Pending</option><option value="granted">Granted</option><option value="revoked">Revoked</option></select></label>
+                  </div>
+                  <label>Evidence or note<input required={consentForm.status === "granted"} value={consentForm.evidence} onChange={(event) => setConsentForm({ ...consentForm, evidence: event.target.value })} placeholder="How and when consent was recorded" /></label>
+                  <button className="button button-dark" disabled={busy === "channel-consent"}>{busy === "channel-consent" ? "Saving…" : "Save consent →"}</button>
+                </form>
+                <div className="communications-consent-list">
+                  <strong>Recorded permissions</strong>
+                  {snapshot.smsVoice.consents.length ? snapshot.smsVoice.consents.map((consent) => (
+                    <article key={consent.id}>
+                      <span><b>{consent.address}</b><small>{consent.channel.toUpperCase()} · {consent.source.replaceAll("_", " ")}</small></span>
+                      <em className={`consent-${consent.status}`}>{labelCommunicationValue(consent.status)}</em>
+                    </article>
+                  )) : <p>No SMS or voice consent has been recorded for this client.</p>}
+                </div>
+                <div className="communications-activity-list">
+                  <strong>Recent provider activity</strong>
+                  {[...snapshot.smsVoice.recentSmsEvents.map((event) => ({ id: event.id, type: "SMS", title: `${event.direction === "inbound" ? event.from_address : event.to_address}`, status: event.status, date: event.occurred_at })), ...snapshot.smsVoice.recentCalls.map((call) => ({ id: call.id, type: "Call", title: `${call.direction === "inbound" ? call.from_address : call.to_address}`, status: `${call.status}${call.duration_seconds ? ` · ${call.duration_seconds}s` : ""}`, date: call.created_at }))].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()).slice(0, 8).map((activity) => (
+                    <article key={`${activity.type}-${activity.id}`}><span><b>{activity.type} · {activity.title || "Unknown number"}</b><small>{dateTimeLabel(activity.date)}</small></span><em>{labelCommunicationValue(activity.status)}</em></article>
+                  ))}
+                  {!snapshot.smsVoice.recentSmsEvents.length && !snapshot.smsVoice.recentCalls.length && <p>No SMS delivery events or calls have been recorded yet.</p>}
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="communications-workspace">
             <aside className="conversation-panel" aria-label="Conversations">
@@ -400,11 +449,13 @@ export default function InboxPage() {
                 <form className="communications-form new-conversation-form" onSubmit={createConversation}>
                   <div className="communications-form-heading"><strong>Start a conversation</strong><button type="button" onClick={() => setNewThreadOpen(false)} aria-label="Close new conversation form">×</button></div>
                   <label>Subject<input required value={newThread.subject} onChange={(event) => setNewThread({ ...newThread, subject: event.target.value })} placeholder="What does the client need?" /></label>
-                  {!snapshot.isClient && <label>Channel<select value={newThread.channel} onChange={(event) => setNewThread({ ...newThread, channel: event.target.value })}>{COMMUNICATION_CHANNELS.filter((channel) => channel === "internal" || channel === "email").map((channel) => <option key={channel} value={channel}>{communicationDeliveryLabel(channel)}</option>)}</select></label>}
+                  {!snapshot.isClient && <label>Channel<select value={newThread.channel} onChange={(event) => setNewThread({ ...newThread, channel: event.target.value })}>{COMMUNICATION_CHANNELS.filter((channel) => channel === "internal" || channel === "email" || (channel === "sms" && snapshot.smsVoice.migrationReady)).map((channel) => <option key={channel} value={channel}>{communicationDeliveryLabel(channel)}</option>)}</select></label>}
                   {newThread.channel === "email" && !snapshot.isClient && <label>Email recipient(s)<input required type="text" value={newThread.recipients} onChange={(event) => setNewThread({ ...newThread, recipients: event.target.value })} placeholder="client@example.com" /><small>Separate multiple addresses with commas.</small></label>}
-                  <label>Message<textarea required value={newThread.body} onChange={(event) => setNewThread({ ...newThread, body: event.target.value })} placeholder={newThread.channel === "email" ? "Write the email draft…" : "Write the first shared update…"} /></label>
+                  {newThread.channel === "sms" && !snapshot.isClient && <label>Mobile recipient<input required type="tel" value={newThread.recipients} onChange={(event) => setNewThread({ ...newThread, recipients: event.target.value })} placeholder="+15035551234" /><small>Use one mobile number with country code. Active consent is required before sending.</small></label>}
+                  <label>Message<textarea required value={newThread.body} onChange={(event) => setNewThread({ ...newThread, body: event.target.value })} placeholder={newThread.channel === "email" ? "Write the email draft…" : newThread.channel === "sms" ? "Write the SMS draft…" : "Write the first shared update…"} /></label>
                   {newThread.channel === "email" && <p className="draft-warning"><strong>{snapshot.delivery.email === "ready" ? "Review before sending." : "Draft only."}</strong> {snapshot.delivery.email === "ready" ? "This saves a draft. Open the thread and send it when the recipient and content are correct." : "This will be saved for review and will not be sent."}</p>}
-                  <button className="button button-dark" disabled={busy === "new-thread"}>{busy === "new-thread" ? "Saving…" : newThread.channel === "email" ? "Save email draft →" : "Share conversation →"}</button>
+                  {newThread.channel === "sms" && <p className="draft-warning"><strong>{snapshot.delivery.sms === "ready" ? "Review consent before sending." : "Draft only."}</strong> {snapshot.delivery.sms === "ready" ? "The Send action will remain protected until this exact number has granted consent." : "Connect Twilio after saving; this draft cannot leave the workspace yet."}</p>}
+                  <button className="button button-dark" disabled={busy === "new-thread"}>{busy === "new-thread" ? "Saving…" : newThread.channel === "email" ? "Save email draft →" : newThread.channel === "sms" ? "Save SMS draft →" : "Share conversation →"}</button>
                 </form>
               )}
 
@@ -496,6 +547,25 @@ export default function InboxPage() {
                     </div>
                   ) : (
                     <div className="email-draft-boundary"><strong>Email delivery is not connected.</strong><p>These messages remain reviewable drafts. Add the verified provider configuration before the app will offer a Send action.</p></div>
+                  ) : selectedConversation.channel === "sms" && snapshot.canManage ? (
+                    <div className={`email-draft-boundary ${snapshot.delivery.sms === "ready" ? "is-ready" : ""}`}>
+                      <strong>{snapshot.delivery.sms === "ready" ? "SMS delivery is ready." : "SMS drafts are protected."}</strong>
+                      <p>{snapshot.delivery.sms === "ready" ? "A message can be sent only when its exact recipient has granted consent and is not suppressed." : "Connect Twilio to enable sending. Drafts, consent, and opt-out records remain safely stored meanwhile."}</p>
+                      <div className="email-delivery-actions">
+                        {selectedConversation.messages.filter((smsMessage) => smsMessage.channel === "sms" && (smsMessage.status === "draft" || smsMessage.status === "failed") && !smsMessage.provider_message_id).map((smsMessage) => {
+                          const recipient = smsMessage.recipients[0] || "";
+                          const consent = snapshot.smsVoice.consents.find((item) => item.channel === "sms" && item.address === recipient);
+                          const canSend = snapshot.delivery.sms === "ready" && consent?.status === "granted";
+                          return (
+                            <button className="email-delivery-action" key={smsMessage.id} type="button" onClick={() => void sendSms(smsMessage.id)} disabled={Boolean(busy) || !canSend}>
+                              <span><strong>{canSend ? (smsMessage.status === "failed" ? "Retry SMS" : "Send SMS") : `Consent ${consent?.status || "not recorded"}`}</strong><small>To: {recipient || "No recipient"}</small></span>
+                              <b>{busy === `send-${smsMessage.id}` ? "Sending…" : canSend ? "→" : "—"}</b>
+                            </button>
+                          );
+                        })}
+                        {!selectedConversation.messages.some((smsMessage) => smsMessage.channel === "sms" && (smsMessage.status === "draft" || smsMessage.status === "failed") && !smsMessage.provider_message_id) && <small className="email-delivery-empty">No SMS drafts are waiting. Delivery receipts and inbound replies will appear automatically.</small>}
+                      </div>
+                    </div>
                   ) : null}
                 </>
               ) : (
