@@ -1,4 +1,4 @@
-export const COMMUNICATION_CHANNELS = ["internal", "email", "sms", "voice"] as const;
+export const COMMUNICATION_CHANNELS = ["internal", "email", "sms", "voice", "webchat"] as const;
 export const CONVERSATION_STATUSES = ["open", "pending", "closed"] as const;
 export const CONVERSATION_PRIORITIES = ["normal", "high", "urgent"] as const;
 export const MESSAGE_STATUSES = ["draft", "queued", "sent", "delivered", "failed", "received"] as const;
@@ -129,6 +129,7 @@ export function buildCommunicationsSummary(conversations: Conversation[]): Commu
 
 export function communicationDeliveryLabel(channel: CommunicationChannel) {
   if (channel === "internal") return "Shared securely";
+  if (channel === "webchat") return "Website chat";
   if (channel === "email") return "Email";
   return labelCommunicationValue(channel);
 }

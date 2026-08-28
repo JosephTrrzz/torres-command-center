@@ -264,7 +264,7 @@ export default function InboxPage() {
   async function addReply(event: FormEvent) {
     event.preventDefault();
     if (!selectedConversation) return;
-    if (await mutate("reply", { action: "add_message", conversationId: selectedConversation.id, channel: "internal", body: replyBody })) setReplyBody("");
+    if (await mutate("reply", { action: "add_message", conversationId: selectedConversation.id, channel: selectedConversation.channel, body: replyBody })) setReplyBody("");
   }
 
   async function updateConversation(event: FormEvent<HTMLFormElement>) {
@@ -471,7 +471,7 @@ export default function InboxPage() {
                     <div>
                       <span className={`conversation-channel channel-${selectedConversation.channel}`}>{communicationDeliveryLabel(selectedConversation.channel)}</span>
                       <h2>{selectedConversation.subject}</h2>
-                      <p>{selectedConversation.client_visible ? "Visible in the client workspace" : "Internal staff record"} · Started {dateTimeLabel(selectedConversation.created_at)}</p>
+                      <p>{selectedConversation.channel === "webchat" ? "Live website conversation" : selectedConversation.client_visible ? "Visible in the client workspace" : "Internal staff record"} · Started {dateTimeLabel(selectedConversation.created_at)}</p>
                     </div>
                     <span className={`conversation-priority priority-${selectedConversation.priority}`}>{labelCommunicationValue(selectedConversation.priority)}</span>
                   </header>
@@ -496,10 +496,10 @@ export default function InboxPage() {
                     ))}
                   </div>
 
-                  {canWrite && selectedConversation.channel === "internal" ? (
+                  {canWrite && (selectedConversation.channel === "internal" || selectedConversation.channel === "webchat") ? (
                     <form className="communications-form reply-form" onSubmit={addReply}>
-                      <label>Reply to this conversation<textarea required value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder="Write a secure update…" /></label>
-                      <div className="reply-form-footer"><small>This reply is shared with the client workspace.</small><button className="button button-dark" disabled={busy === "reply"}>{busy === "reply" ? "Sharing…" : "Share reply →"}</button></div>
+                      <label>{selectedConversation.channel === "webchat" ? "Reply to the website visitor" : "Reply to this conversation"}<textarea required value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder={selectedConversation.channel === "webchat" ? "Write a live response…" : "Write a secure update…"} /></label>
+                      <div className="reply-form-footer"><small>{selectedConversation.channel === "webchat" ? "Your first reply transfers this chat to staff and pauses automated responses." : "This reply is shared with the client workspace."}</small><button className="button button-dark" disabled={busy === "reply"}>{busy === "reply" ? "Sending…" : selectedConversation.channel === "webchat" ? "Send live reply →" : "Share reply →"}</button></div>
                     </form>
                   ) : selectedConversation.channel === "email" ? snapshot.delivery.email === "ready" && snapshot.canManage ? (
                     <div className="email-draft-boundary is-ready">
