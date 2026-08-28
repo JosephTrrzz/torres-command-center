@@ -84,3 +84,21 @@ staff or client browser
 Internal messages are real client-visible records and are available immediately in the customer portal's Inbox. Email is deliberately draft-only until an approved provider is configured; SMS and voice remain visibly unavailable. This prevents the interface from implying that an external message was delivered when no provider accepted it.
 
 The API enforces organization permission and client scope before every read or mutation. Customer users may read and reply only to client-visible conversations for their assigned client. Staff may manage thread priority and status. Direct authenticated table writes are revoked, and RLS repeats the tenant/client visibility boundary as defense in depth.
+
+Campaigns reuse the same tracked-email ledger and signed Resend webhook while keeping audience selection in a separate protected domain:
+
+```text
+staff browser → /api/campaigns → draft + reviewed recipients
+                                  │
+                                  ├── organization suppression check
+                                  ├── staff-only test send
+                                  └── typed SEND confirmation
+                                             │
+                                             ▼
+                                     email_deliveries + Resend
+                                             │ signed webhook
+                                             ▼
+                                 recipient delivery state + suppression
+```
+
+Announcements, newsletters, and review requests belong to one organization and one client. Review requests may reference only a completed service job. Suppressions are organization-wide and are checked during audience creation and immediately before sending. Public unsubscribe links use opaque per-recipient tokens; they never expose tenant identifiers, and they create durable suppression records. Browser writes to campaign, recipient, and suppression tables are revoked.

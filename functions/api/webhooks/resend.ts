@@ -26,6 +26,8 @@ interface DeliveryRow {
   status: ResendDeliveryStatus | "queued";
 }
 
+interface MarketingRecipientRow { organization_id: string; email: string }
+
 const statusRank: Record<DeliveryRow["status"], number> = {
   queued: 0,
   sent: 1,
@@ -102,6 +104,30 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     headers: serviceHeaders(serviceKey, "return=minimal"),
     body: JSON.stringify(deliveryPatch),
   });
+  const marketingPatch = {
+    status: nextStatus,
+    provider_message_id: providerMessageId,
+    error_detail: terminalFailure ? deliveryPatch.error_detail : "",
+    ...(nextStatus === "delivered" ? { delivered_at: occurredAt } : {}),
+    updated_at: new Date().toISOString(),
+  };
+  await fetch(`${url}/rest/v1/marketing_campaign_recipients?email_delivery_id=eq.${encodeURIComponent(delivery.id)}`, {
+    method: "PATCH",
+    headers: serviceHeaders(serviceKey, "return=minimal"),
+    body: JSON.stringify(marketingPatch),
+  });
+  if (["bounced", "complained", "suppressed"].includes(nextStatus)) {
+    const recipientResponse = await fetch(`${url}/rest/v1/marketing_campaign_recipients?email_delivery_id=eq.${encodeURIComponent(delivery.id)}&select=organization_id,email&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const recipients = recipientResponse.ok ? await recipientResponse.json().catch(() => []) as MarketingRecipientRow[] : [];
+    const recipient = recipients[0];
+    if (recipient) {
+      await fetch(`${url}/rest/v1/marketing_suppressions?on_conflict=organization_id,email`, {
+        method: "POST",
+        headers: serviceHeaders(serviceKey, "resolution=merge-duplicates,return=minimal"),
+        body: JSON.stringify({ organization_id: recipient.organization_id, email: recipient.email.toLowerCase(), reason: nextStatus === "bounced" ? "bounced" : nextStatus === "complained" ? "complained" : "provider_suppressed", source: "resend_webhook", detail: detail || nextStatus, updated_at: occurredAt }),
+      });
+    }
+  }
   if (delivery.message_id) {
     await fetch(`${url}/rest/v1/messages?id=eq.${encodeURIComponent(delivery.message_id)}`, {
       method: "PATCH",

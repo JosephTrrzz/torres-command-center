@@ -16,6 +16,7 @@ interface TrackedEmailInput {
 export interface TrackedEmailResult {
   sent: boolean;
   status: "sent" | "failed" | "not_configured";
+  deliveryId?: string;
   providerMessageId?: string;
   error?: string;
 }
@@ -64,7 +65,7 @@ export async function sendTrackedEmail(env: EmailEnv, input: TrackedEmailInput):
   const delivery = deliveries[0];
   if (!delivery?.id) return { sent: false, status: "failed", error: "Email delivery history could not be resolved." };
   if (delivery.provider_message_id && ["sent", "delivered"].includes(delivery.status || "")) {
-    return { sent: true, status: "sent", providerMessageId: delivery.provider_message_id };
+    return { sent: true, status: "sent", deliveryId: delivery.id, providerMessageId: delivery.provider_message_id };
   }
 
   try {
@@ -85,11 +86,12 @@ export async function sendTrackedEmail(env: EmailEnv, input: TrackedEmailInput):
       return {
         sent: true,
         status: "sent",
+        deliveryId: delivery.id,
         providerMessageId: provider.id,
         error: "Resend accepted the email, but its delivery record could not be updated.",
       };
     }
-    return { sent: true, status: "sent", providerMessageId: provider.id };
+    return { sent: true, status: "sent", deliveryId: delivery.id, providerMessageId: provider.id };
   } catch (error) {
     const detail = error instanceof Error ? error.message.slice(0, 500) : "Email provider rejected the request.";
     await fetch(`${input.supabaseUrl}/rest/v1/email_deliveries?id=eq.${encodeURIComponent(delivery.id)}`, {
@@ -97,6 +99,6 @@ export async function sendTrackedEmail(env: EmailEnv, input: TrackedEmailInput):
       headers: { ...headers(input.serviceKey), Prefer: "return=minimal" },
       body: JSON.stringify({ status: "failed", error_detail: detail, updated_at: new Date().toISOString() }),
     }).catch(() => undefined);
-    return { sent: false, status: "failed", error: detail };
+    return { sent: false, status: "failed", deliveryId: delivery.id, error: detail };
   }
 }

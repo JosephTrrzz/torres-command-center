@@ -18,6 +18,8 @@ export type OrganizationPermission =
   | "operations.manage"
   | "communications.read"
   | "communications.manage"
+  | "marketing.read"
+  | "marketing.manage"
   | "integrations.read"
   | "integrations.manage"
   | "reports.read"
@@ -47,11 +49,11 @@ export interface AuthContext {
 }
 
 const ROLE_PERMISSIONS: Record<OrganizationRole, readonly OrganizationPermission[]> = {
-  owner: ["organization.manage", "clients.read", "clients.manage", "crm.read", "crm.manage", "operations.read", "operations.manage", "communications.read", "communications.manage", "integrations.read", "integrations.manage", "reports.read", "reports.export", "audit.read", "automation.manage", "ai.use"],
-  admin: ["organization.manage", "clients.read", "clients.manage", "crm.read", "crm.manage", "operations.read", "operations.manage", "communications.read", "communications.manage", "integrations.read", "integrations.manage", "reports.read", "reports.export", "audit.read", "automation.manage", "ai.use"],
-  operator: ["clients.read", "clients.manage", "crm.read", "crm.manage", "operations.read", "operations.manage", "communications.read", "communications.manage", "integrations.read", "integrations.manage", "reports.read", "reports.export", "ai.use"],
-  member: ["clients.read", "crm.read", "operations.read", "communications.read", "communications.manage", "integrations.read", "reports.read", "reports.export", "ai.use"],
-  viewer: ["clients.read", "crm.read", "operations.read", "communications.read", "integrations.read", "reports.read"],
+  owner: ["organization.manage", "clients.read", "clients.manage", "crm.read", "crm.manage", "operations.read", "operations.manage", "communications.read", "communications.manage", "marketing.read", "marketing.manage", "integrations.read", "integrations.manage", "reports.read", "reports.export", "audit.read", "automation.manage", "ai.use"],
+  admin: ["organization.manage", "clients.read", "clients.manage", "crm.read", "crm.manage", "operations.read", "operations.manage", "communications.read", "communications.manage", "marketing.read", "marketing.manage", "integrations.read", "integrations.manage", "reports.read", "reports.export", "audit.read", "automation.manage", "ai.use"],
+  operator: ["clients.read", "clients.manage", "crm.read", "crm.manage", "operations.read", "operations.manage", "communications.read", "communications.manage", "marketing.read", "marketing.manage", "integrations.read", "integrations.manage", "reports.read", "reports.export", "ai.use"],
+  member: ["clients.read", "crm.read", "operations.read", "communications.read", "communications.manage", "marketing.read", "integrations.read", "reports.read", "reports.export", "ai.use"],
+  viewer: ["clients.read", "crm.read", "operations.read", "communications.read", "marketing.read", "integrations.read", "reports.read"],
   client: ["operations.read", "communications.read", "communications.manage", "integrations.read", "reports.read", "reports.export", "ai.use"],
 };
 

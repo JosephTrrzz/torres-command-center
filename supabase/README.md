@@ -30,6 +30,9 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `message_attachments` | Private metadata for files attached to Inbox email drafts. The actual objects remain in a protected Supabase Storage bucket and are served only through authenticated, tenant-scoped Functions. | Inbox |
 | `email_deliveries` | Server-owned outbound email attempts. Stores the provider ID, idempotency key, recipient list, and truthful sent/delivered/failed state. | Inbox (server-managed) |
 | `email_delivery_events` | Signed, deduplicated provider webhook events for delivery, delay, bounce, complaint, failure, and suppression history. | Inbox (server-managed) |
+| `marketing_campaigns` | Client-scoped announcement, newsletter, and review-request drafts with an explicit send lifecycle. | Campaigns |
+| `marketing_campaign_recipients` | The reviewed audience and truthful delivery result for each campaign email. Includes consent basis and a private unsubscribe token. | Campaigns (server-managed) |
+| `marketing_suppressions` | Organization-wide do-not-send records created by unsubscribes, complaints, bounces, or an administrator. | Campaigns (server-managed) |
 
 ## How the records connect
 
@@ -48,6 +51,10 @@ profiles ── client_id ──> clients <── client_id ── client_people
                                                    ├── message_participants
                                                    └── messages ─┬─ message_attachments
                                                                 └─ email_deliveries ── email_delivery_events
+                              └── client_id ── marketing_campaigns
+                                                   └── marketing_campaign_recipients ── email_deliveries
+
+organizations ── marketing_suppressions (one durable suppression per email address)
 ```
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
@@ -68,6 +75,7 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 6. Open **Reports** and verify the saved mapping and live metrics.
 7. Open **Operations** to create real service jobs, schedule work, prepare estimates, and choose which updates the client may see.
 8. Open **Inbox** to start a secure client-visible conversation. Email is saved as a draft first; when the verified provider is configured, staff review and send it from the thread while delivery state updates automatically.
+9. Open **Campaigns** to create a client-scoped draft, review eligible contacts, send a staff test, and type `SEND` only when the recipient list and content are ready.
 
 ## Important safety rules
 
@@ -84,10 +92,12 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Do not mark an email draft as sent manually. Provider delivery state must be written by the protected communications workflow after a real provider response.
 - Keep staff-only notes and files out of client-visible conversations and messages.
 - Upload email files only through Inbox. The `communication-attachments` bucket is private and must not receive public object policies or public URLs.
+- Never bypass `marketing_suppressions` or manually change a campaign recipient to sent. The protected Campaigns Function rechecks suppression immediately before delivery, and provider webhooks own delivery truth.
+- Review requests may reference only completed service jobs and require a valid review URL. Campaigns are intentionally limited to 25 recipients while the controlled delivery foundation is being proven.
 
 ## Phase migration order
 
-Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql) and [`communication_attachments.sql`](./communication_attachments.sql) before enabling outbound email attachments. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
+Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql), [`communication_attachments.sql`](./communication_attachments.sql), and [`marketing.sql`](./marketing.sql) before enabling campaign delivery. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
 
 ## Add descriptions inside Supabase
 
