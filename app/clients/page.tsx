@@ -19,6 +19,7 @@ export default function ClientsPage() {
   const [activationBusyId, setActivationBusyId] = useState("");
   const [activationSent, setActivationSent] = useState<Record<string, boolean>>({});
   const [activationLink, setActivationLink] = useState("");
+  const [activationDelivery, setActivationDelivery] = useState<{ email: string; sent: boolean; error: string } | null>(null);
 
   useEffect(() => {
     fetchClients()
@@ -59,9 +60,11 @@ export default function ClientsPage() {
         const row = createBody.client;
         if (row?.id) {
           const inviteResponse = await fetch("/api/admin/customer-invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: row.id, email: input.email, fullName: input.name }) });
-          const inviteBody = await inviteResponse.json().catch(() => ({}));
+          const inviteBody = await inviteResponse.json().catch(() => ({})) as { activationLink?: string; email?: string; emailSent?: boolean; emailError?: string; message?: string; error?: string };
           if (!inviteResponse.ok) throw new Error(inviteBody.error || "Client was created, but the portal invitation could not be prepared.");
           setMessage(inviteBody.message || "Client and portal invitation created successfully");
+          if (inviteBody.activationLink) setActivationLink(inviteBody.activationLink);
+          setActivationDelivery({ email: inviteBody.email || input.email, sent: Boolean(inviteBody.emailSent), error: inviteBody.emailError || "" });
           setOnboarding({
           id: row.id, name: input.name, initials: input.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
           industry: input.industry, location: input.location, website: input.website, email: input.email, phone: input.phone,
@@ -104,12 +107,14 @@ export default function ClientsPage() {
     setActivationBusyId(client.id);
     setError("");
     setActivationLink("");
+    setActivationDelivery(null);
     try {
       const response = await fetch("/api/admin/customer-invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: client.id, resend: true }) });
-      const body = await response.json().catch(() => ({}));
+      const body = await response.json().catch(() => ({})) as { activationLink?: string; email?: string; emailSent?: boolean; emailError?: string; message?: string; error?: string };
       if (!response.ok) throw new Error(body.error || "Unable to prepare an activation link.");
       setActivationSent((current) => ({ ...current, [client.id]: true }));
       if (typeof body.activationLink === "string") setActivationLink(body.activationLink);
+      setActivationDelivery({ email: body.email || client.email || "the client", sent: Boolean(body.emailSent), error: body.emailError || "" });
       setMessage(body.message || "Activation link prepared.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to prepare an activation link.");
@@ -188,7 +193,7 @@ export default function ClientsPage() {
         <div className="form-actions"><Link className="button button-dark" href={`/clients/detail/?id=${encodeURIComponent(onboarding.id)}`}>Open client account <span>→</span></Link><Link className="button button-light" href={`/integrations/?client=${encodeURIComponent(onboarding.id)}`}>Prepare integrations <span>→</span></Link>{onboarding.website && <a className="button button-outline" href={onboarding.website.startsWith("http") ? onboarding.website : `https://${onboarding.website}`} target="_blank" rel="noreferrer">Open client site ↗</a>}</div>
       </section>}
 
-      {activationLink && <section className="detail-card activation-link-card" aria-live="polite"><div><p className="eyebrow">Activation link ready</p><h2>Send this secure link to the client</h2><p>The link signs the client in and activates their assigned portal. Treat it like a password and share it privately.</p></div><div className="activation-link-row"><input aria-label="Client activation link" readOnly value={activationLink} /><button className="button button-dark" type="button" onClick={() => void navigator.clipboard?.writeText(activationLink)}>Copy link</button></div></section>}
+      {activationLink && <section className="detail-card activation-link-card" aria-live="polite"><div><p className="eyebrow">{activationDelivery?.sent ? "Activation email accepted" : "Activation link ready"}</p><h2>{activationDelivery?.sent ? `Invitation sent to ${activationDelivery.email}` : "Copy and send this secure link"}</h2><p>{activationDelivery?.sent ? "Resend accepted the branded invitation. Keep this private link as a fallback in case the client needs it again." : "The email provider did not accept the invitation. Copy this private link and send it to the client manually."}</p>{!activationDelivery?.sent && activationDelivery?.error && <small className="updated">{activationDelivery.error}</small>}</div><div className="activation-link-row"><input aria-label="Client activation link" readOnly value={activationLink} onFocus={(event) => event.currentTarget.select()} /><button className="button button-dark" type="button" onClick={() => void navigator.clipboard?.writeText(activationLink)}>{activationDelivery?.sent ? "Copy fallback link" : "Copy link"}</button></div></section>}
 
       <section className="client-grid client-grid-wide">
         {clients.map((client) => (

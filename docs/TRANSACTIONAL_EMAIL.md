@@ -1,6 +1,6 @@
 # Phase 4 transactional email
 
-The Inbox always saves email as a draft first. It offers **Send email** only when the server has both a valid Resend API key and a verified From address. A message is never marked sent from a browser click alone: the provider must return a real message ID, and signed webhooks advance it to delivered or failed.
+The Inbox always saves email as a draft first. It offers **Send email** only when the server has both a valid Resend API key and a verified From address. Customer-portal and team invitations use the same provider-backed delivery ledger and retain a secure copy-link fallback. A message is never marked sent from a browser click alone: the provider must return a real message ID, and signed webhooks advance it to delivered or failed.
 
 ## One-time production setup
 
@@ -23,5 +23,7 @@ Do not expose these secrets with a `NEXT_PUBLIC_` prefix. The browser never call
 3. Review the draft, click **Send email**, and confirm the state changes from Draft to Sent only after provider acceptance.
 4. Wait for the signed webhook and confirm the state changes to Delivered, or shows a readable failure reason.
 5. Confirm the client portal does not expose staff-only email drafts.
+6. From Clients, prepare a customer activation and confirm the UI says **email accepted** only after Resend returns a provider message ID.
+7. From Settings, invite a team member and confirm the same tracked-email behavior and fallback link.
 
 Resend webhook delivery is at least once. `email_delivery_events.provider_event_id` deduplicates retries, and `email_deliveries.idempotency_key` prevents duplicate sends during request retries.

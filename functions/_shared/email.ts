@@ -34,12 +34,30 @@ export function escapeEmailHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-export function buildTransactionalEmailHtml(input: { heading: string; body: string; preheader?: string }) {
+function safeActionUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return ["https:", "http:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+export function buildTransactionalEmailHtml(input: {
+  heading: string;
+  body: string;
+  preheader?: string;
+  action?: { label: string; url: string };
+}) {
   const paragraphs = input.body
     .split(/\n{2,}/)
     .map((paragraph) => `<p style="margin:0 0 16px;color:#4f5458;font-size:16px;line-height:1.65;white-space:pre-line">${escapeEmailHtml(paragraph)}</p>`)
     .join("");
-  return `<!doctype html><html><body style="margin:0;background:#f5f1e8;font-family:Arial,sans-serif;color:#132238"><div style="display:none;max-height:0;overflow:hidden">${escapeEmailHtml(input.preheader || input.heading)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1e8;padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #ded8cd;border-radius:18px"><tr><td style="padding:30px"><p style="margin:0 0 24px;color:#9a7335;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Torres &amp; Co. Technology</p><h1 style="margin:0 0 20px;color:#132238;font-size:28px;line-height:1.2">${escapeEmailHtml(input.heading)}</h1>${paragraphs}<p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #ebe5da;color:#777;font-size:12px;line-height:1.5">Sent securely from the Torres &amp; Co. Command Center.</p></td></tr></table></td></tr></table></body></html>`;
+  const actionUrl = input.action ? safeActionUrl(input.action.url) : "";
+  const action = input.action && actionUrl
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 28px"><tr><td style="border-radius:10px;background:#132238"><a href="${escapeEmailHtml(actionUrl)}" style="display:inline-block;padding:14px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">${escapeEmailHtml(input.action.label)}</a></td></tr></table>`
+    : "";
+  return `<!doctype html><html><body style="margin:0;background:#f5f1e8;font-family:Arial,sans-serif;color:#132238"><div style="display:none;max-height:0;overflow:hidden">${escapeEmailHtml(input.preheader || input.heading)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1e8;padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #ded8cd;border-radius:18px"><tr><td style="padding:30px"><p style="margin:0 0 24px;color:#9a7335;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Torres &amp; Co. Technology</p><h1 style="margin:0 0 20px;color:#132238;font-size:28px;line-height:1.2">${escapeEmailHtml(input.heading)}</h1>${paragraphs}${action}<p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #ebe5da;color:#777;font-size:12px;line-height:1.5">Sent securely from the Torres &amp; Co. Command Center.</p></td></tr></table></td></tr></table></body></html>`;
 }
 
 export async function sendTransactionalEmail(env: EmailEnv, input: {

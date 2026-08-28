@@ -93,6 +93,23 @@ describe("transactional email safety", () => {
     expect(html).not.toContain("<update>");
   });
 
+  it("renders only safe activation actions", () => {
+    const html = buildTransactionalEmailHtml({
+      heading: "Portal invitation",
+      body: "Your workspace is ready.",
+      action: { label: "Open <portal>", url: "https://admin.example.com/activate?a=1&b=2" },
+    });
+    expect(html).toContain("Open &lt;portal&gt;");
+    expect(html).toContain("https://admin.example.com/activate?a=1&amp;b=2");
+
+    const unsafe = buildTransactionalEmailHtml({
+      heading: "Portal invitation",
+      body: "Your workspace is ready.",
+      action: { label: "Open portal", url: "javascript:alert(1)" },
+    });
+    expect(unsafe).not.toContain("javascript:");
+  });
+
   it("maps only supported provider lifecycle events", () => {
     expect(deliveryStatusForResendEvent("email.delivered")).toBe("delivered");
     expect(deliveryStatusForResendEvent("email.bounced")).toBe("bounced");

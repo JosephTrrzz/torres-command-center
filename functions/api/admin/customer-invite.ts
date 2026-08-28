@@ -1,7 +1,9 @@
 import { createNotification } from "../../_shared/notifications";
 import { getSupabaseUrl, requireAuth, type FunctionEnv } from "../../_shared/auth";
+import { buildTransactionalEmailHtml, type EmailEnv } from "../../_shared/email";
+import { activationEmailKey, sendTrackedEmail } from "../../_shared/tracked-email";
 
-interface Env extends FunctionEnv {
+interface Env extends FunctionEnv, EmailEnv {
   PUBLIC_APP_URL?: string;
 }
 
@@ -108,20 +110,56 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     body: "Activate your account to review reports and manage your business profile.",
     href: "/portal/",
   }) : Promise.resolve(false);
+  const deliverActivationLink = async (actionLink: string) => {
+    if (!organizationId) return { sent: false, status: "failed" as const, error: "This client is not assigned to an organization." };
+    const subject = `Activate your ${fullName || "client"} portal`;
+    const greeting = fullName ? `Hello ${fullName},` : "Hello,";
+    const text = `${greeting}\n\nTorres & Co. Technology has prepared your secure client portal. Use the private link below to activate your account and review the workspace assigned to your business.\n\nActivate client portal: ${actionLink}\n\nThis link is private and expires. If you did not expect this invitation, you can ignore this email.`;
+    return sendTrackedEmail(env, {
+      supabaseUrl,
+      serviceKey,
+      organizationId,
+      clientId,
+      recipient: email,
+      subject,
+      text,
+      html: buildTransactionalEmailHtml({
+        heading: "Your client portal is ready",
+        preheader: "Activate your secure Torres & Co. client portal.",
+        body: `${greeting}\n\nTorres & Co. Technology has prepared your secure client portal. Activate your account to review the workspace assigned to your business.\n\nThis private link expires. If you did not expect this invitation, you can ignore this email.`,
+        action: { label: "Activate client portal", url: actionLink },
+      }),
+      templateKey: "customer_portal_activation",
+      idempotencyKey: await activationEmailKey(`customer-activation:${clientId}`, actionLink),
+    });
+  };
+  const activationPayload = (delivery: Awaited<ReturnType<typeof deliverActivationLink>>, activationLink: string, invited: boolean) => ({
+    invited,
+    email,
+    activationLink,
+    emailSent: delivery.sent,
+    deliveryStatus: delivery.status,
+    ...(delivery.error ? { emailError: delivery.error } : {}),
+    message: delivery.sent
+      ? `Activation email accepted for delivery to ${email}. The secure link is also available as a fallback.`
+      : `The secure activation link is ready, but email was not sent${delivery.error ? `: ${delivery.error}` : "."} Copy and share the link privately.`,
+  });
   if (input?.resend) {
     const linkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "magiclink", email, redirect_to: redirectTo }) });
     const linkBody = await linkResponse.json().catch(() => ({})) as { action_link?: string; user?: { id?: string }; msg?: string; message?: string };
     if (linkResponse.ok && linkBody.action_link) {
       await recordOrganizationInvitation(linkBody.user?.id || existingProfileId);
+      const delivery = await deliverActivationLink(linkBody.action_link);
       await Promise.allSettled([notifyStaff(`${fullName || email} has a fresh portal activation link.`), notifyCustomer(linkBody.user?.id || existingProfileId)]);
-      return json({ invited: false, email, activationLink: linkBody.action_link, message: "A fresh activation link is ready. Copy it and send it to the client." });
+      return json(activationPayload(delivery, linkBody.action_link, false));
     }
     const inviteLinkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "invite", email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
     const inviteLinkBody = await inviteLinkResponse.json().catch(() => ({})) as { action_link?: string; user?: { id?: string }; msg?: string; message?: string };
     if (inviteLinkResponse.ok && inviteLinkBody.action_link) {
       await recordOrganizationInvitation(inviteLinkBody.user?.id || existingProfileId);
+      const delivery = await deliverActivationLink(inviteLinkBody.action_link);
       await Promise.allSettled([notifyStaff(`${fullName || email} has a new portal activation link.`), notifyCustomer(inviteLinkBody.user?.id || existingProfileId)]);
-      return json({ invited: true, email, activationLink: inviteLinkBody.action_link, message: "A new activation link is ready. Copy it and send it to the client." });
+      return json(activationPayload(delivery, inviteLinkBody.action_link, true));
     }
     const inviteAgain = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });
     const inviteAgainBody = await inviteAgain.json().catch(() => ({})) as { user?: { id?: string }; msg?: string; message?: string };
@@ -131,6 +169,33 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       return json({ invited: true, email, message: "A new activation invitation was sent by email." });
     }
     return json({ error: inviteAgainBody.msg || inviteAgainBody.message || inviteLinkBody.msg || inviteLinkBody.message || linkBody.msg || linkBody.message || "Supabase could not prepare an activation link." }, 502);
+  }
+
+  const preparedLinkResponse = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+    method: "POST",
+    headers: serviceHeaders,
+    body: JSON.stringify({
+      type: existingProfileId ? "magiclink" : "invite",
+      email,
+      data: { full_name: fullName, client_id: clientId, role: "customer" },
+      redirect_to: redirectTo,
+    }),
+  });
+  const preparedLinkBody = await preparedLinkResponse.json().catch(() => ({})) as { action_link?: string; user?: { id?: string } };
+  if (preparedLinkResponse.ok && preparedLinkBody.action_link) {
+    const preparedUserId = preparedLinkBody.user?.id || existingProfileId;
+    if (preparedUserId) {
+      await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(preparedUserId)}`, { method: "PATCH", headers: { ...serviceHeaders, Prefer: "return=minimal" }, body: JSON.stringify({ email, full_name: fullName, role: "customer", client_id: clientId, active: Boolean(existingProfileId), updated_at: new Date().toISOString() }) });
+    }
+    await recordOrganizationInvitation(preparedUserId);
+    const accountResponse = await fetch(`${supabaseUrl}/rest/v1/customer_accounts?on_conflict=client_id`, { method: "POST", headers: { ...serviceHeaders, Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ client_id: clientId, portal_email: email, portal_enabled: true, portal_status: "invited", billing_email: email, billing_status: "not_connected", updated_at: new Date().toISOString() }) });
+    if (!accountResponse.ok) return json({ error: "The activation link was prepared, but the customer portal account could not be saved." }, 502);
+    const delivery = await deliverActivationLink(preparedLinkBody.action_link);
+    await Promise.allSettled([
+      notifyStaff(`${fullName || email}'s client portal activation was prepared.`),
+      notifyCustomer(preparedUserId),
+    ]);
+    return json(activationPayload(delivery, preparedLinkBody.action_link, !existingProfileId));
   }
 
   const inviteResponse = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, { method: "POST", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ email, data: { full_name: fullName, client_id: clientId, role: "customer" }, redirect_to: redirectTo }) });

@@ -1,7 +1,9 @@
 import { authJson, getSupabaseUrl, requireAuth, type FunctionEnv, type OrganizationRole } from "../../_shared/auth";
 import { createNotification } from "../../_shared/notifications";
+import { buildTransactionalEmailHtml, type EmailEnv } from "../../_shared/email";
+import { activationEmailKey, sendTrackedEmail } from "../../_shared/tracked-email";
 
-interface Env extends FunctionEnv {
+interface Env extends FunctionEnv, EmailEnv {
   PUBLIC_APP_URL?: string;
 }
 
@@ -127,11 +129,36 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     }),
   ]);
 
+  const organizationName = organization.name || "Torres & Co.";
+  const subject = `Join ${organizationName} in Torres OS`;
+  const text = `Hello ${fullName},\n\nYou have been invited to join ${organizationName} as ${role}. Use the private activation link below to sign in and open your assigned workspace.\n\nActivate workspace access: ${linkBody.action_link}\n\nThis link is private and expires. If you did not expect this invitation, you can ignore this email.`;
+  const delivery = await sendTrackedEmail(env, {
+    supabaseUrl: url,
+    serviceKey,
+    organizationId: organization.id,
+    recipient: email,
+    subject,
+    text,
+    html: buildTransactionalEmailHtml({
+      heading: `Join ${organizationName}`,
+      preheader: `Activate your ${role} workspace access.`,
+      body: `Hello ${fullName},\n\nYou have been invited to join ${organizationName} as ${role}. Activate your account to open the workspace and tools assigned to you.\n\nThis private link expires. If you did not expect this invitation, you can ignore this email.`,
+      action: { label: "Activate workspace access", url: linkBody.action_link },
+    }),
+    templateKey: "team_workspace_activation",
+    idempotencyKey: await activationEmailKey(`team-activation:${organization.id}:${email}`, linkBody.action_link),
+  });
+
   return authJson({
     invited: true,
     email,
     role,
     activationLink: linkBody.action_link,
-    message: `A secure activation link is ready for ${fullName}.`,
+    emailSent: delivery.sent,
+    deliveryStatus: delivery.status,
+    ...(delivery.error ? { emailError: delivery.error } : {}),
+    message: delivery.sent
+      ? `Invitation email accepted for delivery to ${email}. The secure link is also available as a fallback.`
+      : `The secure activation link is ready, but email was not sent${delivery.error ? `: ${delivery.error}` : "."} Copy and share the link privately.`,
   });
 };

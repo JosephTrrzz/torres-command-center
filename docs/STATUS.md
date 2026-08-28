@@ -9,7 +9,7 @@ Updated 2026-08-27.
 | Custom admin domain | Live | `admin.torrescotechnology.com` serves the Cloudflare Pages app. |
 | Authentication | Live | Supabase sign-in, password reset, role loading, and protected routes work. |
 | Organization authorization | Live cutover | Active memberships and role permissions now drive shell access and protected Google/report/customer-invite Functions, with legacy profile fallback for unmigrated accounts. |
-| Client management | Live foundation | Create/edit clients, contacts, portal settings, and activation links. |
+| Client management | Live foundation | Create/edit clients, contacts, portal settings, and provider-tracked activation emails with secure-link fallback. |
 | Customer portal | Live foundation | Customer-scoped portal and agency preview entry point. |
 | Workspace switching | Live foundation | Direct organization switching is active-membership-bound; agency client previews are explicitly labeled and leave the administrator session unchanged. |
 | Notifications | Live foundation | Persisted rows, RLS, popover states, mark-read, and onboarding producers. |
@@ -29,20 +29,20 @@ Updated 2026-08-27.
 - Phase 1 foundation: complete for the controlled organization cutover. Legacy profile fields remain only as a compatibility fallback for unmigrated accounts.
 - Phase 2 agency and client management: in progress; the membership-bound workspace selector and authorized client preview flow are implemented.
 - Phase 3 CRM and operations: implementation complete; the lead-to-appointment workflow now continues into customer 360, jobs, scheduling, estimates, documents, tasks, activity, and client-visible approvals.
-- Phase 4 communications and marketing: in progress; the secure shared Inbox and provider-backed transactional-email path are implemented. Live email sending remains safely disabled until the verified domain, provider secrets, webhook, and additive delivery migration are configured. SMS/voice, campaigns, review requests, and AI receptionist workflows remain.
+- Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded customer activation emails, and team invitation emails are implemented. SMS/voice, campaigns, review requests, and AI receptionist workflows remain.
 - Phases 5–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-27: 34 unit tests passed, application TypeScript passed, Cloudflare Function TypeScript passed, and the Next.js production build generated all 17 static pages. The communications and transactional-email migrations create no seeded conversations, messages, deliveries, or provider events.
+On 2026-08-27: the unit suite, application TypeScript, Cloudflare Function TypeScript, and Next.js production build passed. The communications and transactional-email migrations create no seeded conversations, messages, deliveries, or provider events.
 
 ## Known limitations
 
 - Some legacy routes and browser data helpers still use `profiles.role` and `profiles.client_id`; protected Google, reports, and invitation Functions now prefer organization memberships and retain a compatibility fallback for unmigrated accounts.
-- Invitation links are generated securely by Supabase and presented to an administrator for delivery. The Inbox transactional-email engine is provider-ready; invitation-template delivery is a separate follow-up slice.
+- Invitation links are generated securely by Supabase, delivered through the provider-backed email ledger, and retained for private manual fallback. Provider rejection is shown honestly instead of being labeled sent.
 - Some preferences remain browser-local and are not yet portable across devices.
 - Business Profile metrics cannot load until Google grants API quota.
 - Operational documents currently use validated HTTPS resource links; managed file uploads and storage lifecycle controls remain a later enhancement.
-- Secure in-app communications are implemented. Branded outbound email remains draft-only until its verified provider configuration and delivery migration are present; SMS, voice, campaigns, review requests, and AI receptionist workflows remain roadmap capabilities.
+- Secure in-app communications and branded outbound email are implemented. SMS, voice, campaigns, review requests, and AI receptionist workflows remain roadmap capabilities.
 - AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
 - Reports are live but still need persisted snapshots, provenance display, scheduled delivery, and broader tests.
