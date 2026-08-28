@@ -8,6 +8,15 @@ export type ConversationStatus = typeof CONVERSATION_STATUSES[number];
 export type ConversationPriority = typeof CONVERSATION_PRIORITIES[number];
 export type MessageStatus = typeof MESSAGE_STATUSES[number];
 
+export interface CommunicationAttachment {
+  id: string;
+  message_id: string;
+  file_name: string;
+  content_type: string;
+  byte_size: number;
+  created_at: string;
+}
+
 export interface CommunicationMessage {
   id: string;
   conversation_id: string;
@@ -24,6 +33,7 @@ export interface CommunicationMessage {
   client_visible: boolean;
   sent_at: string | null;
   created_at: string;
+  attachments: CommunicationAttachment[];
 }
 
 export interface Conversation {

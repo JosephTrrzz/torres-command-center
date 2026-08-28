@@ -4,13 +4,20 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { appRoleForOrganizationRole } from "../../lib/access-control";
-import { changeCommunications, fetchCommunications } from "../../lib/communications-api";
+import {
+  changeCommunications,
+  deleteCommunicationAttachment,
+  downloadCommunicationAttachment,
+  fetchCommunications,
+  uploadCommunicationAttachment,
+} from "../../lib/communications-api";
 import {
   COMMUNICATION_CHANNELS,
   CONVERSATION_PRIORITIES,
   CONVERSATION_STATUSES,
   communicationDeliveryLabel,
   labelCommunicationValue,
+  type CommunicationAttachment,
   type CommunicationMessage,
   type CommunicationsSnapshot,
   type Conversation,
@@ -38,6 +45,12 @@ function relativeDateLabel(value: string) {
     : { month: "short", day: "numeric" }).format(date);
 }
 
+function fileSizeLabel(byteSize: number) {
+  if (byteSize < 1024) return `${byteSize} B`;
+  if (byteSize < 1024 * 1024) return `${Math.round(byteSize / 1024)} KB`;
+  return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function lastMessage(conversation: Conversation) {
   return conversation.messages[conversation.messages.length - 1] || null;
 }
@@ -62,7 +75,12 @@ function ConversationListItem({ conversation, active, onChoose }: { conversation
   );
 }
 
-function MessageBubble({ message, clientView }: { message: CommunicationMessage; clientView: boolean }) {
+function MessageBubble({ message, clientView, onDownload, downloadingId }: {
+  message: CommunicationMessage;
+  clientView: boolean;
+  onDownload: (attachment: CommunicationAttachment) => void;
+  downloadingId: string;
+}) {
   const ownMessage = clientView ? message.direction === "inbound" : message.direction === "outbound";
   return (
     <article className={`message-bubble ${ownMessage ? "is-own" : "is-other"} is-${message.status}`}>
@@ -75,6 +93,16 @@ function MessageBubble({ message, clientView }: { message: CommunicationMessage;
       </header>
       {message.recipients.length > 0 && <p className="message-recipients"><b>To:</b> {message.recipients.join(", ")}</p>}
       <p className="message-body">{message.body}</p>
+      {message.attachments.length > 0 && (
+        <div className="message-attachment-list" aria-label="Email attachments">
+          {message.attachments.map((attachment) => (
+            <button type="button" key={attachment.id} onClick={() => onDownload(attachment)} disabled={downloadingId === attachment.id}>
+              <span aria-hidden="true">↧</span>
+              <span><strong>{attachment.file_name}</strong><small>{fileSizeLabel(attachment.byte_size)}</small></span>
+            </button>
+          ))}
+        </div>
+      )}
       {message.status === "failed" && message.error_detail && <p className="message-error-detail" role="alert"><strong>Delivery failed:</strong> {message.error_detail}</p>}
       <footer>
         <span>{message.client_visible ? "Visible to client" : "Staff only"}</span>
@@ -254,6 +282,59 @@ export default function InboxPage() {
     await mutate(`send-${messageId}`, { action: "send_email", messageId });
   }
 
+  async function reloadAfterAttachmentChange() {
+    if (!session || !snapshot) return;
+    await loadWorkspace(session, snapshot.isClient ? undefined : selectedClientId, "background");
+  }
+
+  async function uploadAttachments(messageId: string, files: File[]) {
+    if (!session || !snapshot || !files.length) return;
+    setBusy(`attach-${messageId}`);
+    setError("");
+    setMessage("");
+    try {
+      for (const file of files) {
+        await uploadCommunicationAttachment(session, { clientId: snapshot.client.id, messageId, file });
+      }
+      await reloadAfterAttachmentChange();
+      setMessage(`${files.length} ${files.length === 1 ? "file" : "files"} attached securely.`);
+    } catch (uploadError) {
+      await reloadAfterAttachmentChange();
+      setError(uploadError instanceof Error ? uploadError.message : "The files could not be attached.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function removeAttachment(attachmentId: string) {
+    if (!session || !snapshot) return;
+    setBusy(`remove-${attachmentId}`);
+    setError("");
+    setMessage("");
+    try {
+      const response = await deleteCommunicationAttachment(session, { clientId: snapshot.client.id, attachmentId });
+      await reloadAfterAttachmentChange();
+      setMessage(response.message || "Attachment removed.");
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : "The attachment could not be removed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function downloadAttachment(attachment: CommunicationAttachment) {
+    if (!session || !snapshot) return;
+    setBusy(`download-${attachment.id}`);
+    setError("");
+    try {
+      await downloadCommunicationAttachment(session, { clientId: snapshot.client.id, attachment });
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : "The attachment could not be downloaded.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   function refreshInbox() {
     if (!session || !snapshot) return;
     void loadWorkspace(session, snapshot.isClient ? undefined : selectedClientId, "manual");
@@ -353,7 +434,15 @@ export default function InboxPage() {
                   )}
 
                   <div className="message-timeline" aria-label="Message history">
-                    {selectedConversation.messages.map((conversationMessage) => <MessageBubble key={conversationMessage.id} message={conversationMessage} clientView={snapshot.isClient} />)}
+                    {selectedConversation.messages.map((conversationMessage) => (
+                      <MessageBubble
+                        key={conversationMessage.id}
+                        message={conversationMessage}
+                        clientView={snapshot.isClient}
+                        onDownload={(attachment) => void downloadAttachment(attachment)}
+                        downloadingId={busy.startsWith("download-") ? busy.slice(9) : ""}
+                      />
+                    ))}
                   </div>
 
                   {canWrite && selectedConversation.channel === "internal" ? (
@@ -364,13 +453,43 @@ export default function InboxPage() {
                   ) : selectedConversation.channel === "email" ? snapshot.delivery.email === "ready" && snapshot.canManage ? (
                     <div className="email-draft-boundary is-ready">
                       <strong>Transactional email is ready.</strong>
-                      <p>Review the recipient and message before sending. Status changes to sent only after the provider accepts it, then updates automatically when delivery succeeds or fails.</p>
+                      <p>Review the recipient, message, and files before sending. The Torres &amp; Co. signature and confidentiality notice are added automatically to every delivered email.</p>
                       <div className="email-delivery-actions">
                         {selectedConversation.messages.filter((emailMessage) => emailMessage.channel === "email" && (emailMessage.status === "draft" || emailMessage.status === "failed") && !emailMessage.provider_message_id).map((emailMessage) => (
-                          <button className="email-delivery-action" type="button" key={emailMessage.id} onClick={() => void sendEmail(emailMessage.id)} disabled={busy === `send-${emailMessage.id}`}>
-                            <span><strong>{emailMessage.status === "failed" ? "Retry email" : "Send email"}</strong><small>{emailMessage.recipients.join(", ")}</small></span>
-                            <b>{busy === `send-${emailMessage.id}` ? "Sending…" : "→"}</b>
-                          </button>
+                          <div className="email-draft-card" key={emailMessage.id}>
+                            <div className="email-draft-recipient"><span><strong>{emailMessage.status === "failed" ? "Ready to retry" : "Ready for review"}</strong><small>To: {emailMessage.recipients.join(", ")}</small></span><b>{emailMessage.attachments.length}/5 files</b></div>
+                            {emailMessage.attachments.length > 0 && (
+                              <div className="email-attachment-list" aria-label="Draft attachments">
+                                {emailMessage.attachments.map((attachment) => (
+                                  <div key={attachment.id}>
+                                    <span><strong>{attachment.file_name}</strong><small>{fileSizeLabel(attachment.byte_size)}</small></span>
+                                    <button type="button" onClick={() => void removeAttachment(attachment.id)} disabled={busy === `remove-${attachment.id}`} aria-label={`Remove ${attachment.file_name}`}>{busy === `remove-${attachment.id}` ? "…" : "×"}</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div className="email-draft-controls">
+                              <label className="email-attachment-picker">
+                                <span aria-hidden="true">＋</span> {busy === `attach-${emailMessage.id}` ? "Uploading…" : "Add files"}
+                                <input
+                                  type="file"
+                                  multiple
+                                  accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.docx,.xlsx,application/pdf,image/jpeg,image/png,image/webp,text/plain,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                  disabled={Boolean(busy) || emailMessage.attachments.length >= 5}
+                                  onChange={(event) => {
+                                    const files = Array.from(event.currentTarget.files || []);
+                                    event.currentTarget.value = "";
+                                    void uploadAttachments(emailMessage.id, files);
+                                  }}
+                                />
+                              </label>
+                              <button className="email-delivery-action" type="button" onClick={() => void sendEmail(emailMessage.id)} disabled={Boolean(busy)}>
+                                <span><strong>{emailMessage.status === "failed" ? "Retry email" : "Send email"}</strong><small>{emailMessage.attachments.length ? `${emailMessage.attachments.length} secure ${emailMessage.attachments.length === 1 ? "attachment" : "attachments"}` : "No attachments"}</small></span>
+                                <b>{busy === `send-${emailMessage.id}` ? "Sending…" : "→"}</b>
+                              </button>
+                            </div>
+                            <small className="email-attachment-help">PDF, images, TXT, CSV, Word, or Excel · 10 MB each · 20 MB total</small>
+                          </div>
                         ))}
                         {!selectedConversation.messages.some((emailMessage) => emailMessage.channel === "email" && (emailMessage.status === "draft" || emailMessage.status === "failed") && !emailMessage.provider_message_id) && <small className="email-delivery-empty">No drafts are waiting to send. Delivery status will continue updating automatically.</small>}
                       </div>

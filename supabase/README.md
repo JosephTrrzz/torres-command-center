@@ -27,6 +27,7 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `conversations` | One client-scoped shared Inbox thread with channel, priority, status, and client visibility. | Inbox |
 | `message_participants` | Staff, client, external, or system participants associated with an Inbox thread. | Inbox (server-managed) |
 | `messages` | Immutable secure messages or unsent email drafts, including real delivery state and client visibility. | Inbox |
+| `message_attachments` | Private metadata for files attached to Inbox email drafts. The actual objects remain in a protected Supabase Storage bucket and are served only through authenticated, tenant-scoped Functions. | Inbox |
 | `email_deliveries` | Server-owned outbound email attempts. Stores the provider ID, idempotency key, recipient list, and truthful sent/delivered/failed state. | Inbox (server-managed) |
 | `email_delivery_events` | Signed, deduplicated provider webhook events for delivery, delay, bounce, complaint, failure, and suppression history. | Inbox (server-managed) |
 
@@ -45,7 +46,8 @@ profiles ── client_id ──> clients <── client_id ── client_people
                                                    └── job_documents
                               └── client_id ── conversations
                                                    ├── message_participants
-                                                   └── messages ── email_deliveries ── email_delivery_events
+                                                   └── messages ─┬─ message_attachments
+                                                                └─ email_deliveries ── email_delivery_events
 ```
 
 The `client_id` links are important: they prevent one client's contacts, portal access, or Google properties from being shown for another client.
@@ -80,11 +82,12 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Do not calculate or overwrite estimate totals directly. The Operations Function validates line items and calculates totals server-side.
 - Mark job notes, documents, and estimates client-visible only when they are ready for the customer portal.
 - Do not mark an email draft as sent manually. Provider delivery state must be written by the protected communications workflow after a real provider response.
-- Keep staff-only notes out of client-visible conversations and messages.
+- Keep staff-only notes and files out of client-visible conversations and messages.
+- Upload email files only through Inbox. The `communication-attachments` bucket is private and must not receive public object policies or public URLs.
 
 ## Phase migration order
 
-Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql) before enabling the outbound email provider. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
+Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Then run [`transactional_email.sql`](./transactional_email.sql) and [`communication_attachments.sql`](./communication_attachments.sql) before enabling outbound email attachments. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
 
 ## Add descriptions inside Supabase
 

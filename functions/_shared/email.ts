@@ -14,6 +14,17 @@ export type ResendDeliveryStatus =
   | "complained"
   | "suppressed";
 
+export interface TransactionalEmailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
+}
+
+export const TRANSACTIONAL_EMAIL_SIGNATURE = "Team at Torres & Co. Technology LLC";
+export const TRANSACTIONAL_EMAIL_CONFIDENTIALITY_NOTICE = "Confidentiality notice: This email and any attachments are intended only for the named recipient and may contain confidential information. If you are not the intended recipient, do not read, copy, use, disclose, or distribute it. Please notify the sender and permanently delete this email, its attachments, and all copies or records from your systems.";
+
+const emailFooterMarker = "data-torres-email-footer";
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function configured(value: string | undefined) {
@@ -32,6 +43,19 @@ export function escapeEmailHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+export function withTransactionalEmailFooter(text: string) {
+  const normalized = text.trimEnd();
+  if (normalized.includes(TRANSACTIONAL_EMAIL_CONFIDENTIALITY_NOTICE)) return normalized;
+  return `${normalized}\n\n${TRANSACTIONAL_EMAIL_SIGNATURE}\n\n${TRANSACTIONAL_EMAIL_CONFIDENTIALITY_NOTICE}`;
+}
+
+export function withTransactionalEmailHtmlFooter(html: string) {
+  if (html.includes(emailFooterMarker)) return html;
+  const footer = `<div ${emailFooterMarker}="true" style="margin:28px 0 0;padding-top:20px;border-top:1px solid #ebe5da"><p style="margin:0 0 14px;color:#132238;font-size:14px;font-weight:700;line-height:1.5">${escapeEmailHtml(TRANSACTIONAL_EMAIL_SIGNATURE)}</p><p style="margin:0;color:#777;font-size:11px;line-height:1.55">${escapeEmailHtml(TRANSACTIONAL_EMAIL_CONFIDENTIALITY_NOTICE)}</p></div>`;
+  const bodyClose = html.toLowerCase().lastIndexOf("</body>");
+  return bodyClose >= 0 ? `${html.slice(0, bodyClose)}${footer}${html.slice(bodyClose)}` : `${html}${footer}`;
 }
 
 function safeActionUrl(value: string) {
@@ -57,7 +81,7 @@ export function buildTransactionalEmailHtml(input: {
   const action = input.action && actionUrl
     ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 28px"><tr><td style="border-radius:10px;background:#132238"><a href="${escapeEmailHtml(actionUrl)}" style="display:inline-block;padding:14px 22px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">${escapeEmailHtml(input.action.label)}</a></td></tr></table>`
     : "";
-  return `<!doctype html><html><body style="margin:0;background:#f5f1e8;font-family:Arial,sans-serif;color:#132238"><div style="display:none;max-height:0;overflow:hidden">${escapeEmailHtml(input.preheader || input.heading)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1e8;padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #ded8cd;border-radius:18px"><tr><td style="padding:30px"><p style="margin:0 0 24px;color:#9a7335;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Torres &amp; Co. Technology</p><h1 style="margin:0 0 20px;color:#132238;font-size:28px;line-height:1.2">${escapeEmailHtml(input.heading)}</h1>${paragraphs}${action}<p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #ebe5da;color:#777;font-size:12px;line-height:1.5">Sent securely from the Torres &amp; Co. Command Center.</p></td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#f5f1e8;font-family:Arial,sans-serif;color:#132238"><div style="display:none;max-height:0;overflow:hidden">${escapeEmailHtml(input.preheader || input.heading)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1e8;padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #ded8cd;border-radius:18px"><tr><td style="padding:30px"><p style="margin:0 0 24px;color:#9a7335;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Torres &amp; Co. Technology</p><h1 style="margin:0 0 20px;color:#132238;font-size:28px;line-height:1.2">${escapeEmailHtml(input.heading)}</h1>${paragraphs}${action}<div ${emailFooterMarker}="true" style="margin:28px 0 0;padding-top:20px;border-top:1px solid #ebe5da"><p style="margin:0 0 14px;color:#132238;font-size:14px;font-weight:700;line-height:1.5">${escapeEmailHtml(TRANSACTIONAL_EMAIL_SIGNATURE)}</p><p style="margin:0;color:#777;font-size:11px;line-height:1.55">${escapeEmailHtml(TRANSACTIONAL_EMAIL_CONFIDENTIALITY_NOTICE)}</p></div></td></tr></table></td></tr></table></body></html>`;
 }
 
 export async function sendTransactionalEmail(env: EmailEnv, input: {
@@ -67,6 +91,7 @@ export async function sendTransactionalEmail(env: EmailEnv, input: {
   html?: string;
   idempotencyKey: string;
   replyTo?: string;
+  attachments?: TransactionalEmailAttachment[];
 }) {
   if (!emailConfigured(env)) throw new Error("Transactional email is not configured.");
   const to = input.to.map((address) => address.trim().toLowerCase()).filter(Boolean).slice(0, 25);
@@ -84,9 +109,10 @@ export async function sendTransactionalEmail(env: EmailEnv, input: {
       from: env.TRANSACTIONAL_EMAIL_FROM?.trim(),
       to,
       subject: input.subject.trim().slice(0, 998),
-      text: input.text,
-      html: input.html || buildTransactionalEmailHtml({ heading: input.subject, body: input.text }),
+      text: withTransactionalEmailFooter(input.text),
+      html: withTransactionalEmailHtmlFooter(input.html || buildTransactionalEmailHtml({ heading: input.subject, body: input.text })),
       ...(replyTo ? { reply_to: replyTo } : {}),
+      ...(input.attachments?.length ? { attachments: input.attachments.map((attachment) => ({ filename: attachment.filename, content: attachment.content, ...(attachment.contentType ? { content_type: attachment.contentType } : {}) })) } : {}),
     }),
   });
   const payload = await response.json().catch(() => ({})) as { id?: unknown; message?: unknown; name?: unknown };

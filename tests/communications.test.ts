@@ -5,7 +5,20 @@ import {
   labelCommunicationValue,
   type Conversation,
 } from "../lib/communications";
-import { buildTransactionalEmailHtml, deliveryStatusForResendEvent, escapeEmailHtml } from "../functions/_shared/email";
+import {
+  buildTransactionalEmailHtml,
+  deliveryStatusForResendEvent,
+  escapeEmailHtml,
+  TRANSACTIONAL_EMAIL_CONFIDENTIALITY_NOTICE,
+  TRANSACTIONAL_EMAIL_SIGNATURE,
+  withTransactionalEmailFooter,
+  withTransactionalEmailHtmlFooter,
+} from "../functions/_shared/email";
+import {
+  MAX_COMMUNICATION_ATTACHMENT_BYTES,
+  sanitizeCommunicationAttachmentName,
+  validateCommunicationAttachment,
+} from "../functions/_shared/communication-attachments";
 
 const baseConversation: Conversation = {
   id: "conversation-1",
@@ -38,6 +51,7 @@ describe("communications summaries", () => {
           provider_message_id: null,
           error_detail: "",
           client_visible: true,
+          attachments: [],
           sent_at: "2026-08-26T18:00:00.000Z",
           created_at: "2026-08-26T18:00:00.000Z",
         }],
@@ -62,6 +76,7 @@ describe("communications summaries", () => {
           provider_message_id: null,
           error_detail: "",
           client_visible: false,
+          attachments: [],
           sent_at: null,
           created_at: "2026-08-26T19:00:00.000Z",
         }],
@@ -114,5 +129,49 @@ describe("transactional email safety", () => {
     expect(deliveryStatusForResendEvent("email.delivered")).toBe("delivered");
     expect(deliveryStatusForResendEvent("email.bounced")).toBe("bounced");
     expect(deliveryStatusForResendEvent("email.opened")).toBeNull();
+  });
+
+  it("adds the agency signature and confidentiality notice exactly once", () => {
+    const plain = withTransactionalEmailFooter("A secure client update.");
+    expect(plain).toContain(TRANSACTIONAL_EMAIL_SIGNATURE);
+    expect(plain).toContain(TRANSACTIONAL_EMAIL_CONFIDENTIALITY_NOTICE);
+    expect(withTransactionalEmailFooter(plain)).toBe(plain);
+
+    const html = buildTransactionalEmailHtml({
+      heading: "Client update",
+      body: "A secure client update.",
+    });
+    expect(html.match(/Team at Torres &amp; Co\. Technology LLC/g)).toHaveLength(1);
+    expect(html).toContain("Confidentiality notice:");
+    expect(withTransactionalEmailHtmlFooter(html)).toBe(html);
+  });
+});
+
+describe("communication attachment safety", () => {
+  it("allows supported business files and rejects unsafe or oversized files", () => {
+    expect(validateCommunicationAttachment({
+      fileName: "signed-proposal.pdf",
+      contentType: "application/pdf",
+      byteSize: 1024,
+    })).toEqual({
+      fileName: "signed-proposal.pdf",
+      contentType: "application/pdf",
+      byteSize: 1024,
+    });
+    expect(validateCommunicationAttachment({
+      fileName: "invoice.exe",
+      contentType: "application/octet-stream",
+      byteSize: 1024,
+    })).toEqual({ error: "Use PDF, JPG, PNG, WebP, TXT, CSV, DOCX, or XLSX files." });
+    expect(validateCommunicationAttachment({
+      fileName: "large.pdf",
+      contentType: "application/pdf",
+      byteSize: MAX_COMMUNICATION_ATTACHMENT_BYTES + 1,
+    })).toEqual({ error: "Each attachment must be 10 MB or smaller." });
+  });
+
+  it("normalizes attachment names before storage or download", () => {
+    expect(sanitizeCommunicationAttachmentName("../../Client Proposal (final).pdf"))
+      .toBe("Client Proposal -final-.pdf");
   });
 });

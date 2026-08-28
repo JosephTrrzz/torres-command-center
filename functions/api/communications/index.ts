@@ -13,12 +13,14 @@ import {
   sendTransactionalEmail,
   type EmailEnv,
 } from "../../_shared/email";
+import { MAX_COMMUNICATION_ATTACHMENTS_TOTAL_BYTES } from "../../_shared/communication-attachments";
 
 interface Env extends FunctionEnv, EmailEnv {}
 
 type ClientRow = { id: string; organization_id: string | null; name: string; industry: string; location: string };
 type ConversationRow = { id: string; subject: string; channel: string; status: string; priority: string; client_visible: boolean; last_message_at: string; created_at: string };
 type MessageRow = { id: string; conversation_id: string; direction: string; channel: string; status: string; sender_name: string; sender_address: string; recipients: unknown; subject: string; body: string; provider_message_id: string | null; error_detail: string; client_visible: boolean; sent_at: string | null; created_at: string };
+type AttachmentRow = { id: string; message_id: string; file_name: string; content_type: string; byte_size: number; storage_bucket: string; storage_path: string; created_at: string };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,6 +47,53 @@ function isClientContext(context: AuthContext) {
 function recipients(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => typeof item === "string" && item.trim() ? [item.trim().slice(0, 320)] : []).slice(0, 25);
+}
+
+function storageObjectUrl(url: string, bucket: string, path: string) {
+  return `${url}/storage/v1/object/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length))),
+    );
+  }
+  return btoa(binary);
+}
+
+async function readAttachments(url: string, serviceKey: string, messageIds: string[]) {
+  if (!messageIds.length) return [] as AttachmentRow[];
+  const response = await fetch(
+    `${url}/rest/v1/message_attachments?message_id=in.(${messageIds.join(",")})&select=id,message_id,file_name,content_type,byte_size,storage_bucket,storage_path,created_at&order=created_at.asc`,
+    { headers: serviceHeaders(serviceKey) },
+  );
+  // Keep existing Inbox email usable during the brief deploy-before-migration window.
+  if (response.status === 404) return [] as AttachmentRow[];
+  if (!response.ok) throw new Error("Secure attachment records could not be loaded.");
+  return response.json().catch(() => []) as Promise<AttachmentRow[]>;
+}
+
+async function loadProviderAttachments(url: string, serviceKey: string, messageId: string) {
+  const attachments = await readAttachments(url, serviceKey, [messageId]);
+  const totalBytes = attachments.reduce((total, attachment) => total + Number(attachment.byte_size || 0), 0);
+  if (totalBytes > MAX_COMMUNICATION_ATTACHMENTS_TOTAL_BYTES) throw new Error("Attachments for one email can total up to 20 MB.");
+  return Promise.all(attachments.map(async (attachment) => {
+    const response = await fetch(storageObjectUrl(url, attachment.storage_bucket, attachment.storage_path), {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    });
+    if (!response.ok) throw new Error(`${attachment.file_name} could not be read from secure storage.`);
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength !== Number(attachment.byte_size)) throw new Error(`${attachment.file_name} did not pass the secure size check.`);
+    return {
+      filename: attachment.file_name,
+      content: arrayBufferToBase64(buffer),
+      contentType: attachment.content_type,
+    };
+  }));
 }
 
 async function resolveClient(url: string, serviceKey: string, context: AuthContext, requestedClientId: string) {
@@ -83,14 +132,26 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
   if (!conversationResponse.ok) return null;
   const conversations = await conversationResponse.json().catch(() => []) as ConversationRow[];
   let messages: MessageRow[] = [];
+  let attachments: AttachmentRow[] = [];
   if (conversations.length) {
     const messageResponse = await fetch(`${url}/rest/v1/messages?conversation_id=in.(${conversations.map((conversation) => conversation.id).join(",")})${visibility}&select=id,conversation_id,direction,channel,status,sender_name,sender_address,recipients,subject,body,provider_message_id,error_detail,client_visible,sent_at,created_at&order=created_at.asc`, { headers: serviceHeaders(serviceKey) });
     if (!messageResponse.ok) return null;
     messages = await messageResponse.json().catch(() => []) as MessageRow[];
+    try {
+      attachments = await readAttachments(url, serviceKey, messages.map((message) => message.id));
+    } catch {
+      return null;
+    }
   }
   const normalized = conversations.map((conversation) => ({
     ...conversation,
-    messages: messages.filter((message) => message.conversation_id === conversation.id).map((message) => ({ ...message, recipients: recipients(message.recipients) })),
+    messages: messages.filter((message) => message.conversation_id === conversation.id).map((message) => ({
+      ...message,
+      recipients: recipients(message.recipients),
+      attachments: attachments
+        .filter((attachment) => attachment.message_id === message.id)
+        .map(({ id, message_id, file_name, content_type, byte_size, created_at }) => ({ id, message_id, file_name, content_type, byte_size, created_at })),
+    })),
   }));
   const allMessages = normalized.flatMap((conversation) => conversation.messages);
   return {
@@ -189,6 +250,13 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     if (draft.provider_message_id || (draft.status !== "draft" && draft.status !== "failed")) return authJson({ error: "This email has already been submitted. Create a new draft instead of sending it twice." }, 409);
     const draftRecipients = recipients(draft.recipients);
     if (!draftRecipients.length || draftRecipients.some((recipient) => !emailPattern.test(recipient))) return authJson({ error: "This draft needs at least one valid email recipient." }, 400);
+    let providerAttachments;
+    try {
+      providerAttachments = await loadProviderAttachments(url, serviceKey, draft.id);
+    } catch (attachmentError) {
+      const detail = attachmentError instanceof Error ? attachmentError.message : "The secure attachments could not be prepared.";
+      return authJson({ error: detail }, 502);
+    }
     const idempotencyKey = `communications-email-${draft.id}`;
     const now = new Date().toISOString();
     const deliveryResponse = await fetch(`${url}/rest/v1/email_deliveries?on_conflict=message_id`, {
@@ -222,6 +290,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
         text: draft.body,
         html: buildTransactionalEmailHtml({ heading: draft.subject || "Client update", body: draft.body }),
         idempotencyKey,
+        attachments: providerAttachments,
       });
       const sentAt = new Date().toISOString();
       await Promise.all([
@@ -236,7 +305,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
           body: JSON.stringify({ status: "sent", provider_message_id: provider.id, sent_at: sentAt, error_detail: "" }),
         }),
       ]);
-      await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.email_sent", entityType: "message", entityId: draft.id, clientId: client.id, metadata: { conversation_id: draft.conversation_id, provider: "resend", provider_message_id: provider.id } });
+      await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.email_sent", entityType: "message", entityId: draft.id, clientId: client.id, metadata: { conversation_id: draft.conversation_id, provider: "resend", provider_message_id: provider.id, attachment_count: providerAttachments.length } });
       const snapshot = await readSnapshot(url, serviceKey, context, client, env);
       return authJson({ message: "Email accepted by the provider. Delivery status will update automatically.", snapshot });
     } catch (sendError) {

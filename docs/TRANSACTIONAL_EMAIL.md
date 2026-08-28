@@ -2,6 +2,17 @@
 
 The Inbox always saves email as a draft first. It offers **Send email** only when the server has both a valid Resend API key and a verified From address. Customer-portal invitations, team invitations, and estimate approvals use the same provider-backed delivery ledger. A message is never marked sent from a browser click alone: the provider must return a real message ID, and signed webhooks advance it to delivered or failed.
 
+Every outbound email automatically includes the agency signature **Team at Torres & Co. Technology LLC** and a confidentiality notice for unintended recipients. The footer is added server-side and is idempotent, so retries cannot duplicate it.
+
+## Secure attachments
+
+- Staff can attach PDF, JPG, PNG, WebP, TXT, CSV, DOCX, and XLSX files to an unsent email draft.
+- Each file is limited to 10 MB, with no more than 5 files or 20 MB of raw attachments per email. This stays below Resend's encoded message limit.
+- Files are stored in the private `communication-attachments` Supabase Storage bucket. The browser never receives a service-role key or a public object URL.
+- Upload, removal, and download requests pass through authenticated, tenant-scoped Cloudflare Functions.
+- Attachments are downloaded from private storage and encoded by the server only when Resend accepts the outbound message.
+- Sent attachments remain available to authorized staff from the Inbox record; editable draft files can be removed before sending.
+
 ## Estimate approval workflow
 
 - **Send estimate** resolves the active client portal member first, then the active customer account, client email, or first client contact as a controlled fallback.
@@ -13,7 +24,7 @@ The Inbox always saves email as a draft first. It offers **Send email** only whe
 
 ## One-time production setup
 
-1. Apply [`supabase/transactional_email.sql`](../supabase/transactional_email.sql) after `communications.sql`.
+1. Apply [`supabase/transactional_email.sql`](../supabase/transactional_email.sql) after `communications.sql`, then apply [`supabase/communication_attachments.sql`](../supabase/communication_attachments.sql).
 2. In Resend, verify `torrescotechnology.com` and create a server API key.
 3. In Cloudflare Pages → `torres-command-center-app` → Settings → Variables and Secrets, add these Production values:
    - Secret `RESEND_API_KEY`
@@ -29,12 +40,13 @@ Do not expose these secrets with a `NEXT_PUBLIC_` prefix. The browser never call
 
 1. Open Inbox as a staff member and select a real client.
 2. Create an Email conversation with a mailbox you control.
-3. Review the draft, click **Send email**, and confirm the state changes from Draft to Sent only after provider acceptance.
+3. Attach a small controlled PDF, confirm it appears in the draft, remove and re-add it once, then click **Send email**. Confirm the state changes from Draft to Sent only after provider acceptance.
 4. Wait for the signed webhook and confirm the state changes to Delivered, or shows a readable failure reason.
 5. Confirm the client portal does not expose staff-only email drafts.
 6. From Clients, prepare a customer activation and confirm the UI says **email accepted** only after Resend returns a provider message ID.
 7. From Settings, invite a team member and confirm the same tracked-email behavior and fallback link.
 8. From Operations, send a real draft estimate and confirm it stays draft when no client email exists, changes to Sent only after provider acceptance, and opens the correct estimate after sign-in.
 9. Accept or reject the estimate as the client and confirm the decision persists and the responsible staff mailbox receives the decision email.
+10. Confirm the recipient receives the attached PDF plus one signature and confidentiality notice, and confirm authorized staff can download the retained private attachment from the sent Inbox message.
 
 Resend webhook delivery is at least once. `email_delivery_events.provider_event_id` deduplicates retries, and `email_deliveries.idempotency_key` prevents duplicate sends during request retries.
