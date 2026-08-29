@@ -18,7 +18,8 @@ type AppointmentRow = { id: string; lead_id: string; title: string; starts_at: s
 type TaskRow = { id: string; lead_id: string | null; appointment_id: string | null; title: string; description: string; due_at: string | null; priority: string; status: string; assigned_to: string | null; completed_at: string | null; created_at: string };
 type ActivityRow = { id: string; lead_id: string; activity_type: string; title: string; detail: string; created_at: string };
 type ChatMessageRow = { id: string; conversation_id: string; direction: "inbound" | "outbound" | "system"; sender_name: string; body: string; status: string; created_at: string };
-type ReceptionistSessionRow = { conversation_id: string; state: string; ai_enabled: boolean };
+type ConversationRow = { id: string; client_id: string; subject: string; status: string; priority: string; last_message_at: string; updated_at: string };
+type ReceptionistSessionRow = { conversation_id: string; state: string; ai_enabled: boolean; visitor_name: string; visitor_email: string; visitor_phone: string };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const leadStatuses = new Set(["new", "qualified", "contacted", "appointment_scheduled", "won", "lost"]);
@@ -129,30 +130,33 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     : agencyId
       ? readAgencyTeam(url, serviceKey, agencyId)
       : Promise.resolve([]);
-  const [leadResponse, appointmentResponse, taskResponse, activityResponse, team] = await Promise.all([
+  const [leadResponse, appointmentResponse, taskResponse, activityResponse, conversationResponse, team] = await Promise.all([
     fetch(`${url}/rest/v1/crm_leads?client_id=${clientFilter}&select=*&order=created_at.desc`, { headers: serviceHeaders(serviceKey) }),
     fetch(`${url}/rest/v1/crm_appointments?client_id=${clientFilter}&select=*&order=starts_at.asc`, { headers: serviceHeaders(serviceKey) }),
     fetch(`${url}/rest/v1/crm_tasks?client_id=${clientFilter}&select=*&order=due_at.asc.nullslast,created_at.desc`, { headers: serviceHeaders(serviceKey) }),
     fetch(`${url}/rest/v1/crm_activities?client_id=${clientFilter}&select=id,lead_id,activity_type,title,detail,created_at&order=created_at.desc&limit=100`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/conversations?client_id=${clientFilter}&channel=eq.webchat&archived_at=is.null&select=id,client_id,subject,status,priority,last_message_at,updated_at&order=last_message_at.desc.nullslast,updated_at.desc&limit=100`, { headers: serviceHeaders(serviceKey) }),
     teamPromise,
   ]);
-  if (![leadResponse, appointmentResponse, taskResponse, activityResponse].every((response) => response.ok)) return null;
+  if (![leadResponse, appointmentResponse, taskResponse, activityResponse, conversationResponse].every((response) => response.ok)) return null;
   const leads = await leadResponse.json().catch(() => []) as LeadRow[];
   const appointments = await appointmentResponse.json().catch(() => []) as AppointmentRow[];
   const tasks = await taskResponse.json().catch(() => []) as TaskRow[];
   const activities = await activityResponse.json().catch(() => []) as ActivityRow[];
+  const conversations = await conversationResponse.json().catch(() => []) as ConversationRow[];
   const chatLeadPairs = leads.flatMap((lead) => {
     if (lead.external_provider !== "website_chat") return [];
     const conversationId = crmConversationId(lead.source_metadata);
     return conversationId ? [{ leadId: lead.id, conversationId }] : [];
   });
-  const conversationIds = Array.from(new Set(chatLeadPairs.map((pair) => pair.conversationId)));
+  const leadByConversation = new Map(chatLeadPairs.map((pair) => [pair.conversationId, pair.leadId]));
+  const conversationIds = Array.from(new Set(conversations.map((conversation) => conversation.id)));
   let chatMessages: ChatMessageRow[] = [];
   let receptionistSessions: ReceptionistSessionRow[] = [];
   if (conversationIds.length) {
     const [messageResponse, sessionResponse] = await Promise.all([
       fetch(`${url}/rest/v1/messages?conversation_id=in.(${conversationIds.join(",")})&channel=eq.webchat&select=id,conversation_id,direction,sender_name,body,status,created_at&order=created_at.asc`, { headers: serviceHeaders(serviceKey) }),
-      fetch(`${url}/rest/v1/receptionist_sessions?conversation_id=in.(${conversationIds.join(",")})&select=conversation_id,state,ai_enabled`, { headers: serviceHeaders(serviceKey) }),
+      fetch(`${url}/rest/v1/receptionist_sessions?conversation_id=in.(${conversationIds.join(",")})&select=conversation_id,state,ai_enabled,visitor_name,visitor_email,visitor_phone`, { headers: serviceHeaders(serviceKey) }),
     ]);
     chatMessages = messageResponse.ok ? await messageResponse.json().catch(() => []) as ChatMessageRow[] : [];
     receptionistSessions = sessionResponse.ok ? await sessionResponse.json().catch(() => []) as ReceptionistSessionRow[] : [];
@@ -164,14 +168,24 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     messageGroups.set(chatMessage.conversation_id, messages);
   }
   const sessionByConversation = new Map(receptionistSessions.map((session) => [session.conversation_id, session]));
-  const websiteChats = chatLeadPairs.map((pair) => {
-    const receptionistSession = sessionByConversation.get(pair.conversationId);
+  const websiteChats = conversations.map((conversation) => {
+    const receptionistSession = sessionByConversation.get(conversation.id);
+    const messages = messageGroups.get(conversation.id) || [];
+    const latestMessage = messages[messages.length - 1];
     return {
-      leadId: pair.leadId,
-      conversationId: pair.conversationId,
-      state: receptionistSession?.state || "identified",
+      leadId: leadByConversation.get(conversation.id) || null,
+      conversationId: conversation.id,
+      clientId: conversation.client_id,
+      visitorName: receptionistSession?.visitor_name || messages.find((message) => message.direction === "inbound")?.sender_name || "Website visitor",
+      visitorEmail: receptionistSession?.visitor_email || "",
+      visitorPhone: receptionistSession?.visitor_phone || "",
+      status: conversation.status,
+      priority: conversation.priority,
+      lastMessageAt: conversation.last_message_at || conversation.updated_at,
+      latestMessage: latestMessage?.body || "New website conversation",
+      state: receptionistSession?.state || (leadByConversation.has(conversation.id) ? "qualified" : "anonymous"),
       aiEnabled: receptionistSession?.ai_enabled ?? false,
-      messages: messageGroups.get(pair.conversationId) || [],
+      messages,
     };
   });
   return {
@@ -296,10 +310,12 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     await writeActivity(url, serviceKey, { organizationId, clientId: client.id, leadId, type: assignmentChanged ? "lead.assigned" : "lead.stage_changed", title: assignmentChanged ? "Assignment updated" : "Pipeline stage updated", detail: assignmentChanged ? `${lead.full_name} was assigned to a team member.` : `${lead.full_name} moved to ${status.replaceAll("_", " ")}.`, userId: context.userId, metadata: { status, assigned_to: assignedTo || null } });
     if (assignmentChanged && assignedTo) { notificationUserId = assignedTo; notificationTitle = "Lead assigned to you"; notificationBody = `${lead.full_name} needs follow-up for ${client.name}.`; }
   } else if (action === "reply_to_website_chat") {
-    const lead = await readLead(url, serviceKey, client.id, leadId);
+    const requestedConversationId = clean(input?.conversationId, 36);
+    const lead = leadId ? await readLead(url, serviceKey, client.id, leadId) : null;
     const body = clean(input?.body, 2000);
-    const conversationId = lead ? crmConversationId(lead.source_metadata) : "";
-    if (!lead || lead.external_provider !== "website_chat" || !conversationId || !body) return authJson({ error: "Choose a website-chat lead and enter a reply." }, 400);
+    const conversationId = requestedConversationId || (lead ? crmConversationId(lead.source_metadata) : "");
+    if (!uuidPattern.test(conversationId) || !body) return authJson({ error: "Choose a website conversation and enter a reply." }, 400);
+    if (lead && (lead.external_provider !== "website_chat" || crmConversationId(lead.source_metadata) !== conversationId)) return authJson({ error: "That lead is not linked to this website conversation." }, 400);
     const conversationResponse = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}&channel=eq.webchat&select=id&limit=1`, { headers: serviceHeaders(serviceKey) });
     const conversations = conversationResponse.ok ? await conversationResponse.json().catch(() => []) as Array<{ id?: string }> : [];
     if (!conversations[0]?.id) return authJson({ error: "That website chat is no longer available." }, 404);
@@ -338,7 +354,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     entityId = messageId;
     entityType = "message";
     lifecycleAction = "crm.website_chat.replied";
-    await writeActivity(url, serviceKey, { organizationId, clientId: client.id, leadId, type: "chat.replied", title: "Website chat reply sent", detail: `${senderName} replied to ${lead.full_name} in the website chat.`, userId: context.userId, metadata: { conversation_id: conversationId, message_id: messageId } });
+    if (lead) await writeActivity(url, serviceKey, { organizationId, clientId: client.id, leadId: lead.id, type: "chat.replied", title: "Website chat reply sent", detail: `${senderName} replied to ${lead.full_name} in the website chat.`, userId: context.userId, metadata: { conversation_id: conversationId, message_id: messageId } });
   } else if (action === "schedule_appointment") {
     const lead = await readLead(url, serviceKey, client.id, leadId);
     const title = clean(input?.title, 180);

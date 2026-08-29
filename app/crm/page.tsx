@@ -13,6 +13,7 @@ import {
   labelCrmValue,
   type CrmLead,
   type CrmSnapshot,
+  type CrmWebsiteChat,
 } from "../../lib/crm";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { fetchClients } from "../../lib/supabase-data";
@@ -32,6 +33,29 @@ function contactLine(lead: CrmLead) {
   return [lead.email, lead.phone].filter(Boolean).join(" · ") || "No contact method";
 }
 
+function WebsiteChatPanel({ chat, displayName, canManage, busy, reply, onReplyChange, onRefresh, onSubmit }: {
+  chat: CrmWebsiteChat;
+  displayName: string;
+  canManage: boolean;
+  busy: boolean;
+  reply: string;
+  onReplyChange: (value: string) => void;
+  onRefresh: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return <section className="crm-chat" aria-label={`Website chat with ${displayName}`}>
+    <header><div><p className="eyebrow">Website chat</p><h3>{displayName}</h3><small>{chat.aiEnabled ? "AI receptionist is assisting" : "Joseph and the team own this reply"}</small></div><button type="button" onClick={onRefresh} aria-label="Refresh website chat">Refresh ↻</button></header>
+    <div className="crm-chat-contact">
+      <span>{chat.leadId ? "Qualified lead" : "Contact details pending"}</span>
+      <small>{[chat.visitorEmail, chat.visitorPhone].filter(Boolean).join(" · ") || "The visitor has not shared an email or phone yet."}</small>
+    </div>
+    <div className="crm-chat-messages" role="log" aria-live="polite">
+      {chat.messages.length ? chat.messages.map((chatMessage) => <article className={`crm-chat-message ${chatMessage.direction}`} key={chatMessage.id}><div><strong>{chatMessage.sender_name || (chatMessage.direction === "inbound" ? displayName : "Joseph")}</strong><time>{dateTimeLabel(chatMessage.created_at)}</time></div><p>{chatMessage.body}</p><small>{chatMessage.status}</small></article>) : <p className="crm-inline-empty">The visitor has not sent a message yet.</p>}
+    </div>
+    {canManage && <form className="crm-chat-composer" onSubmit={onSubmit}><label htmlFor={`crm-chat-reply-${chat.conversationId}`}>Reply as Joseph</label><textarea id={`crm-chat-reply-${chat.conversationId}`} maxLength={2000} required value={reply} onChange={(event) => onReplyChange(event.target.value)} placeholder="Write a helpful reply to the website visitor…" /><div><small>Replies appear in the visitor’s current website chat. Sending pauses the AI receptionist for this conversation.</small><button className="button button-dark" disabled={busy}>{busy ? "Sending…" : "Send reply →"}</button></div></form>}
+  </section>;
+}
+
 const blankLead = { clientId: "", fullName: "", email: "", phone: "", company: "", serviceInterest: "", message: "", source: "website", assignedTo: "" };
 
 export default function CrmPage() {
@@ -40,6 +64,7 @@ export default function CrmPage() {
   const [clientId, setClientId] = useState("");
   const [snapshot, setSnapshot] = useState<CrmSnapshot | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState("");
+  const [selectedConversationId, setSelectedConversationId] = useState("");
   const [leadForm, setLeadForm] = useState(blankLead);
   const [chatReply, setChatReply] = useState("");
   const [loading, setLoading] = useState(true);
@@ -49,13 +74,18 @@ export default function CrmPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const selectedLead = useMemo(
-    () => snapshot?.leads.find((lead) => lead.id === selectedLeadId) || snapshot?.leads[0] || null,
-    [snapshot, selectedLeadId],
+  const conversationSelection = useMemo(
+    () => snapshot?.websiteChats.find((chat) => chat.conversationId === selectedConversationId) || null,
+    [snapshot, selectedConversationId],
   );
+  const selectedLead = useMemo(() => {
+    if (conversationSelection && !conversationSelection.leadId) return null;
+    const requestedLeadId = conversationSelection?.leadId || selectedLeadId;
+    return snapshot?.leads.find((lead) => lead.id === requestedLeadId) || snapshot?.leads[0] || null;
+  }, [conversationSelection, selectedLeadId, snapshot]);
   const selectedWebsiteChat = useMemo(
-    () => snapshot?.websiteChats.find((chat) => chat.leadId === selectedLead?.id) || null,
-    [snapshot, selectedLead?.id],
+    () => conversationSelection || snapshot?.websiteChats.find((chat) => chat.leadId === selectedLead?.id) || null,
+    [conversationSelection, snapshot, selectedLead?.id],
   );
   const teamById = useMemo(() => new Map(snapshot?.team.map((member) => [member.id, member.name]) || []), [snapshot]);
   const clientById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients]);
@@ -89,20 +119,22 @@ export default function CrmPage() {
       setClients(rows);
       const queryClient = new URLSearchParams(window.location.search).get("client") || "";
       const queryLead = new URLSearchParams(window.location.search).get("lead") || "";
+      const queryConversation = new URLSearchParams(window.location.search).get("conversation") || "";
       const initial = rows.some((client) => client.id === queryClient) ? queryClient : "";
       setClientId(initial);
+      setSelectedConversationId(queryConversation);
       setLeadForm((current) => ({ ...current, clientId: initial || rows[0]?.id || "" }));
       void load(stored, initial, queryLead);
     }).catch(() => { setLoading(false); setError("Client records could not be loaded."); });
   }, [load]);
 
   useEffect(() => {
-    if (!session || !selectedWebsiteChat?.leadId) return;
+    if (!session || !selectedWebsiteChat?.conversationId) return;
     const timer = window.setInterval(() => {
-      void load(session, clientId, selectedWebsiteChat.leadId, true);
+      void load(session, clientId, selectedWebsiteChat.leadId || "", true);
     }, 8000);
     return () => window.clearInterval(timer);
-  }, [clientId, load, selectedWebsiteChat?.leadId, session]);
+  }, [clientId, load, selectedWebsiteChat?.conversationId, selectedWebsiteChat?.leadId, session]);
 
   useEffect(() => {
     if (!session) return;
@@ -128,20 +160,34 @@ export default function CrmPage() {
 
   const chooseClient = (nextClientId: string) => {
     if (!session) return;
-    setClientId(nextClientId); setSelectedLeadId(""); setChatReply("");
+    setClientId(nextClientId); setSelectedLeadId(""); setSelectedConversationId(""); setChatReply("");
     setLeadForm((current) => ({ ...current, clientId: nextClientId || current.clientId || clients[0]?.id || "" }));
     const url = new URL(window.location.href);
     if (nextClientId) url.searchParams.set("client", nextClientId); else url.searchParams.delete("client");
     url.searchParams.delete("lead");
+    url.searchParams.delete("conversation");
     window.history.replaceState({}, "", url);
     void load(session, nextClientId);
   };
 
   const chooseLead = (nextLeadId: string) => {
     setSelectedLeadId(nextLeadId);
+    const linkedChat = snapshot?.websiteChats.find((chat) => chat.leadId === nextLeadId);
+    setSelectedConversationId(linkedChat?.conversationId || "");
     setChatReply("");
     const url = new URL(window.location.href);
     if (nextLeadId) url.searchParams.set("lead", nextLeadId); else url.searchParams.delete("lead");
+    if (linkedChat) url.searchParams.set("conversation", linkedChat.conversationId); else url.searchParams.delete("conversation");
+    window.history.replaceState({}, "", url);
+  };
+
+  const chooseWebsiteChat = (chat: CrmWebsiteChat) => {
+    setSelectedConversationId(chat.conversationId);
+    setSelectedLeadId(chat.leadId || "");
+    setChatReply("");
+    const url = new URL(window.location.href);
+    url.searchParams.set("conversation", chat.conversationId);
+    if (chat.leadId) url.searchParams.set("lead", chat.leadId); else url.searchParams.delete("lead");
     window.history.replaceState({}, "", url);
   };
 
@@ -189,8 +235,8 @@ export default function CrmPage() {
 
   const replyToWebsiteChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedLead || !selectedWebsiteChat || !chatReply.trim()) return;
-    const next = await mutate("website-chat-reply", { action: "reply_to_website_chat", clientId: selectedLead.client_id, leadId: selectedLead.id, body: chatReply });
+    if (!selectedWebsiteChat || !chatReply.trim()) return;
+    const next = await mutate("website-chat-reply", { action: "reply_to_website_chat", clientId: selectedWebsiteChat.clientId, leadId: selectedWebsiteChat.leadId || "", conversationId: selectedWebsiteChat.conversationId, body: chatReply });
     if (next) setChatReply("");
   };
 
@@ -237,9 +283,15 @@ export default function CrmPage() {
         <p className="crm-form-note">A name and either email or phone are required.</p><button className="button button-dark" disabled={busy === "new-lead"}>{busy === "new-lead" ? "Saving…" : "Add lead →"}</button>
       </form></details>}
 
-      {snapshot.leads.length === 0 ? <section className="empty-state crm-empty"><p className="eyebrow">Pipeline ready</p><h2>No leads yet</h2><p>Use “Capture a lead” when the first real inquiry arrives. No demo contacts are inserted.</p></section> : <div className="crm-layout">
+      {snapshot.websiteChats.length > 0 && <section className="crm-chat-queue" aria-label="Website conversations">
+        <div className="crm-section-title"><div><p className="eyebrow">Website intake</p><h2>Website conversations</h2><p>New widget chats stay visible here while contact details are being collected.</p></div><span>{snapshot.websiteChats.length}</span></div>
+        <div className="crm-chat-queue-grid">{snapshot.websiteChats.map((chat) => <button type="button" key={chat.conversationId} className={chat.conversationId === selectedWebsiteChat?.conversationId ? "active" : ""} onClick={() => chooseWebsiteChat(chat)}><span className="crm-chat-queue-avatar">{chat.visitorName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "WV"}</span><span><strong>{chat.visitorName}</strong><small>{clientById.get(chat.clientId) || "Website chat"}</small><em>{chat.latestMessage}</em></span><span className={chat.leadId ? "qualified" : "pending"}>{chat.leadId ? "Lead" : "Needs contact"}</span><time>{dateTimeLabel(chat.lastMessageAt)}</time></button>)}</div>
+      </section>}
+
+      {snapshot.leads.length === 0 && snapshot.websiteChats.length === 0 ? <section className="empty-state crm-empty"><p className="eyebrow">Pipeline ready</p><h2>No leads yet</h2><p>Form submissions and website conversations will appear here automatically.</p></section> : <div className="crm-layout">
         <aside className="crm-pipeline" aria-label="Lead pipeline">
           <div className="crm-section-title"><div><p className="eyebrow">Pipeline</p><h2>Leads</h2></div><span>{snapshot.leads.length}</span></div>
+          {!snapshot.leads.length && <p className="crm-inline-empty">No visitor has shared enough contact information to become a lead yet.</p>}
           {LEAD_STATUSES.map((status) => {
             const leads = snapshot.leads.filter((lead) => lead.status === status);
             if (!leads.length) return null;
@@ -247,18 +299,17 @@ export default function CrmPage() {
           })}
         </aside>
 
+        {selectedWebsiteChat && !selectedLead && <main className="crm-workspace crm-chat-workspace">
+          <section className="crm-lead-hero"><div><p className="eyebrow">{clientById.get(selectedWebsiteChat.clientId) || "Website"} · pre-qualification chat</p><h2>{selectedWebsiteChat.visitorName}</h2><p>Contact details have not been provided yet.</p><small>Keep the conversation here until the visitor shares an email or phone; the system will then create the formal CRM lead.</small></div><span className="crm-stage-pill">Website chat</span></section>
+          <WebsiteChatPanel chat={selectedWebsiteChat} displayName={selectedWebsiteChat.visitorName} canManage={snapshot.canManage} busy={busy === "website-chat-reply"} reply={chatReply} onReplyChange={setChatReply} onRefresh={() => session && void load(session, clientId, "", true)} onSubmit={replyToWebsiteChat} />
+        </main>}
+
         {selectedLead && <main className="crm-workspace">
           <section className="crm-lead-hero"><div><p className="eyebrow">{clientById.get(selectedLead.client_id) || "Client account"} · {labelCrmValue(selectedLead.source)} lead</p><h2>{selectedLead.full_name}</h2><p>{contactLine(selectedLead)}</p><small>{[selectedLead.company, selectedLead.service_interest].filter(Boolean).join(" · ") || "No company or service noted"}</small></div><span className={`crm-stage-pill ${selectedLead.status}`}>{labelCrmValue(selectedLead.status)}</span></section>
 
           {selectedLead.message && <section className="crm-note"><p className="eyebrow">Inquiry</p><p>{selectedLead.message}</p></section>}
 
-          {selectedWebsiteChat && <section className="crm-chat" aria-label={`Website chat with ${selectedLead.full_name}`}>
-            <header><div><p className="eyebrow">Website chat</p><h3>Live conversation</h3><small>{selectedWebsiteChat.aiEnabled ? "AI receptionist is assisting" : "Joseph and the team own this reply"}</small></div><button type="button" onClick={() => session && void load(session, clientId, selectedLead.id, true)} aria-label="Refresh website chat">Refresh ↻</button></header>
-            <div className="crm-chat-messages" role="log" aria-live="polite">
-              {selectedWebsiteChat.messages.length ? selectedWebsiteChat.messages.map((chatMessage) => <article className={`crm-chat-message ${chatMessage.direction}`} key={chatMessage.id}><div><strong>{chatMessage.sender_name || (chatMessage.direction === "inbound" ? selectedLead.full_name : "Joseph")}</strong><time>{dateTimeLabel(chatMessage.created_at)}</time></div><p>{chatMessage.body}</p><small>{chatMessage.status}</small></article>) : <p className="crm-inline-empty">The visitor has not sent a message yet.</p>}
-            </div>
-            {snapshot.canManage && <form className="crm-chat-composer" onSubmit={replyToWebsiteChat}><label htmlFor="crm-chat-reply">Reply as Joseph</label><textarea id="crm-chat-reply" maxLength={2000} required value={chatReply} onChange={(event) => setChatReply(event.target.value)} placeholder="Write a helpful reply to the website visitor…" /><div><small>Replies appear in the visitor’s open website chat. Sending pauses the AI receptionist for this conversation.</small><button className="button button-dark" disabled={busy === "website-chat-reply"}>{busy === "website-chat-reply" ? "Sending…" : "Send reply →"}</button></div></form>}
-          </section>}
+          {selectedWebsiteChat && <WebsiteChatPanel chat={selectedWebsiteChat} displayName={selectedLead.full_name} canManage={snapshot.canManage} busy={busy === "website-chat-reply"} reply={chatReply} onReplyChange={setChatReply} onRefresh={() => session && void load(session, clientId, selectedLead.id, true)} onSubmit={replyToWebsiteChat} />}
 
           {snapshot.canManage && <form className="crm-control-row" key={selectedLead.id} onSubmit={updateLead}><label>Pipeline stage<select name="status" defaultValue={selectedLead.status}>{LEAD_STATUSES.map((status) => <option key={status} value={status}>{labelCrmValue(status)}</option>)}</select></label><label>Owner<select name="assignedTo" defaultValue={selectedLead.assigned_to || ""}><option value="">Unassigned</option>{snapshot.team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label><button className="button button-dark" disabled={busy === "lead-update"}>{busy === "lead-update" ? "Saving…" : "Update lead →"}</button></form>}
 

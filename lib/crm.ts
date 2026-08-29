@@ -73,8 +73,16 @@ export interface CrmChatMessage {
 }
 
 export interface CrmWebsiteChat {
-  leadId: string;
+  leadId: string | null;
   conversationId: string;
+  clientId: string;
+  visitorName: string;
+  visitorEmail: string;
+  visitorPhone: string;
+  status: string;
+  priority: string;
+  lastMessageAt: string;
+  latestMessage: string;
   state: string;
   aiEnabled: boolean;
   messages: CrmChatMessage[];
