@@ -39,6 +39,7 @@ export interface AuthOrganizationMembership {
 export interface AuthContext {
   userId: string;
   email: string | null;
+  fullName: string | null;
   role: AppRole;
   clientId: string | null;
   organizationId: string | null;
@@ -109,6 +110,21 @@ export function hasOrganizationPermission(context: Pick<AuthContext, "permission
   return context.permissions.includes(permission);
 }
 
+export function authDisplayName(
+  context: Pick<AuthContext, "fullName" | "email">,
+  fallback = "Workspace member",
+) {
+  const fullName = context.fullName?.trim();
+  if (fullName) return fullName;
+  const localPart = context.email?.split("@")[0]?.trim() || "";
+  if (!localPart) return fallback;
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
 export function canSwitchOrganization(memberships: AuthOrganizationMembership[], organizationId: string) {
   return memberships.some((membership) => membership.organizationId === organizationId);
 }
@@ -131,10 +147,10 @@ export async function requireAuth(
   if (!user.id) return { response: json({ error: "Unable to verify the signed-in user." }, 401) };
 
   const serviceHeaders = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
-  const profileResponse = await fetch(`${url}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=role,client_id,default_organization_id,active&limit=1`, {
+  const profileResponse = await fetch(`${url}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=role,client_id,default_organization_id,full_name,active&limit=1`, {
     headers: serviceHeaders,
   });
-  const profiles = await profileResponse.json().catch(() => []) as Array<{ role?: unknown; client_id?: unknown; default_organization_id?: unknown; active?: unknown }>;
+  const profiles = await profileResponse.json().catch(() => []) as Array<{ role?: unknown; client_id?: unknown; default_organization_id?: unknown; full_name?: unknown; active?: unknown }>;
   const profile = profiles[0];
   if (!profileResponse.ok || !profile || !isRole(profile.role) || profile.active !== true) return { response: json({ error: "This account is not authorized for the requested action." }, 403) };
 
@@ -171,6 +187,7 @@ export async function requireAuth(
   const context: AuthContext = {
     userId: user.id,
     email: user.email?.toLowerCase() || null,
+    fullName: typeof profile.full_name === "string" && profile.full_name.trim() ? profile.full_name.trim() : null,
     role: profile.role,
     clientId: typeof profile.client_id === "string" ? profile.client_id : null,
     organizationId: selectedMembership?.organizationId ?? defaultOrganizationId,

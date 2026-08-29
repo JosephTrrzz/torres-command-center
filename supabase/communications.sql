@@ -28,16 +28,27 @@ create table if not exists public.conversations (
   channel text not null default 'internal' check (channel in ('internal', 'email', 'sms', 'voice')),
   status text not null default 'open' check (status in ('open', 'pending', 'closed')),
   priority text not null default 'normal' check (priority in ('normal', 'high', 'urgent')),
+  category text not null default 'general',
   assigned_to uuid references public.profiles(id) on delete set null,
   client_visible boolean not null default true,
+  archived_at timestamptz,
+  archived_by uuid references public.profiles(id) on delete set null,
   last_message_at timestamptz not null default now(),
   created_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+alter table public.conversations add column if not exists category text not null default 'general';
+alter table public.conversations add column if not exists archived_at timestamptz;
+alter table public.conversations add column if not exists archived_by uuid references public.profiles(id) on delete set null;
+alter table public.conversations drop constraint if exists conversations_category_check;
+alter table public.conversations add constraint conversations_category_check
+  check (category in ('general', 'sales', 'onboarding', 'project', 'support', 'billing'));
+
 create index if not exists conversations_client_activity_idx on public.conversations (client_id, status, last_message_at desc);
 create index if not exists conversations_assignee_idx on public.conversations (assigned_to, status, last_message_at desc);
+create index if not exists conversations_client_archive_category_idx on public.conversations (client_id, archived_at, category, last_message_at desc);
 
 create table if not exists public.message_participants (
   id uuid primary key default gen_random_uuid(),
@@ -89,7 +100,7 @@ using (
   public.can_access_organization(organization_id)
   and (
     not public.has_organization_role(organization_id, array['client'])
-    or (client_visible and client_id = public.current_client_id())
+    or (client_visible and archived_at is null and client_id = public.current_client_id())
   )
 );
 
@@ -101,7 +112,7 @@ using (exists (
     and public.can_access_organization(conversation.organization_id)
     and (
       not public.has_organization_role(conversation.organization_id, array['client'])
-      or (conversation.client_visible and conversation.client_id = public.current_client_id())
+      or (conversation.client_visible and conversation.archived_at is null and conversation.client_id = public.current_client_id())
     )
 ));
 
@@ -118,6 +129,7 @@ using (
         select 1 from public.conversations conversation
         where conversation.id = conversation_id
           and conversation.client_visible
+          and conversation.archived_at is null
           and conversation.client_id = public.current_client_id()
       )
     )
@@ -131,6 +143,9 @@ revoke all on public.conversations, public.message_participants, public.messages
 grant select on public.conversations, public.message_participants, public.messages to authenticated;
 
 comment on table public.conversations is 'Organization- and client-scoped inbox threads shared by agency staff and authorized client users.';
+comment on column public.conversations.category is 'Staff-selected Inbox category used for durable filtering and workflow organization.';
+comment on column public.conversations.archived_at is 'When set, removes the conversation from active staff queues and client portal visibility without deleting history.';
+comment on column public.conversations.archived_by is 'Authenticated staff profile that last archived the conversation.';
 comment on table public.message_participants is 'Normalized communication participants without granting direct write access to the browser.';
 comment on table public.messages is 'Immutable message records. Email remains draft until an approved delivery provider returns a real provider message ID.';
 

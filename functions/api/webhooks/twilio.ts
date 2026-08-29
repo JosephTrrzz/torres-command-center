@@ -92,7 +92,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   }
 
   const subject = `SMS from ${fromAddress}`;
-  const conversationResponse = await fetch(`${url}/rest/v1/conversations`, { method: "POST", headers: serviceHeaders(serviceKey, "return=representation"), body: JSON.stringify({ organization_id: consent.organization_id, client_id: consent.client_id, subject, channel: "sms", status: "open", priority: "normal", client_visible: false, last_message_at: now }) });
+  const conversationResponse = await fetch(`${url}/rest/v1/conversations`, { method: "POST", headers: serviceHeaders(serviceKey, "return=representation"), body: JSON.stringify({ organization_id: consent.organization_id, client_id: consent.client_id, subject, channel: "sms", status: "open", priority: "normal", category: "support", client_visible: false, last_message_at: now }) });
   const conversations = conversationResponse.ok ? await conversationResponse.json().catch(() => []) as Array<{ id?: string }> : [];
   if (!conversations[0]?.id) return twiml();
   const messageResponse = await fetch(`${url}/rest/v1/messages`, { method: "POST", headers: serviceHeaders(serviceKey, "return=representation"), body: JSON.stringify({ organization_id: consent.organization_id, client_id: consent.client_id, conversation_id: conversations[0].id, direction: "inbound", channel: "sms", status: "received", sender_name: fromAddress, sender_address: fromAddress, recipients: [toAddress], subject, body, provider_message_id: providerMessageId, client_visible: false, sent_at: now }) });

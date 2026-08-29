@@ -1,11 +1,13 @@
 export const COMMUNICATION_CHANNELS = ["internal", "email", "sms", "voice", "webchat"] as const;
 export const CONVERSATION_STATUSES = ["open", "pending", "closed"] as const;
 export const CONVERSATION_PRIORITIES = ["normal", "high", "urgent"] as const;
+export const CONVERSATION_CATEGORIES = ["general", "sales", "onboarding", "project", "support", "billing"] as const;
 export const MESSAGE_STATUSES = ["draft", "queued", "sent", "delivered", "failed", "received"] as const;
 
 export type CommunicationChannel = typeof COMMUNICATION_CHANNELS[number];
 export type ConversationStatus = typeof CONVERSATION_STATUSES[number];
 export type ConversationPriority = typeof CONVERSATION_PRIORITIES[number];
+export type ConversationCategory = typeof CONVERSATION_CATEGORIES[number];
 export type MessageStatus = typeof MESSAGE_STATUSES[number];
 
 export interface CommunicationAttachment {
@@ -42,7 +44,9 @@ export interface Conversation {
   channel: CommunicationChannel;
   status: ConversationStatus;
   priority: ConversationPriority;
+  category: ConversationCategory;
   client_visible: boolean;
+  archived_at: string | null;
   last_message_at: string;
   created_at: string;
   messages: CommunicationMessage[];
@@ -117,11 +121,15 @@ export function labelCommunicationValue(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+export function conversationCategoryLabel(category: string) {
+  return labelCommunicationValue(category);
+}
+
 export function buildCommunicationsSummary(conversations: Conversation[]): CommunicationsSummary {
   const messages = conversations.flatMap((conversation) => conversation.messages);
   return {
-    openConversations: conversations.filter((conversation) => conversation.status === "open").length,
-    pendingConversations: conversations.filter((conversation) => conversation.status === "pending").length,
+    openConversations: conversations.filter((conversation) => !conversation.archived_at && conversation.status === "open").length,
+    pendingConversations: conversations.filter((conversation) => !conversation.archived_at && conversation.status === "pending").length,
     sharedMessages: messages.filter((message) => message.client_visible && message.status !== "draft").length,
     emailDrafts: messages.filter((message) => message.channel === "email" && message.status === "draft").length,
   };

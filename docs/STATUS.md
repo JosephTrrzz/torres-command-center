@@ -20,7 +20,7 @@ Updated 2026-08-28.
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
 | CRM | Live vertical slice | Client-scoped lead capture, assignment, pipeline updates, appointments, follow-up tasks, activity history, and a secure Formspree website-intake endpoint ready for provider configuration. |
 | Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, customer-safe visibility, and provider-tracked estimate approvals. |
-| Shared inbox | Phase 4 vertical slice | Client-scoped secure conversations, agency/client replies, priorities, statuses, notifications, audit/outbox history, provider-backed email delivery, private attachments, and automatic signature/confidentiality notices. |
+| Shared inbox | Phase 4 vertical slice | Client-scoped secure conversations, profile-named agency/client replies, durable categories, reversible staff archiving, priorities, statuses, notifications, audit/outbox history, provider-backed email delivery, private attachments, and automatic signature/confidentiality notices. |
 | SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
 | Campaigns and review requests | Phase 4B ready to migrate | Client-scoped drafts, consent basis, recipient review, durable suppression, staff test sends, explicit production confirmation, unsubscribe handling, and provider delivery truth. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |

@@ -61,3 +61,9 @@ Reason: onboarding must survive interrupted sessions, show the agency exactly wh
 Decision: project progress is calculated from completed milestones and is never entered as an independent percentage.
 
 Reason: milestone-derived progress gives agency staff and clients the same explainable view, prevents optimistic or contradictory status, and provides an auditable foundation for notifications, reports, and automations.
+
+## D-011 — reversible Inbox organization
+
+Decision: Inbox categories use a controlled taxonomy, and archive is a reversible state rather than deletion. Archived conversations remain available to authorized staff but are removed from active workload totals and client portal visibility until restored.
+
+Reason: durable categories make triage consistent across devices, while reversible archiving preserves communication history and prevents an old thread from disappearing permanently or remaining actionable to a client.

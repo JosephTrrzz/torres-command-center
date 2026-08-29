@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONVERSATION_CATEGORIES,
   buildCommunicationsSummary,
   communicationDeliveryLabel,
+  conversationCategoryLabel,
   labelCommunicationValue,
   type Conversation,
 } from "../lib/communications";
@@ -25,6 +27,7 @@ import {
   twilioSmsConfigured,
   twilioVoiceConfigured,
 } from "../functions/_shared/twilio";
+import { authDisplayName } from "../functions/_shared/auth";
 
 const baseConversation: Conversation = {
   id: "conversation-1",
@@ -32,7 +35,9 @@ const baseConversation: Conversation = {
   channel: "internal",
   status: "open",
   priority: "normal",
+  category: "general",
   client_visible: true,
+  archived_at: null,
   last_message_at: "2026-08-26T18:00:00.000Z",
   created_at: "2026-08-26T17:00:00.000Z",
   messages: [],
@@ -102,6 +107,28 @@ describe("communications summaries", () => {
     expect(communicationDeliveryLabel("email")).toBe("Email");
     expect(communicationDeliveryLabel("sms")).toBe("Sms");
     expect(labelCommunicationValue("awaiting_review")).toBe("Awaiting Review");
+    expect(CONVERSATION_CATEGORIES).toContain("support");
+    expect(conversationCategoryLabel("onboarding")).toBe("Onboarding");
+  });
+
+  it("keeps archived threads out of active workload totals", () => {
+    const summary = buildCommunicationsSummary([
+      baseConversation,
+      { ...baseConversation, id: "conversation-2", status: "pending", archived_at: "2026-08-27T12:00:00.000Z" },
+    ]);
+
+    expect(summary.openConversations).toBe(1);
+    expect(summary.pendingConversations).toBe(0);
+  });
+});
+
+describe("communication sender identity", () => {
+  it("uses the authenticated profile name for replies", () => {
+    expect(authDisplayName({ fullName: "Joseph", email: "admin@example.com" })).toBe("Joseph");
+  });
+
+  it("creates a readable fallback when the profile name is missing", () => {
+    expect(authDisplayName({ fullName: null, email: "joseph.torres@example.com" })).toBe("Joseph Torres");
   });
 });
 

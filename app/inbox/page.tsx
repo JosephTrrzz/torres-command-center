@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { appRoleForOrganizationRole } from "../../lib/access-control";
@@ -13,9 +13,11 @@ import {
 } from "../../lib/communications-api";
 import {
   COMMUNICATION_CHANNELS,
+  CONVERSATION_CATEGORIES,
   CONVERSATION_PRIORITIES,
   CONVERSATION_STATUSES,
   communicationDeliveryLabel,
+  conversationCategoryLabel,
   labelCommunicationValue,
   type CommunicationAttachment,
   type CommunicationMessage,
@@ -60,7 +62,7 @@ type WorkspaceLoadMode = "initial" | "manual" | "background";
 function ConversationListItem({ conversation, active, onChoose }: { conversation: Conversation; active: boolean; onChoose: (id: string) => void }) {
   const latest = lastMessage(conversation);
   return (
-    <button className={`conversation-list-item ${active ? "active" : ""}`} onClick={() => onChoose(conversation.id)} type="button">
+    <button className={`conversation-list-item ${active ? "active" : ""} ${conversation.archived_at ? "is-archived" : ""}`} onClick={() => onChoose(conversation.id)} type="button">
       <span className="conversation-list-topline">
         <span className={`conversation-channel channel-${conversation.channel}`}>{communicationDeliveryLabel(conversation.channel)}</span>
         <time dateTime={conversation.last_message_at}>{relativeDateLabel(conversation.last_message_at)}</time>
@@ -68,8 +70,8 @@ function ConversationListItem({ conversation, active, onChoose }: { conversation
       <strong>{conversation.subject}</strong>
       <span className="conversation-preview">{latest?.body || "No messages yet"}</span>
       <span className="conversation-list-footer">
-        <span className={`conversation-priority priority-${conversation.priority}`}>{labelCommunicationValue(conversation.priority)}</span>
-        <span>{labelCommunicationValue(conversation.status)}</span>
+        <span className="conversation-category">{conversationCategoryLabel(conversation.category)}</span>
+        <span>{conversation.archived_at ? "Archived" : labelCommunicationValue(conversation.status)}</span>
       </span>
     </button>
   );
@@ -125,14 +127,22 @@ export default function InboxPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [newThreadOpen, setNewThreadOpen] = useState(false);
-  const [newThread, setNewThread] = useState({ subject: "", channel: "internal", recipients: "", body: "" });
+  const [newThread, setNewThread] = useState({ subject: "", channel: "internal", category: "general", recipients: "", body: "" });
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [archiveFilter, setArchiveFilter] = useState<"active" | "archived">("active");
   const [consentForm, setConsentForm] = useState({ channel: "sms", address: "", status: "pending", evidence: "" });
   const [replyBody, setReplyBody] = useState("");
   const loadSequence = useRef(0);
 
-  const selectedConversation = snapshot?.conversations.find((conversation) => conversation.id === selectedConversationId)
-    || snapshot?.conversations[0]
+  const filteredConversations = useMemo(() => snapshot?.conversations.filter((conversation) => (
+    (archiveFilter === "archived" ? Boolean(conversation.archived_at) : !conversation.archived_at)
+    && (categoryFilter === "all" || conversation.category === categoryFilter)
+  )) || [], [archiveFilter, categoryFilter, snapshot]);
+  const selectedConversation = filteredConversations.find((conversation) => conversation.id === selectedConversationId)
+    || filteredConversations[0]
     || null;
+  const activeConversationCount = snapshot?.conversations.filter((conversation) => !conversation.archived_at).length || 0;
+  const archivedConversationCount = snapshot?.conversations.filter((conversation) => Boolean(conversation.archived_at)).length || 0;
   const canWrite = Boolean(snapshot?.canManage || snapshot?.isClient);
 
   const loadWorkspace = useCallback(async (activeSession: AuthSession, clientId?: string, mode: WorkspaceLoadMode = "initial") => {
@@ -207,11 +217,20 @@ export default function InboxPage() {
     };
   }, [busy, loadWorkspace, refreshing, selectedClientId, session, snapshot]);
 
+  useEffect(() => {
+    if (!snapshot) return;
+    if (!filteredConversations.some((conversation) => conversation.id === selectedConversationId)) {
+      setSelectedConversationId(filteredConversations[0]?.id || "");
+    }
+  }, [archiveFilter, categoryFilter, filteredConversations, selectedConversationId, snapshot]);
+
   function chooseClient(clientId: string) {
     if (!session) return;
     setSelectedClientId(clientId);
     setMessage("");
     setNewThreadOpen(false);
+    setCategoryFilter("all");
+    setArchiveFilter("active");
     const url = new URL(window.location.href);
     url.searchParams.set("client", clientId);
     url.searchParams.delete("conversation");
@@ -255,7 +274,9 @@ export default function InboxPage() {
     const recipients = newThread.recipients.split(",").map((recipient) => recipient.trim()).filter(Boolean);
     const next = await mutate("new-thread", { action: "create_conversation", ...newThread, recipients });
     if (next) {
-      setNewThread({ subject: "", channel: "internal", recipients: "", body: "" });
+      setNewThread({ subject: "", channel: "internal", category: "general", recipients: "", body: "" });
+      setCategoryFilter("all");
+      setArchiveFilter("active");
       setNewThreadOpen(false);
       setSelectedConversationId(next.conversations[0]?.id || "");
     }
@@ -276,7 +297,22 @@ export default function InboxPage() {
       conversationId: selectedConversation.id,
       status: form.get("status"),
       priority: form.get("priority"),
+      category: form.get("category"),
     });
+  }
+
+  async function archiveConversation() {
+    if (!selectedConversation) return;
+    const archiving = !selectedConversation.archived_at;
+    const next = await mutate("conversation-archive", {
+      action: "archive_conversation",
+      conversationId: selectedConversation.id,
+      archived: archiving,
+    });
+    if (!next) return;
+    setArchiveFilter(archiving ? "archived" : "active");
+    const nextList = next.conversations.filter((conversation) => archiving ? Boolean(conversation.archived_at) : !conversation.archived_at);
+    setSelectedConversationId(nextList[0]?.id || "");
   }
 
   async function sendEmail(messageId: string) {
@@ -445,10 +481,21 @@ export default function InboxPage() {
                 {canWrite && <button className="conversation-new-button" onClick={() => setNewThreadOpen((current) => !current)} type="button" aria-expanded={newThreadOpen}>＋ New</button>}
               </div>
 
+              <div className="conversation-panel-filters">
+                {!snapshot.isClient && (
+                  <div className="conversation-filter-tabs" role="group" aria-label="Conversation state">
+                    <button className={archiveFilter === "active" ? "active" : ""} type="button" onClick={() => setArchiveFilter("active")}>Active <span>{activeConversationCount}</span></button>
+                    <button className={archiveFilter === "archived" ? "active" : ""} type="button" onClick={() => setArchiveFilter("archived")}>Archived <span>{archivedConversationCount}</span></button>
+                  </div>
+                )}
+                <label className="conversation-category-filter">Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">All categories</option>{CONVERSATION_CATEGORIES.map((category) => <option key={category} value={category}>{conversationCategoryLabel(category)}</option>)}</select></label>
+              </div>
+
               {newThreadOpen && canWrite && (
                 <form className="communications-form new-conversation-form" onSubmit={createConversation}>
                   <div className="communications-form-heading"><strong>Start a conversation</strong><button type="button" onClick={() => setNewThreadOpen(false)} aria-label="Close new conversation form">×</button></div>
                   <label>Subject<input required value={newThread.subject} onChange={(event) => setNewThread({ ...newThread, subject: event.target.value })} placeholder="What does the client need?" /></label>
+                  <label>Category<select value={newThread.category} onChange={(event) => setNewThread({ ...newThread, category: event.target.value })}>{CONVERSATION_CATEGORIES.map((category) => <option key={category} value={category}>{conversationCategoryLabel(category)}</option>)}</select></label>
                   {!snapshot.isClient && <label>Channel<select value={newThread.channel} onChange={(event) => setNewThread({ ...newThread, channel: event.target.value })}>{COMMUNICATION_CHANNELS.filter((channel) => channel === "internal" || channel === "email" || (channel === "sms" && snapshot.smsVoice.migrationReady)).map((channel) => <option key={channel} value={channel}>{communicationDeliveryLabel(channel)}</option>)}</select></label>}
                   {newThread.channel === "email" && !snapshot.isClient && <label>Email recipient(s)<input required type="text" value={newThread.recipients} onChange={(event) => setNewThread({ ...newThread, recipients: event.target.value })} placeholder="client@example.com" /><small>Separate multiple addresses with commas.</small></label>}
                   {newThread.channel === "sms" && !snapshot.isClient && <label>Mobile recipient<input required type="tel" value={newThread.recipients} onChange={(event) => setNewThread({ ...newThread, recipients: event.target.value })} placeholder="+15035551234" /><small>Use one mobile number with country code. Active consent is required before sending.</small></label>}
@@ -460,7 +507,7 @@ export default function InboxPage() {
               )}
 
               <div className="conversation-list">
-                {snapshot.conversations.length ? snapshot.conversations.map((conversation) => <ConversationListItem key={conversation.id} conversation={conversation} active={conversation.id === selectedConversation?.id} onChoose={chooseConversation} />) : <div className="conversation-empty"><span aria-hidden="true">✉</span><strong>No conversations yet</strong><p>{canWrite ? "Start the first client conversation to create a shared record." : "No messages have been shared with this account."}</p></div>}
+                {filteredConversations.length ? filteredConversations.map((conversation) => <ConversationListItem key={conversation.id} conversation={conversation} active={conversation.id === selectedConversation?.id} onChoose={chooseConversation} />) : <div className="conversation-empty"><span aria-hidden="true">✉</span><strong>{archiveFilter === "archived" ? "No archived conversations" : categoryFilter === "all" ? "No conversations yet" : `No ${conversationCategoryLabel(categoryFilter).toLowerCase()} conversations`}</strong><p>{archiveFilter === "archived" ? "Archived threads will stay here until you restore them." : canWrite ? "Start a conversation or choose another category." : "No messages have been shared with this account."}</p></div>}
               </div>
             </aside>
 
@@ -469,7 +516,7 @@ export default function InboxPage() {
                 <>
                   <header className="conversation-detail-heading">
                     <div>
-                      <span className={`conversation-channel channel-${selectedConversation.channel}`}>{communicationDeliveryLabel(selectedConversation.channel)}</span>
+                      <div className="conversation-detail-badges"><span className={`conversation-channel channel-${selectedConversation.channel}`}>{communicationDeliveryLabel(selectedConversation.channel)}</span><span className="conversation-category">{conversationCategoryLabel(selectedConversation.category)}</span>{selectedConversation.archived_at && <span className="conversation-archived-badge">Archived</span>}</div>
                       <h2>{selectedConversation.subject}</h2>
                       <p>{selectedConversation.channel === "webchat" ? "Live website conversation" : selectedConversation.client_visible ? "Visible in the client workspace" : "Internal staff record"} · Started {dateTimeLabel(selectedConversation.created_at)}</p>
                     </div>
@@ -478,9 +525,11 @@ export default function InboxPage() {
 
                   {snapshot.canManage && (
                     <form className="conversation-controls" onSubmit={updateConversation}>
+                      <label>Category<select name="category" defaultValue={selectedConversation.category} key={`category-${selectedConversation.id}-${selectedConversation.category}`}>{CONVERSATION_CATEGORIES.map((category) => <option value={category} key={category}>{conversationCategoryLabel(category)}</option>)}</select></label>
                       <label>Status<select name="status" defaultValue={selectedConversation.status} key={`status-${selectedConversation.id}-${selectedConversation.status}`}>{CONVERSATION_STATUSES.map((status) => <option value={status} key={status}>{labelCommunicationValue(status)}</option>)}</select></label>
                       <label>Priority<select name="priority" defaultValue={selectedConversation.priority} key={`priority-${selectedConversation.id}-${selectedConversation.priority}`}>{CONVERSATION_PRIORITIES.map((priority) => <option value={priority} key={priority}>{labelCommunicationValue(priority)}</option>)}</select></label>
                       <button className="button button-light" disabled={busy === "conversation-status"}>Update</button>
+                      <button className="button button-light conversation-archive-button" type="button" onClick={() => void archiveConversation()} disabled={busy === "conversation-archive"}>{busy === "conversation-archive" ? "Saving…" : selectedConversation.archived_at ? "Restore" : "Archive"}</button>
                     </form>
                   )}
 
@@ -496,7 +545,9 @@ export default function InboxPage() {
                     ))}
                   </div>
 
-                  {canWrite && (selectedConversation.channel === "internal" || selectedConversation.channel === "webchat") ? (
+                  {selectedConversation.archived_at ? (
+                    <div className="conversation-archived-notice"><strong>This conversation is archived.</strong><p>Restore it to add replies, send drafts, or change its active status.</p></div>
+                  ) : canWrite && (selectedConversation.channel === "internal" || selectedConversation.channel === "webchat") ? (
                     <form className="communications-form reply-form" onSubmit={addReply}>
                       <label>{selectedConversation.channel === "webchat" ? "Reply to the website visitor" : "Reply to this conversation"}<textarea required value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder={selectedConversation.channel === "webchat" ? "Write a live response…" : "Write a secure update…"} /></label>
                       <div className="reply-form-footer"><small>{selectedConversation.channel === "webchat" ? "Your first reply transfers this chat to staff and pauses automated responses." : "This reply is shared with the client workspace."}</small><button className="button button-dark" disabled={busy === "reply"}>{busy === "reply" ? "Sending…" : selectedConversation.channel === "webchat" ? "Send live reply →" : "Share reply →"}</button></div>

@@ -293,7 +293,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const conversationResponse = await fetch(`${url}/rest/v1/conversations`, {
       method: "POST",
       headers: serviceHeaders(serviceKey, "return=representation"),
-      body: JSON.stringify({ organization_id: client.organization_id, client_id: client.id, subject: "Website chat · New visitor", channel: "webchat", status: "open", priority: "normal", client_visible: false, last_message_at: now }),
+      body: JSON.stringify({ organization_id: client.organization_id, client_id: client.id, subject: "Website chat · New visitor", channel: "webchat", status: "open", priority: "normal", category: "sales", client_visible: false, last_message_at: now }),
     });
     const conversations = conversationResponse.ok ? await conversationResponse.json().catch(() => []) as Array<{ id?: string }> : [];
     const conversationId = conversations[0]?.id || "";

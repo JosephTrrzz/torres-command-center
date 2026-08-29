@@ -1,4 +1,5 @@
 import {
+  authDisplayName,
   authJson,
   getSupabaseUrl,
   hasOrganizationPermission,
@@ -25,7 +26,7 @@ import {
 interface Env extends FunctionEnv, EmailEnv, TwilioEnv {}
 
 type ClientRow = { id: string; organization_id: string | null; name: string; industry: string; location: string };
-type ConversationRow = { id: string; subject: string; channel: string; status: string; priority: string; client_visible: boolean; last_message_at: string; created_at: string };
+type ConversationRow = { id: string; subject: string; channel: string; status: string; priority: string; category: string; client_visible: boolean; archived_at: string | null; archived_by: string | null; last_message_at: string; created_at: string };
 type MessageRow = { id: string; conversation_id: string; direction: string; channel: string; status: string; sender_name: string; sender_address: string; recipients: unknown; subject: string; body: string; provider_message_id: string | null; error_detail: string; client_visible: boolean; sent_at: string | null; created_at: string };
 type AttachmentRow = { id: string; message_id: string; file_name: string; content_type: string; byte_size: number; storage_bucket: string; storage_path: string; created_at: string };
 type ConsentRow = { id: string; channel: "sms" | "voice"; address: string; status: "pending" | "granted" | "revoked"; source: string; evidence: string; granted_at: string | null; revoked_at: string | null; updated_at: string };
@@ -36,6 +37,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const conversationStatuses = new Set(["open", "pending", "closed"]);
 const conversationPriorities = new Set(["normal", "high", "urgent"]);
+const conversationCategories = new Set(["general", "sales", "onboarding", "project", "support", "billing"]);
 
 function serviceHeaders(serviceKey: string, prefer?: string) {
   return {
@@ -201,14 +203,15 @@ async function updateReceptionistOwnership(url: string, serviceKey: string, inpu
 
 async function readSnapshot(url: string, serviceKey: string, context: AuthContext, client: ClientRow, env: Env) {
   const clientView = isClientContext(context);
-  const visibility = clientView ? "&client_visible=eq.true" : "";
-  const conversationResponse = await fetch(`${url}/rest/v1/conversations?client_id=eq.${encodeURIComponent(client.id)}${visibility}&select=id,subject,channel,status,priority,client_visible,last_message_at,created_at&order=last_message_at.desc`, { headers: serviceHeaders(serviceKey) });
+  const conversationVisibility = clientView ? "&client_visible=eq.true&archived_at=is.null" : "";
+  const messageVisibility = clientView ? "&client_visible=eq.true" : "";
+  const conversationResponse = await fetch(`${url}/rest/v1/conversations?client_id=eq.${encodeURIComponent(client.id)}${conversationVisibility}&select=id,subject,channel,status,priority,category,client_visible,archived_at,archived_by,last_message_at,created_at&order=last_message_at.desc`, { headers: serviceHeaders(serviceKey) });
   if (!conversationResponse.ok) return null;
   const conversations = await conversationResponse.json().catch(() => []) as ConversationRow[];
   let messages: MessageRow[] = [];
   let attachments: AttachmentRow[] = [];
   if (conversations.length) {
-    const messageResponse = await fetch(`${url}/rest/v1/messages?conversation_id=in.(${conversations.map((conversation) => conversation.id).join(",")})${visibility}&select=id,conversation_id,direction,channel,status,sender_name,sender_address,recipients,subject,body,provider_message_id,error_detail,client_visible,sent_at,created_at&order=created_at.asc`, { headers: serviceHeaders(serviceKey) });
+    const messageResponse = await fetch(`${url}/rest/v1/messages?conversation_id=in.(${conversations.map((conversation) => conversation.id).join(",")})${messageVisibility}&select=id,conversation_id,direction,channel,status,sender_name,sender_address,recipients,subject,body,provider_message_id,error_detail,client_visible,sent_at,created_at&order=created_at.asc`, { headers: serviceHeaders(serviceKey) });
     if (!messageResponse.ok) return null;
     messages = await messageResponse.json().catch(() => []) as MessageRow[];
     try {
@@ -219,6 +222,9 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
   }
   const normalized = conversations.map((conversation) => ({
     ...conversation,
+    category: conversationCategories.has(conversation.category) ? conversation.category : "general",
+    archived_at: conversation.archived_at || null,
+    archived_by: conversation.archived_by || null,
     messages: messages.filter((message) => message.conversation_id === conversation.id).map((message) => ({
       ...message,
       recipients: recipients(message.recipients),
@@ -242,8 +248,8 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     smsVoice,
     conversations: normalized,
     summary: {
-      openConversations: normalized.filter((conversation) => conversation.status === "open").length,
-      pendingConversations: normalized.filter((conversation) => conversation.status === "pending").length,
+      openConversations: normalized.filter((conversation) => !conversation.archived_at && conversation.status === "open").length,
+      pendingConversations: normalized.filter((conversation) => !conversation.archived_at && conversation.status === "pending").length,
       sharedMessages: allMessages.filter((message) => message.client_visible && message.status !== "draft").length,
       emailDrafts: allMessages.filter((message) => message.channel === "email" && message.status === "draft").length,
     },
@@ -307,16 +313,47 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const conversationId = clean(input?.conversationId, 36);
     const status = clean(input?.status, 20);
     const priority = clean(input?.priority, 20);
-    if (!uuidPattern.test(conversationId) || !conversationStatuses.has(status) || !conversationPriorities.has(priority)) return authJson({ error: "Choose a valid conversation status and priority." }, 400);
-    const response = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=representation"), body: JSON.stringify({ status, priority, updated_at: new Date().toISOString() }) });
+    const category = clean(input?.category, 30);
+    if (!uuidPattern.test(conversationId) || !conversationStatuses.has(status) || !conversationPriorities.has(priority) || !conversationCategories.has(category)) return authJson({ error: "Choose a valid conversation category, status, and priority." }, 400);
+    const response = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=representation"), body: JSON.stringify({ status, priority, category, updated_at: new Date().toISOString() }) });
     const rows = response.ok ? await response.json().catch(() => []) as ConversationRow[] : [];
     if (!response.ok || !rows[0]) return authJson({ error: "That conversation could not be updated." }, 400);
     if (rows[0].channel === "webchat" && status === "closed") {
       await updateReceptionistOwnership(url, serviceKey, { conversationId, organizationId, clientId: client.id, state: "closed" });
     }
-    await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.conversation_updated", entityType: "conversation", entityId: conversationId, clientId: client.id, metadata: { status, priority } });
+    await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: "communications.conversation_updated", entityType: "conversation", entityId: conversationId, clientId: client.id, metadata: { status, priority, category } });
     const snapshot = await readSnapshot(url, serviceKey, context, client, env);
     return authJson({ message: "Conversation updated.", snapshot });
+  }
+
+  if (action === "archive_conversation") {
+    if (clientView) return authJson({ error: "Only workspace staff can archive conversations." }, 403);
+    const conversationId = clean(input?.conversationId, 36);
+    const archived = input?.archived === true;
+    if (!uuidPattern.test(conversationId)) return authJson({ error: "Choose a valid conversation." }, 400);
+    const now = new Date().toISOString();
+    const response = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}`, {
+      method: "PATCH",
+      headers: serviceHeaders(serviceKey, "return=representation"),
+      body: JSON.stringify(archived
+        ? { archived_at: now, archived_by: context.userId, status: "closed", updated_at: now }
+        : { archived_at: null, archived_by: null, status: "open", updated_at: now }),
+    });
+    const rows = response.ok ? await response.json().catch(() => []) as ConversationRow[] : [];
+    if (!response.ok || !rows[0]) return authJson({ error: "That conversation could not be archived." }, 400);
+    if (archived && rows[0].channel === "webchat") {
+      await updateReceptionistOwnership(url, serviceKey, { conversationId, organizationId, clientId: client.id, state: "closed" });
+    }
+    await writeLifecycle(url, serviceKey, {
+      organizationId,
+      userId: context.userId,
+      action: archived ? "communications.conversation_archived" : "communications.conversation_unarchived",
+      entityType: "conversation",
+      entityId: conversationId,
+      clientId: client.id,
+    });
+    const snapshot = await readSnapshot(url, serviceKey, context, client, env);
+    return authJson({ message: archived ? "Conversation archived." : "Conversation restored.", snapshot });
   }
 
   if (action === "send_email") {
@@ -514,24 +551,27 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   if (action === "create_conversation") {
     if (!subject) return authJson({ error: "Add a subject for the new conversation." }, 400);
+    const category = clean(input?.category, 30) || "general";
+    if (!conversationCategories.has(category)) return authJson({ error: "Choose a valid conversation category." }, 400);
     const response = await fetch(`${url}/rest/v1/conversations`, {
       method: "POST",
       headers: serviceHeaders(serviceKey, "return=representation"),
-      body: JSON.stringify({ organization_id: organizationId, client_id: client.id, subject, channel, status: "open", priority: "normal", client_visible: channel === "internal", last_message_at: now, created_by: context.userId }),
+      body: JSON.stringify({ organization_id: organizationId, client_id: client.id, subject, channel, status: "open", priority: "normal", category, client_visible: channel === "internal", last_message_at: now, created_by: context.userId }),
     });
     const rows = response.ok ? await response.json().catch(() => []) as ConversationRow[] : [];
     if (!response.ok || !rows[0]) return authJson({ error: "The conversation could not be created. Apply supabase/communications.sql if this is the first Phase 4 setup." }, response.status === 404 ? 503 : 400);
     conversationId = rows[0].id;
   } else {
     if (!uuidPattern.test(conversationId)) return authJson({ error: "Choose a conversation before replying." }, 400);
-    const response = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}&select=id,subject,channel,client_visible&limit=1`, { headers: serviceHeaders(serviceKey) });
-    const rows = response.ok ? await response.json().catch(() => []) as Array<{ id?: string; subject?: string; channel?: string; client_visible?: boolean }> : [];
+    const response = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}&select=id,subject,channel,client_visible,archived_at&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const rows = response.ok ? await response.json().catch(() => []) as Array<{ id?: string; subject?: string; channel?: string; client_visible?: boolean; archived_at?: string | null }> : [];
     if (!rows[0]?.id || (clientView && !rows[0].client_visible)) return authJson({ error: "That conversation is not available in this client workspace." }, 404);
+    if (rows[0].archived_at) return authJson({ error: "Restore this conversation before replying." }, 409);
     conversationSubject = clean(rows[0].subject, 180) || "Conversation";
     channel = rows[0].channel === "webchat" ? "webchat" : rows[0].channel === "email" || rows[0].channel === "sms" ? rows[0].channel : "internal";
   }
 
-  const senderName = clean(input?.senderName, 160) || context.email || (clientView ? "Client" : "Torres & Co. team");
+  const senderName = authDisplayName(context, clientView ? "Client" : "Torres & Co. team");
   const senderAddress = clean(input?.senderAddress, 320) || context.email || "";
   const direction = clientView ? "inbound" : "outbound";
   const status = channel === "email" || channel === "sms" ? "draft" : clientView ? "received" : "sent";
