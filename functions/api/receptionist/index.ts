@@ -1,5 +1,6 @@
 import { getSupabaseUrl, type FunctionEnv } from "../../_shared/auth";
 import { createNotification } from "../../_shared/notifications";
+import { websiteChatCrmHref } from "../../_shared/crm-chat";
 import {
   DEFAULT_RECEPTIONIST_KNOWLEDGE,
   allowedReceptionistOrigins,
@@ -174,7 +175,7 @@ async function agencyUserIds(url: string, serviceKey: string, organizationId: st
   return Array.from(new Set(rows.map((row) => row.user_id).filter((id): id is string => Boolean(id && uuidPattern.test(id)))));
 }
 
-async function notifyTeam(env: Env, url: string, serviceKey: string, session: SessionRow, title: string, body: string) {
+async function notifyTeam(env: Env, url: string, serviceKey: string, session: SessionRow, title: string, body: string, href: string) {
   const userIds = await agencyUserIds(url, serviceKey, session.organization_id);
   await Promise.allSettled(userIds.map((userId) => createNotification(env, {
     userId,
@@ -182,8 +183,16 @@ async function notifyTeam(env: Env, url: string, serviceKey: string, session: Se
     type: "action",
     title,
     body,
-    href: `/inbox/?client=${encodeURIComponent(session.client_id)}&conversation=${encodeURIComponent(session.conversation_id)}`,
+    href,
   })));
+}
+
+async function readSessionLead(url: string, serviceKey: string, sessionId: string) {
+  const response = await fetch(`${url}/rest/v1/crm_leads?external_provider=eq.website_chat&external_submission_id=eq.${encodeURIComponent(sessionId)}&select=id&limit=1`, {
+    headers: serviceHeaders(serviceKey),
+  });
+  const rows = response.ok ? await response.json().catch(() => []) as Array<{ id?: string }> : [];
+  return rows[0]?.id && uuidPattern.test(rows[0].id) ? rows[0].id : "";
 }
 
 async function applyRateLimit(url: string, serviceKey: string, request: Request, origin: string, token: string) {
@@ -353,12 +362,14 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     await insertMessage(url, serviceKey, { session, direction: "outbound", senderName: assistantName, body: "Thank you. Your contact details were saved for the Torres & Co. team. No appointment or service has been confirmed yet." });
     await recordAction(url, serviceKey, session, "lead_created", {}, { lead_id: lead.leadId });
     await lifecycle(url, serviceKey, session, "crm.lead.created", "crm_lead", lead.leadId, { conversation_id: session.conversation_id });
-    await notifyTeam(env, url, serviceKey, { ...session, state: "qualified", visitor_name: lead.fullName, visitor_email: lead.email, visitor_phone: lead.phone }, "New receptionist lead", `${lead.fullName} requested follow-up${lead.requestedService ? ` about ${lead.requestedService}` : ""}.`);
+    await notifyTeam(env, url, serviceKey, { ...session, state: "qualified", visitor_name: lead.fullName, visitor_email: lead.email, visitor_phone: lead.phone }, "New receptionist lead", `${lead.fullName} requested follow-up${lead.requestedService ? ` about ${lead.requestedService}` : ""}.`, websiteChatCrmHref(lead.leadId));
     return json({ state: "qualified", saved: true, messages: await publicMessages(url, serviceKey, session.conversation_id) }, 201, cors);
   }
 
   if (action === "handoff") {
     if (input.confirmed !== true) return json({ error: "Confirm that you want a team member to join this conversation." }, 422, cors);
+    const leadId = await readSessionLead(url, serviceKey, session.id);
+    if (!leadId) return json({ error: "Share your name and a valid email or phone number before requesting a person." }, 422, cors);
     if (session.state !== "staff_owned" && session.state !== "closed") {
       const now = new Date().toISOString();
       await Promise.all([
@@ -367,7 +378,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       ]);
       await insertMessage(url, serviceKey, { session, direction: "outbound", senderName: assistantName, body: "I have paused automated replies and notified the Torres & Co. team. A person can continue here when available." });
       await recordAction(url, serviceKey, session, "handoff_requested");
-      await notifyTeam(env, url, serviceKey, { ...session, state: "handoff", ai_enabled: false }, "Website chat needs a person", `${session.visitor_name || "A website visitor"} requested a human response.`);
+      await notifyTeam(env, url, serviceKey, { ...session, state: "handoff", ai_enabled: false }, "Website chat needs a person", `${session.visitor_name || "A website visitor"} requested a human response.`, websiteChatCrmHref(leadId));
     }
     return json({ state: "handoff", aiEnabled: false, messages: await publicMessages(url, serviceKey, session.conversation_id) }, 200, cors);
   }

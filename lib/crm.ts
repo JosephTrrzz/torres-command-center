@@ -63,6 +63,23 @@ export interface CrmActivity {
   created_at: string;
 }
 
+export interface CrmChatMessage {
+  id: string;
+  direction: "inbound" | "outbound" | "system";
+  sender_name: string;
+  body: string;
+  status: string;
+  created_at: string;
+}
+
+export interface CrmWebsiteChat {
+  leadId: string;
+  conversationId: string;
+  state: string;
+  aiEnabled: boolean;
+  messages: CrmChatMessage[];
+}
+
 export interface CrmTeamMember { id: string; name: string; email: string; role: string }
 export interface CrmClientOption { id: string; name: string }
 
@@ -75,6 +92,7 @@ export interface CrmSnapshot {
   appointments: CrmAppointment[];
   tasks: CrmTask[];
   activities: CrmActivity[];
+  websiteChats: CrmWebsiteChat[];
   team: CrmTeamMember[];
   summary: ReturnType<typeof buildCrmSummary>;
 }

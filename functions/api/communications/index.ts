@@ -204,8 +204,9 @@ async function updateReceptionistOwnership(url: string, serviceKey: string, inpu
 async function readSnapshot(url: string, serviceKey: string, context: AuthContext, client: ClientRow, env: Env) {
   const clientView = isClientContext(context);
   const conversationVisibility = clientView ? "&client_visible=eq.true&archived_at=is.null" : "";
+  const channelVisibility = "&channel=neq.webchat";
   const messageVisibility = clientView ? "&client_visible=eq.true" : "";
-  const conversationResponse = await fetch(`${url}/rest/v1/conversations?client_id=eq.${encodeURIComponent(client.id)}${conversationVisibility}&select=id,subject,channel,status,priority,category,client_visible,archived_at,archived_by,last_message_at,created_at&order=last_message_at.desc`, { headers: serviceHeaders(serviceKey) });
+  const conversationResponse = await fetch(`${url}/rest/v1/conversations?client_id=eq.${encodeURIComponent(client.id)}${conversationVisibility}${channelVisibility}&select=id,subject,channel,status,priority,category,client_visible,archived_at,archived_by,last_message_at,created_at&order=last_message_at.desc`, { headers: serviceHeaders(serviceKey) });
   if (!conversationResponse.ok) return null;
   const conversations = await conversationResponse.json().catch(() => []) as ConversationRow[];
   let messages: MessageRow[] = [];

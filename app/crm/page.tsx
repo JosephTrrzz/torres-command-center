@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { changeCrm, fetchCrm } from "../../lib/crm-api";
@@ -41,6 +41,7 @@ export default function CrmPage() {
   const [snapshot, setSnapshot] = useState<CrmSnapshot | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [leadForm, setLeadForm] = useState(blankLead);
+  const [chatReply, setChatReply] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -50,23 +51,32 @@ export default function CrmPage() {
     () => snapshot?.leads.find((lead) => lead.id === selectedLeadId) || snapshot?.leads[0] || null,
     [snapshot, selectedLeadId],
   );
+  const selectedWebsiteChat = useMemo(
+    () => snapshot?.websiteChats.find((chat) => chat.leadId === selectedLead?.id) || null,
+    [snapshot, selectedLead?.id],
+  );
   const teamById = useMemo(() => new Map(snapshot?.team.map((member) => [member.id, member.name]) || []), [snapshot]);
   const clientById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients]);
   const selectedActivities = snapshot?.activities.filter((activity) => activity.lead_id === selectedLead?.id).slice(0, 8) || [];
   const selectedTasks = snapshot?.tasks.filter((task) => task.lead_id === selectedLead?.id) || [];
   const selectedAppointments = snapshot?.appointments.filter((appointment) => appointment.lead_id === selectedLead?.id) || [];
 
-  const load = async (activeSession: AuthSession, requestedClient = "") => {
-    setLoading(true); setError(""); setMessage("");
+  const load = useCallback(async (activeSession: AuthSession, requestedClient = "", requestedLead = "", quiet = false) => {
+    if (!quiet) { setLoading(true); setError(""); setMessage(""); }
     try {
       const next = await fetchCrm(activeSession, requestedClient);
       setSnapshot(next);
-      setSelectedLeadId((current) => next.leads.some((lead) => lead.id === current) ? current : next.leads[0]?.id || "");
+      setSelectedLeadId((current) => {
+        if (requestedLead && next.leads.some((lead) => lead.id === requestedLead)) return requestedLead;
+        return next.leads.some((lead) => lead.id === current) ? current : next.leads[0]?.id || "";
+      });
     } catch (loadError) {
-      setSnapshot(null);
-      setError(loadError instanceof Error ? loadError.message : "The CRM workspace could not be loaded.");
-    } finally { setLoading(false); }
-  };
+      if (!quiet) {
+        setSnapshot(null);
+        setError(loadError instanceof Error ? loadError.message : "The CRM workspace could not be loaded.");
+      }
+    } finally { if (!quiet) setLoading(false); }
+  }, []);
 
   useEffect(() => {
     const stored = readStoredSession();
@@ -75,21 +85,39 @@ export default function CrmPage() {
     void fetchClients().then((rows) => {
       setClients(rows);
       const queryClient = new URLSearchParams(window.location.search).get("client") || "";
+      const queryLead = new URLSearchParams(window.location.search).get("lead") || "";
       const initial = rows.some((client) => client.id === queryClient) ? queryClient : "";
       setClientId(initial);
       setLeadForm((current) => ({ ...current, clientId: initial || rows[0]?.id || "" }));
-      void load(stored, initial);
+      void load(stored, initial, queryLead);
     }).catch(() => { setLoading(false); setError("Client records could not be loaded."); });
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    if (!session || !selectedWebsiteChat?.leadId) return;
+    const timer = window.setInterval(() => {
+      void load(session, clientId, selectedWebsiteChat.leadId, true);
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [clientId, load, selectedWebsiteChat?.leadId, session]);
 
   const chooseClient = (nextClientId: string) => {
     if (!session) return;
-    setClientId(nextClientId); setSelectedLeadId("");
+    setClientId(nextClientId); setSelectedLeadId(""); setChatReply("");
     setLeadForm((current) => ({ ...current, clientId: nextClientId || current.clientId || clients[0]?.id || "" }));
     const url = new URL(window.location.href);
     if (nextClientId) url.searchParams.set("client", nextClientId); else url.searchParams.delete("client");
+    url.searchParams.delete("lead");
     window.history.replaceState({}, "", url);
     void load(session, nextClientId);
+  };
+
+  const chooseLead = (nextLeadId: string) => {
+    setSelectedLeadId(nextLeadId);
+    setChatReply("");
+    const url = new URL(window.location.href);
+    if (nextLeadId) url.searchParams.set("lead", nextLeadId); else url.searchParams.delete("lead");
+    window.history.replaceState({}, "", url);
   };
 
   const mutate = async (label: string, input: Record<string, unknown>) => {
@@ -134,6 +162,13 @@ export default function CrmPage() {
     if (next) event.currentTarget.reset();
   };
 
+  const replyToWebsiteChat = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedLead || !selectedWebsiteChat || !chatReply.trim()) return;
+    const next = await mutate("website-chat-reply", { action: "reply_to_website_chat", clientId: selectedLead.client_id, leadId: selectedLead.id, body: chatReply });
+    if (next) setChatReply("");
+  };
+
   const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
   start.setMinutes(0, 0, 0);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
@@ -174,7 +209,7 @@ export default function CrmPage() {
           {LEAD_STATUSES.map((status) => {
             const leads = snapshot.leads.filter((lead) => lead.status === status);
             if (!leads.length) return null;
-            return <section className="crm-stage" key={status}><header><strong>{labelCrmValue(status)}</strong><span>{leads.length}</span></header>{leads.map((lead) => <button key={lead.id} type="button" className={lead.id === selectedLead?.id ? "active" : ""} onClick={() => setSelectedLeadId(lead.id)}><span className="crm-lead-avatar">{lead.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><span><strong>{lead.full_name}</strong><small>{clientById.get(lead.client_id) || lead.email || lead.phone || "Client account"}</small></span><i>{lead.assigned_to ? teamById.get(lead.assigned_to)?.split(" ")[0] || "Assigned" : "Unassigned"}</i></button>)}</section>;
+            return <section className="crm-stage" key={status}><header><strong>{labelCrmValue(status)}</strong><span>{leads.length}</span></header>{leads.map((lead) => <button key={lead.id} type="button" className={lead.id === selectedLead?.id ? "active" : ""} onClick={() => chooseLead(lead.id)}><span className="crm-lead-avatar">{lead.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><span><strong>{lead.full_name}</strong><small>{clientById.get(lead.client_id) || lead.email || lead.phone || "Client account"}</small></span><i>{lead.assigned_to ? teamById.get(lead.assigned_to)?.split(" ")[0] || "Assigned" : "Unassigned"}</i></button>)}</section>;
           })}
         </aside>
 
@@ -182,6 +217,14 @@ export default function CrmPage() {
           <section className="crm-lead-hero"><div><p className="eyebrow">{clientById.get(selectedLead.client_id) || "Client account"} · {labelCrmValue(selectedLead.source)} lead</p><h2>{selectedLead.full_name}</h2><p>{contactLine(selectedLead)}</p><small>{[selectedLead.company, selectedLead.service_interest].filter(Boolean).join(" · ") || "No company or service noted"}</small></div><span className={`crm-stage-pill ${selectedLead.status}`}>{labelCrmValue(selectedLead.status)}</span></section>
 
           {selectedLead.message && <section className="crm-note"><p className="eyebrow">Inquiry</p><p>{selectedLead.message}</p></section>}
+
+          {selectedWebsiteChat && <section className="crm-chat" aria-label={`Website chat with ${selectedLead.full_name}`}>
+            <header><div><p className="eyebrow">Website chat</p><h3>Live conversation</h3><small>{selectedWebsiteChat.aiEnabled ? "AI receptionist is assisting" : "Joseph and the team own this reply"}</small></div><button type="button" onClick={() => session && void load(session, clientId, selectedLead.id, true)} aria-label="Refresh website chat">Refresh ↻</button></header>
+            <div className="crm-chat-messages" role="log" aria-live="polite">
+              {selectedWebsiteChat.messages.length ? selectedWebsiteChat.messages.map((chatMessage) => <article className={`crm-chat-message ${chatMessage.direction}`} key={chatMessage.id}><div><strong>{chatMessage.sender_name || (chatMessage.direction === "inbound" ? selectedLead.full_name : "Joseph")}</strong><time>{dateTimeLabel(chatMessage.created_at)}</time></div><p>{chatMessage.body}</p><small>{chatMessage.status}</small></article>) : <p className="crm-inline-empty">The visitor has not sent a message yet.</p>}
+            </div>
+            {snapshot.canManage && <form className="crm-chat-composer" onSubmit={replyToWebsiteChat}><label htmlFor="crm-chat-reply">Reply as Joseph</label><textarea id="crm-chat-reply" maxLength={2000} required value={chatReply} onChange={(event) => setChatReply(event.target.value)} placeholder="Write a helpful reply to the website visitor…" /><div><small>Replies appear in the visitor’s open website chat. Sending pauses the AI receptionist for this conversation.</small><button className="button button-dark" disabled={busy === "website-chat-reply"}>{busy === "website-chat-reply" ? "Sending…" : "Send reply →"}</button></div></form>}
+          </section>}
 
           {snapshot.canManage && <form className="crm-control-row" key={selectedLead.id} onSubmit={updateLead}><label>Pipeline stage<select name="status" defaultValue={selectedLead.status}>{LEAD_STATUSES.map((status) => <option key={status} value={status}>{labelCrmValue(status)}</option>)}</select></label><label>Owner<select name="assignedTo" defaultValue={selectedLead.assigned_to || ""}><option value="">Unassigned</option>{snapshot.team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label><button className="button button-dark" disabled={busy === "lead-update"}>{busy === "lead-update" ? "Saving…" : "Update lead →"}</button></form>}
 
