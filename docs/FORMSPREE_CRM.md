@@ -31,6 +31,8 @@ For the current Torres website form, the expected form ID is `mrennqzo`. The cur
 
 The webhook stores only this whitelisted business information. It never stores the signing secret or the full request in audit events. Formspree retries return success without creating another lead.
 
+Email labels are matched case-insensitively and tolerate common form-builder names such as `Email Address`, `emailAddress`, `contactEmail`, and `_replyto`. When Formspree retries an existing submission, the webhook backfills contact fields that were previously empty without replacing CRM edits that already contain a value.
+
 ## Verification
 
 Submit the live website form once with a real test address. In the Command Center, open **CRM**, choose **Torres & Co. Technology LLC**, and confirm the lead appears as `Website / New`. The owner notification bell should also show **New website lead**.

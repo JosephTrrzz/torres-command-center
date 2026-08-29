@@ -23,9 +23,30 @@ export interface FormspreeLead {
   isSpam: boolean;
 }
 
+export interface ExistingFormspreeLeadContact {
+  email?: unknown;
+  phone?: unknown;
+  company?: unknown;
+  service_interest?: unknown;
+  message?: unknown;
+}
+
 function clean(value: unknown, maxLength: number) {
   if (Array.isArray(value)) value = value[0];
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function normalizedFieldName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function submissionValue(submission: Record<string, unknown>, aliases: string[]) {
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(submission, alias)) return submission[alias];
+  }
+  const aliasNames = new Set(aliases.map(normalizedFieldName));
+  const matchingKey = Object.keys(submission).find((key) => aliasNames.has(normalizedFieldName(key)));
+  return matchingKey ? submission[matchingKey] : undefined;
 }
 
 function configured(value: string | undefined) {
@@ -97,24 +118,37 @@ export async function formspreeSubmissionFingerprint(payload: string) {
 
 export function mapFormspreeLead(payload: FormspreePayload): FormspreeLead {
   const submission = payload.submission && typeof payload.submission === "object" ? payload.submission : {};
-  const fullName = clean(submission.name ?? submission.fullName ?? submission.full_name, 180);
-  const company = clean(submission.businessName ?? submission.company ?? submission.business_name, 180);
-  const contactMethod = clean(submission.contactMethod ?? submission.contact_method, 80);
-  const description = clean(submission.description ?? submission.message, 4000);
-  const submittedValue = clean(submission._date ?? submission.submittedAt ?? submission.submitted_at, 100);
+  const firstName = clean(submissionValue(submission, ["firstName", "first_name", "first"]), 90);
+  const lastName = clean(submissionValue(submission, ["lastName", "last_name", "last"]), 90);
+  const fullName = clean(submissionValue(submission, ["name", "fullName", "full_name", "contactName", "contact_name", "yourName"]), 180)
+    || [firstName, lastName].filter(Boolean).join(" ");
+  const company = clean(submissionValue(submission, ["businessName", "business_name", "company", "companyName", "organization"]), 180);
+  const contactMethod = clean(submissionValue(submission, ["contactMethod", "contact_method", "preferredContact", "preferred_contact"]), 80);
+  const description = clean(submissionValue(submission, ["description", "message", "comments", "projectDescription", "inquiry"]), 4000);
+  const submittedValue = clean(submissionValue(submission, ["_date", "submittedAt", "submitted_at"]), 100);
   const submittedDate = submittedValue ? new Date(submittedValue) : null;
   const submittedAt = submittedDate && !Number.isNaN(submittedDate.getTime()) ? submittedDate.toISOString() : null;
   const contactNote = contactMethod ? `Preferred contact: ${contactMethod}.` : "";
   return {
     fullName: fullName || company,
-    email: clean(submission.email, 320).toLowerCase(),
-    phone: clean(submission.phone, 60),
+    email: clean(submissionValue(submission, ["email", "emailAddress", "email_address", "contactEmail", "contact_email", "yourEmail", "_replyto", "replyTo", "reply_to"]), 320).toLowerCase(),
+    phone: clean(submissionValue(submission, ["phone", "phoneNumber", "phone_number", "telephone", "mobile"]), 60),
     company,
-    serviceInterest: clean(submission.service ?? submission.serviceInterest ?? submission.service_interest, 240),
+    serviceInterest: clean(submissionValue(submission, ["service", "serviceInterest", "service_interest", "requestedService", "requested_service"]), 240),
     message: [description, contactNote].filter(Boolean).join("\n\n"),
     contactMethod,
     submittedAt,
-    sourceUrl: clean(submission._url ?? submission.sourceUrl ?? submission.source_url, 1000),
-    isSpam: Boolean(clean(submission._gotcha, 500)),
+    sourceUrl: clean(submissionValue(submission, ["_url", "sourceUrl", "source_url"]), 1000),
+    isSpam: Boolean(clean(submissionValue(submission, ["_gotcha"]), 500)),
   };
+}
+
+export function missingFormspreeLeadContact(existing: ExistingFormspreeLeadContact, incoming: FormspreeLead) {
+  const patch: Record<string, string> = {};
+  if (!clean(existing.email, 320) && incoming.email) patch.email = incoming.email;
+  if (!clean(existing.phone, 60) && incoming.phone) patch.phone = incoming.phone;
+  if (!clean(existing.company, 180) && incoming.company) patch.company = incoming.company;
+  if (!clean(existing.service_interest, 240) && incoming.serviceInterest) patch.service_interest = incoming.serviceInterest;
+  if (!clean(existing.message, 4000) && incoming.message) patch.message = incoming.message;
+  return patch;
 }

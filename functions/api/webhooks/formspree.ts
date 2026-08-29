@@ -4,6 +4,7 @@ import {
   formspreeSubmissionFingerprint,
   mapFormspreeLead,
   matchesFormspreeForm,
+  missingFormspreeLeadContact,
   verifyFormspreeWebhook,
   type FormspreeEnv,
   type FormspreePayload,
@@ -13,6 +14,7 @@ import { createNotification } from "../../_shared/notifications";
 interface Env extends FunctionEnv, FormspreeEnv {}
 
 interface ClientRow { id: string; organization_id: string | null; name: string }
+interface ExistingLeadRow { id?: string; email?: string; phone?: string; company?: string; service_interest?: string; message?: string }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -104,13 +106,25 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const inserted = await insertResponse.json().catch(() => []) as Array<{ id?: string }>;
   let leadId = inserted[0]?.id || "";
   const duplicate = !leadId;
+  let repaired = false;
   if (!leadId) {
-    const existingResponse = await fetch(`${url}/rest/v1/crm_leads?external_provider=eq.formspree&external_submission_id=eq.${encodeURIComponent(fingerprint)}&select=id&limit=1`, { headers: serviceHeaders(serviceKey) });
-    const existing = existingResponse.ok ? await existingResponse.json().catch(() => []) as Array<{ id?: string }> : [];
-    leadId = existing[0]?.id || "";
+    const existingResponse = await fetch(`${url}/rest/v1/crm_leads?external_provider=eq.formspree&external_submission_id=eq.${encodeURIComponent(fingerprint)}&select=id,email,phone,company,service_interest,message&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const existing = existingResponse.ok ? await existingResponse.json().catch(() => []) as ExistingLeadRow[] : [];
+    const existingLead = existing[0];
+    leadId = existingLead?.id || "";
+    const missingContact = existingLead ? missingFormspreeLeadContact(existingLead, lead) : {};
+    if (uuidPattern.test(leadId) && Object.keys(missingContact).length) {
+      const repairResponse = await fetch(`${url}/rest/v1/crm_leads?id=eq.${encodeURIComponent(leadId)}`, {
+        method: "PATCH",
+        headers: serviceHeaders(serviceKey, "return=minimal"),
+        body: JSON.stringify({ ...missingContact, updated_at: new Date().toISOString() }),
+      });
+      if (!repairResponse.ok) return json({ error: "Lead contact details could not be updated." }, 502);
+      repaired = true;
+    }
   }
   if (!uuidPattern.test(leadId)) return json({ error: "Lead could not be confirmed." }, 502);
-  if (duplicate) return json({ accepted: true, duplicate: true });
+  if (duplicate) return json({ accepted: true, duplicate: true, repaired });
 
   const eventMetadata = { client_id: client.id, lead_id: leadId, provider: "formspree", form_id: env.FORMSPREE_FORM_ID?.trim() || "" };
   await Promise.allSettled([

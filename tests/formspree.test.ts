@@ -3,6 +3,7 @@ import {
   formspreeSubmissionFingerprint,
   mapFormspreeLead,
   matchesFormspreeForm,
+  missingFormspreeLeadContact,
   verifyFormspreeWebhook,
 } from "../functions/_shared/formspree";
 
@@ -64,5 +65,38 @@ describe("Formspree CRM intake", () => {
 
   it("marks the honeypot field as spam", () => {
     expect(mapFormspreeLead({ submission: { name: "Bot", email: "bot@example.com", _gotcha: "spam" } }).isSpam).toBe(true);
+  });
+
+  it("recognizes common Formspree email labels without storing arbitrary fields", () => {
+    expect(mapFormspreeLead({ submission: {
+      "Full Name": "Taylor Customer",
+      "Email Address": " Taylor@Example.com ",
+      "Phone Number": "+1 360 555 0188",
+    } })).toMatchObject({
+      fullName: "Taylor Customer",
+      email: "taylor@example.com",
+      phone: "+1 360 555 0188",
+    });
+    expect(mapFormspreeLead({ submission: { name: "Reply To", _replyto: "reply@example.com" } }).email).toBe("reply@example.com");
+  });
+
+  it("repairs missing contact details without overwriting existing CRM values", () => {
+    const incoming = mapFormspreeLead({ submission: {
+      name: "Alex Client",
+      email: "alex@example.com",
+      phone: "503-555-0100",
+      businessName: "Incoming Company",
+      description: "Incoming message",
+    } });
+    expect(missingFormspreeLeadContact({
+      email: "",
+      phone: "503-555-9999",
+      company: "Saved Company",
+      service_interest: "",
+      message: "",
+    }, incoming)).toEqual({
+      email: "alex@example.com",
+      message: "Incoming message",
+    });
   });
 });
