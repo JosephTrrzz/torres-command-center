@@ -44,6 +44,8 @@ export default function CrmPage() {
   const [chatReply, setChatReply] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -66,6 +68,7 @@ export default function CrmPage() {
     try {
       const next = await fetchCrm(activeSession, requestedClient);
       setSnapshot(next);
+      setLastUpdatedAt(new Date());
       setSelectedLeadId((current) => {
         if (requestedLead && next.leads.some((lead) => lead.id === requestedLead)) return requestedLead;
         return next.leads.some((lead) => lead.id === current) ? current : next.leads[0]?.id || "";
@@ -100,6 +103,28 @@ export default function CrmPage() {
     }, 8000);
     return () => window.clearInterval(timer);
   }, [clientId, load, selectedWebsiteChat?.leadId, session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const refreshVisiblePipeline = () => {
+      if (document.visibilityState === "visible") void load(session, clientId, selectedLeadId, true);
+    };
+    const timer = window.setInterval(refreshVisiblePipeline, 15000);
+    window.addEventListener("focus", refreshVisiblePipeline);
+    document.addEventListener("visibilitychange", refreshVisiblePipeline);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshVisiblePipeline);
+      document.removeEventListener("visibilitychange", refreshVisiblePipeline);
+    };
+  }, [clientId, load, selectedLeadId, session]);
+
+  const refreshPipeline = async () => {
+    if (!session || refreshing) return;
+    setRefreshing(true);
+    await load(session, clientId, selectedLeadId, true);
+    setRefreshing(false);
+  };
 
   const chooseClient = (nextClientId: string) => {
     if (!session) return;
@@ -177,7 +202,16 @@ export default function CrmPage() {
   return <Shell active="CRM">
     <div className="page-heading crm-heading">
       <div><p className="eyebrow">Lead operations</p><h1>CRM</h1><p className="lede">Capture every inquiry, assign ownership, schedule the next conversation, and close the follow-up loop.</p></div>
-      {clients.length > 0 && <BrandSelect label="View" value={clientId} onChange={chooseClient} options={[{ value: "", label: "All leads", description: "Entire Torres & Co. pipeline" }, ...clients.map((client) => ({ value: client.id, label: client.name, description: [client.industry, client.location].filter(Boolean).join(" · ") || "Client account" }))]} />}
+      <div className="crm-heading-actions">
+        {clients.length > 0 && <BrandSelect label="View" value={clientId} onChange={chooseClient} options={[{ value: "", label: "All leads", description: "Entire Torres & Co. pipeline" }, ...clients.map((client) => ({ value: client.id, label: client.name, description: [client.industry, client.location].filter(Boolean).join(" · ") || "Client account" }))]} />}
+        <div className="crm-live-control">
+          <span><i aria-hidden="true" />{lastUpdatedAt ? `Updated ${lastUpdatedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connecting…"}</span>
+          <button type="button" onClick={() => void refreshPipeline()} disabled={!session || refreshing} aria-label="Refresh CRM leads">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>
+            {refreshing ? "Refreshing…" : "Refresh leads"}
+          </button>
+        </div>
+      </div>
     </div>
 
     {error && <p className="integration-notice crm-error" role="alert">{error}</p>}
