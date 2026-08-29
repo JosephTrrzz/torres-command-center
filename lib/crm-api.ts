@@ -17,8 +17,9 @@ async function requestCrm(session: AuthSession, path: string, init?: RequestInit
   return body;
 }
 
-export async function fetchCrm(session: AuthSession, clientId: string) {
-  return (await requestCrm(session, `/api/crm/?client=${encodeURIComponent(clientId)}`)).snapshot as CrmSnapshot;
+export async function fetchCrm(session: AuthSession, clientId?: string) {
+  const query = clientId ? `?client=${encodeURIComponent(clientId)}` : "";
+  return (await requestCrm(session, `/api/crm/${query}`)).snapshot as CrmSnapshot;
 }
 
 export async function changeCrm(session: AuthSession, input: Record<string, unknown>) {

@@ -11,6 +11,7 @@ import { createNotification } from "../../_shared/notifications";
 interface Env extends FunctionEnv {}
 
 type ClientRow = { id: string; organization_id: string | null; name: string };
+type OrganizationRow = { id: string };
 type LeadRow = { id: string; client_id: string; full_name: string; email: string; phone: string; company: string; service_interest: string; message: string; source: string; status: string; assigned_to: string | null; created_at: string; updated_at: string };
 type AppointmentRow = { id: string; lead_id: string; title: string; starts_at: string; ends_at: string; timezone: string; status: string; location: string; notes: string; assigned_to: string | null; created_at: string };
 type TaskRow = { id: string; lead_id: string | null; appointment_id: string | null; title: string; description: string; due_at: string | null; priority: string; status: string; assigned_to: string | null; completed_at: string | null; created_at: string };
@@ -58,10 +59,7 @@ async function resolveClient(url: string, serviceKey: string, context: AuthConte
   return rows[0] || null;
 }
 
-async function readTeam(url: string, serviceKey: string, clientOrganizationId: string) {
-  const organizationResponse = await fetch(`${url}/rest/v1/organizations?id=eq.${encodeURIComponent(clientOrganizationId)}&select=parent_organization_id&limit=1`, { headers: serviceHeaders(serviceKey) });
-  const organizations = organizationResponse.ok ? await organizationResponse.json().catch(() => []) as Array<{ parent_organization_id?: string }> : [];
-  const agencyId = organizations[0]?.parent_organization_id || clientOrganizationId;
+async function readAgencyTeam(url: string, serviceKey: string, agencyId: string) {
   const membershipResponse = await fetch(`${url}/rest/v1/organization_memberships?organization_id=eq.${encodeURIComponent(agencyId)}&status=eq.active&role=neq.client&select=user_id,role`, { headers: serviceHeaders(serviceKey) });
   const memberships = membershipResponse.ok ? await membershipResponse.json().catch(() => []) as Array<{ user_id?: string; role?: string }> : [];
   const userIds = memberships.map((row) => row.user_id).filter((id): id is string => Boolean(id && uuidPattern.test(id)));
@@ -73,6 +71,31 @@ async function readTeam(url: string, serviceKey: string, clientOrganizationId: s
     const membership = memberships.find((row) => row.user_id === profile.id);
     return [{ id: profile.id, name: clean(profile.full_name, 160) || clean(profile.email, 320) || "Team member", email: clean(profile.email, 320), role: membership?.role || "member" }];
   });
+}
+
+async function readTeam(url: string, serviceKey: string, clientOrganizationId: string) {
+  const organizationResponse = await fetch(`${url}/rest/v1/organizations?id=eq.${encodeURIComponent(clientOrganizationId)}&select=parent_organization_id&limit=1`, { headers: serviceHeaders(serviceKey) });
+  const organizations = organizationResponse.ok ? await organizationResponse.json().catch(() => []) as Array<{ parent_organization_id?: string }> : [];
+  return readAgencyTeam(url, serviceKey, organizations[0]?.parent_organization_id || clientOrganizationId);
+}
+
+function agencyOrganizationId(context: AuthContext) {
+  return context.memberships.find((membership) => membership.kind === "agency" && membership.role !== "client")?.organizationId
+    || (context.organizationRole !== "client" ? context.organizationId : null);
+}
+
+async function readAccessibleClients(url: string, serviceKey: string, context: AuthContext) {
+  const agencyId = agencyOrganizationId(context);
+  if (!agencyId) {
+    const client = await resolveClient(url, serviceKey, context, context.clientId || "");
+    return client ? [client] : [];
+  }
+  const organizationResponse = await fetch(`${url}/rest/v1/organizations?or=(id.eq.${encodeURIComponent(agencyId)},parent_organization_id.eq.${encodeURIComponent(agencyId)})&status=eq.active&select=id`, { headers: serviceHeaders(serviceKey) });
+  const organizations = organizationResponse.ok ? await organizationResponse.json().catch(() => []) as OrganizationRow[] : [];
+  const organizationIds = organizations.map((organization) => organization.id).filter((id) => uuidPattern.test(id));
+  if (!organizationIds.length) return [];
+  const clientResponse = await fetch(`${url}/rest/v1/clients?organization_id=in.(${organizationIds.join(",")})&select=id,organization_id,name&order=name.asc`, { headers: serviceHeaders(serviceKey) });
+  return clientResponse.ok ? await clientResponse.json().catch(() => []) as ClientRow[] : [];
 }
 
 function summary(leads: LeadRow[], tasks: TaskRow[], appointments: AppointmentRow[]) {
@@ -89,14 +112,26 @@ function summary(leads: LeadRow[], tasks: TaskRow[], appointments: AppointmentRo
   };
 }
 
-async function readSnapshot(url: string, serviceKey: string, context: AuthContext, client: ClientRow) {
-  const organizationId = client.organization_id || "";
+async function readSnapshot(url: string, serviceKey: string, context: AuthContext, clients: ClientRow[], client: ClientRow | null) {
+  const scopedClients = client ? [client] : clients;
+  const clientIds = scopedClients.map((row) => row.id).filter((id) => uuidPattern.test(id));
+  const clientFilter = clientIds.length === 1
+    ? `eq.${encodeURIComponent(clientIds[0])}`
+    : clientIds.length > 1
+      ? `in.(${clientIds.join(",")})`
+      : "eq.00000000-0000-0000-0000-000000000000";
+  const agencyId = agencyOrganizationId(context);
+  const teamPromise = client?.organization_id
+    ? readTeam(url, serviceKey, client.organization_id)
+    : agencyId
+      ? readAgencyTeam(url, serviceKey, agencyId)
+      : Promise.resolve([]);
   const [leadResponse, appointmentResponse, taskResponse, activityResponse, team] = await Promise.all([
-    fetch(`${url}/rest/v1/crm_leads?client_id=eq.${encodeURIComponent(client.id)}&select=*&order=created_at.desc`, { headers: serviceHeaders(serviceKey) }),
-    fetch(`${url}/rest/v1/crm_appointments?client_id=eq.${encodeURIComponent(client.id)}&select=*&order=starts_at.asc`, { headers: serviceHeaders(serviceKey) }),
-    fetch(`${url}/rest/v1/crm_tasks?client_id=eq.${encodeURIComponent(client.id)}&select=*&order=due_at.asc.nullslast,created_at.desc`, { headers: serviceHeaders(serviceKey) }),
-    fetch(`${url}/rest/v1/crm_activities?client_id=eq.${encodeURIComponent(client.id)}&select=id,lead_id,activity_type,title,detail,created_at&order=created_at.desc&limit=100`, { headers: serviceHeaders(serviceKey) }),
-    readTeam(url, serviceKey, organizationId),
+    fetch(`${url}/rest/v1/crm_leads?client_id=${clientFilter}&select=*&order=created_at.desc`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/crm_appointments?client_id=${clientFilter}&select=*&order=starts_at.asc`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/crm_tasks?client_id=${clientFilter}&select=*&order=due_at.asc.nullslast,created_at.desc`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/crm_activities?client_id=${clientFilter}&select=id,lead_id,activity_type,title,detail,created_at&order=created_at.desc&limit=100`, { headers: serviceHeaders(serviceKey) }),
+    teamPromise,
   ]);
   if (![leadResponse, appointmentResponse, taskResponse, activityResponse].every((response) => response.ok)) return null;
   const leads = await leadResponse.json().catch(() => []) as LeadRow[];
@@ -104,7 +139,9 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
   const tasks = await taskResponse.json().catch(() => []) as TaskRow[];
   const activities = await activityResponse.json().catch(() => []) as ActivityRow[];
   return {
-    client: { id: client.id, name: client.name },
+    scope: { type: client ? "client" : "organization", clientId: client?.id || null, label: client?.name || "All leads" },
+    client: client ? { id: client.id, name: client.name } : null,
+    clients: clients.map((row) => ({ id: row.id, name: row.name })),
     canManage: hasOrganizationPermission(context, "crm.manage") && context.organizationRole !== "client",
     leads,
     appointments,
@@ -150,10 +187,25 @@ async function readLead(url: string, serviceKey: string, clientId: string, leadI
 
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
   const requestedClientId = new URL(request.url).searchParams.get("client") || "";
-  if (!uuidPattern.test(requestedClientId)) return authJson({ error: "Choose a valid client." }, 400);
-  const resolved = await authenticatedClient(request, env, requestedClientId);
-  if ("response" in resolved) return resolved.response;
-  const snapshot = await readSnapshot(resolved.url, resolved.serviceKey, resolved.context, resolved.client);
+  if (requestedClientId && !uuidPattern.test(requestedClientId)) return authJson({ error: "Choose a valid client." }, 400);
+  if (requestedClientId) {
+    const resolved = await authenticatedClient(request, env, requestedClientId);
+    if ("response" in resolved) return resolved.response;
+    const clients = await readAccessibleClients(resolved.url, resolved.serviceKey, resolved.context);
+    const snapshot = await readSnapshot(resolved.url, resolved.serviceKey, resolved.context, clients, resolved.client);
+    if (!snapshot) return authJson({ error: "CRM storage is not ready. Apply supabase/crm.sql first." }, 503);
+    return authJson({ snapshot });
+  }
+  const auth = await requireAuth(request, env, { permission: "crm.read" });
+  if ("response" in auth) return auth.response;
+  const url = getSupabaseUrl(env);
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!url || !serviceKey) return authJson({ error: "CRM storage is not configured." }, 500);
+  const clients = await readAccessibleClients(url, serviceKey, auth.context);
+  const customerClient = auth.context.organizationRole === "client" || (!auth.context.organizationRole && auth.context.role === "customer")
+    ? clients.find((client) => client.id === auth.context.clientId) || clients[0] || null
+    : null;
+  const snapshot = await readSnapshot(url, serviceKey, auth.context, clients, customerClient);
   if (!snapshot) return authJson({ error: "CRM storage is not ready. Apply supabase/crm.sql first." }, 503);
   return authJson({ snapshot });
 };
@@ -269,7 +321,8 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   await writeLifecycle(url, serviceKey, { organizationId, userId: context.userId, action: lifecycleAction, entityType, entityId, clientId: client.id, leadId });
   if (notificationUserId) await createNotification(env, { userId: notificationUserId, clientId: client.id, type: "action", title: notificationTitle, body: notificationBody, href: `/crm/?client=${encodeURIComponent(client.id)}` });
-  const snapshot = await readSnapshot(url, serviceKey, context, client);
+  const clients = await readAccessibleClients(url, serviceKey, context);
+  const snapshot = await readSnapshot(url, serviceKey, context, clients, client);
   if (!snapshot) return authJson({ error: "The change saved, but the refreshed CRM view is unavailable." }, 502);
   return authJson({ snapshot, message: "CRM workflow updated." });
 };

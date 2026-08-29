@@ -64,9 +64,12 @@ export interface CrmActivity {
 }
 
 export interface CrmTeamMember { id: string; name: string; email: string; role: string }
+export interface CrmClientOption { id: string; name: string }
 
 export interface CrmSnapshot {
-  client: { id: string; name: string };
+  scope: { type: "organization" | "client"; clientId: string | null; label: string };
+  client: CrmClientOption | null;
+  clients: CrmClientOption[];
   canManage: boolean;
   leads: CrmLead[];
   appointments: CrmAppointment[];

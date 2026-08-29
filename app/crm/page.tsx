@@ -32,7 +32,7 @@ function contactLine(lead: CrmLead) {
   return [lead.email, lead.phone].filter(Boolean).join(" · ") || "No contact method";
 }
 
-const blankLead = { fullName: "", email: "", phone: "", company: "", serviceInterest: "", message: "", source: "website", assignedTo: "" };
+const blankLead = { clientId: "", fullName: "", email: "", phone: "", company: "", serviceInterest: "", message: "", source: "website", assignedTo: "" };
 
 export default function CrmPage() {
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -51,12 +51,12 @@ export default function CrmPage() {
     [snapshot, selectedLeadId],
   );
   const teamById = useMemo(() => new Map(snapshot?.team.map((member) => [member.id, member.name]) || []), [snapshot]);
+  const clientById = useMemo(() => new Map(clients.map((client) => [client.id, client.name])), [clients]);
   const selectedActivities = snapshot?.activities.filter((activity) => activity.lead_id === selectedLead?.id).slice(0, 8) || [];
   const selectedTasks = snapshot?.tasks.filter((task) => task.lead_id === selectedLead?.id) || [];
   const selectedAppointments = snapshot?.appointments.filter((appointment) => appointment.lead_id === selectedLead?.id) || [];
 
-  const load = async (activeSession: AuthSession, requestedClient: string) => {
-    if (!requestedClient) { setLoading(false); return; }
+  const load = async (activeSession: AuthSession, requestedClient = "") => {
     setLoading(true); setError(""); setMessage("");
     try {
       const next = await fetchCrm(activeSession, requestedClient);
@@ -75,27 +75,31 @@ export default function CrmPage() {
     void fetchClients().then((rows) => {
       setClients(rows);
       const queryClient = new URLSearchParams(window.location.search).get("client") || "";
-      const initial = rows.some((client) => client.id === queryClient) ? queryClient : rows[0]?.id || "";
+      const initial = rows.some((client) => client.id === queryClient) ? queryClient : "";
       setClientId(initial);
-      if (initial) void load(stored, initial); else setLoading(false);
+      setLeadForm((current) => ({ ...current, clientId: initial || rows[0]?.id || "" }));
+      void load(stored, initial);
     }).catch(() => { setLoading(false); setError("Client records could not be loaded."); });
   }, []);
 
   const chooseClient = (nextClientId: string) => {
     if (!session) return;
     setClientId(nextClientId); setSelectedLeadId("");
+    setLeadForm((current) => ({ ...current, clientId: nextClientId || current.clientId || clients[0]?.id || "" }));
     const url = new URL(window.location.href);
-    url.searchParams.set("client", nextClientId);
+    if (nextClientId) url.searchParams.set("client", nextClientId); else url.searchParams.delete("client");
     window.history.replaceState({}, "", url);
     void load(session, nextClientId);
   };
 
   const mutate = async (label: string, input: Record<string, unknown>) => {
-    if (!session || !clientId) return null;
+    if (!session) return null;
+    const mutationClientId = typeof input.clientId === "string" && input.clientId ? input.clientId : clientId;
+    if (!mutationClientId) { setError("Choose the account this CRM record belongs to."); return null; }
     setBusy(label); setError(""); setMessage("");
     try {
-      const response = await changeCrm(session, { clientId, ...input });
-      const next = response.snapshot as CrmSnapshot;
+      const response = await changeCrm(session, { ...input, clientId: mutationClientId });
+      const next = await fetchCrm(session, clientId || undefined);
       setSnapshot(next);
       setMessage(response.message || "CRM workflow updated.");
       return next;
@@ -108,14 +112,14 @@ export default function CrmPage() {
   const createLead = async (event: FormEvent) => {
     event.preventDefault();
     const next = await mutate("new-lead", { action: "create_lead", ...leadForm });
-    if (next) { setLeadForm(blankLead); setSelectedLeadId(next.leads[0]?.id || ""); }
+    if (next) { setLeadForm({ ...blankLead, clientId: clientId || leadForm.clientId || clients[0]?.id || "" }); setSelectedLeadId(next.leads[0]?.id || ""); }
   };
 
   const updateLead = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedLead) return;
     const form = new FormData(event.currentTarget);
-    await mutate("lead-update", { action: "update_lead", leadId: selectedLead.id, status: form.get("status"), assignedTo: form.get("assignedTo") });
+    await mutate("lead-update", { action: "update_lead", clientId: selectedLead.client_id, leadId: selectedLead.id, status: form.get("status"), assignedTo: form.get("assignedTo") });
   };
 
   const scheduleAppointment = async (event: FormEvent<HTMLFormElement>) => {
@@ -123,7 +127,7 @@ export default function CrmPage() {
     if (!selectedLead) return;
     const form = new FormData(event.currentTarget);
     const next = await mutate("appointment", {
-      action: "schedule_appointment", leadId: selectedLead.id, title: form.get("title"), startsAt: form.get("startsAt"), endsAt: form.get("endsAt"),
+      action: "schedule_appointment", clientId: selectedLead.client_id, leadId: selectedLead.id, title: form.get("title"), startsAt: form.get("startsAt"), endsAt: form.get("endsAt"),
       location: form.get("location"), notes: form.get("notes"), assignedTo: form.get("assignedTo"), taskTitle: form.get("taskTitle"), taskDueAt: form.get("taskDueAt"), priority: form.get("priority"),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
@@ -138,12 +142,12 @@ export default function CrmPage() {
   return <Shell active="CRM">
     <div className="page-heading crm-heading">
       <div><p className="eyebrow">Lead operations</p><h1>CRM</h1><p className="lede">Capture every inquiry, assign ownership, schedule the next conversation, and close the follow-up loop.</p></div>
-      {clients.length > 0 && <BrandSelect label="Client" value={clientId} onChange={chooseClient} options={clients.map((client) => ({ value: client.id, label: client.name, description: [client.industry, client.location].filter(Boolean).join(" · ") || "Client account" }))} />}
+      {clients.length > 0 && <BrandSelect label="View" value={clientId} onChange={chooseClient} options={[{ value: "", label: "All leads", description: "Entire Torres & Co. pipeline" }, ...clients.map((client) => ({ value: client.id, label: client.name, description: [client.industry, client.location].filter(Boolean).join(" · ") || "Client account" }))]} />}
     </div>
 
     {error && <p className="integration-notice crm-error" role="alert">{error}</p>}
     {message && <p className="integration-notice crm-success" role="status">{message}</p>}
-    {loading ? <section className="crm-loading"><strong>Loading client pipeline…</strong><span>Checking assignments, appointments, tasks, and activity.</span></section> : !snapshot ? <section className="empty-state"><h2>Choose a client to open CRM</h2><p>The lead pipeline is kept separate for every client account.</p></section> : <>
+    {loading ? <section className="crm-loading"><strong>Loading agency pipeline…</strong><span>Checking assignments, appointments, tasks, and activity.</span></section> : !snapshot ? <section className="empty-state"><h2>CRM is unavailable</h2><p>The agency pipeline could not be loaded.</p></section> : <>
       <section className="crm-summary" aria-label="CRM summary">
         <article><span>Active leads</span><strong>{snapshot.summary.activeLeads}</strong><small>{snapshot.summary.wonLeads} won</small></article>
         <article><span>Unassigned</span><strong>{snapshot.summary.unassigned}</strong><small>Needs an owner</small></article>
@@ -152,6 +156,7 @@ export default function CrmPage() {
       </section>
 
       {snapshot.canManage && <details className="crm-composer"><summary><span><b>Capture a lead</b><small>Add a real inquiry and assign the first response.</small></span><i>＋</i></summary><form onSubmit={createLead}>
+        <label>Account<select required value={leadForm.clientId} onChange={(event) => setLeadForm({ ...leadForm, clientId: event.target.value })}><option value="">Choose an account</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
         <label>Full name<input required maxLength={180} value={leadForm.fullName} onChange={(event) => setLeadForm({ ...leadForm, fullName: event.target.value })} /></label>
         <label>Email<input type="email" maxLength={320} value={leadForm.email} onChange={(event) => setLeadForm({ ...leadForm, email: event.target.value })} /></label>
         <label>Phone<input type="tel" maxLength={60} value={leadForm.phone} onChange={(event) => setLeadForm({ ...leadForm, phone: event.target.value })} /></label>
@@ -169,20 +174,20 @@ export default function CrmPage() {
           {LEAD_STATUSES.map((status) => {
             const leads = snapshot.leads.filter((lead) => lead.status === status);
             if (!leads.length) return null;
-            return <section className="crm-stage" key={status}><header><strong>{labelCrmValue(status)}</strong><span>{leads.length}</span></header>{leads.map((lead) => <button key={lead.id} type="button" className={lead.id === selectedLead?.id ? "active" : ""} onClick={() => setSelectedLeadId(lead.id)}><span className="crm-lead-avatar">{lead.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><span><strong>{lead.full_name}</strong><small>{lead.email || lead.phone || lead.service_interest || lead.company || labelCrmValue(lead.source)}</small></span><i>{lead.assigned_to ? teamById.get(lead.assigned_to)?.split(" ")[0] || "Assigned" : "Unassigned"}</i></button>)}</section>;
+            return <section className="crm-stage" key={status}><header><strong>{labelCrmValue(status)}</strong><span>{leads.length}</span></header>{leads.map((lead) => <button key={lead.id} type="button" className={lead.id === selectedLead?.id ? "active" : ""} onClick={() => setSelectedLeadId(lead.id)}><span className="crm-lead-avatar">{lead.full_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><span><strong>{lead.full_name}</strong><small>{clientById.get(lead.client_id) || lead.email || lead.phone || "Client account"}</small></span><i>{lead.assigned_to ? teamById.get(lead.assigned_to)?.split(" ")[0] || "Assigned" : "Unassigned"}</i></button>)}</section>;
           })}
         </aside>
 
         {selectedLead && <main className="crm-workspace">
-          <section className="crm-lead-hero"><div><p className="eyebrow">{labelCrmValue(selectedLead.source)} lead</p><h2>{selectedLead.full_name}</h2><p>{contactLine(selectedLead)}</p><small>{[selectedLead.company, selectedLead.service_interest].filter(Boolean).join(" · ") || "No company or service noted"}</small></div><span className={`crm-stage-pill ${selectedLead.status}`}>{labelCrmValue(selectedLead.status)}</span></section>
+          <section className="crm-lead-hero"><div><p className="eyebrow">{clientById.get(selectedLead.client_id) || "Client account"} · {labelCrmValue(selectedLead.source)} lead</p><h2>{selectedLead.full_name}</h2><p>{contactLine(selectedLead)}</p><small>{[selectedLead.company, selectedLead.service_interest].filter(Boolean).join(" · ") || "No company or service noted"}</small></div><span className={`crm-stage-pill ${selectedLead.status}`}>{labelCrmValue(selectedLead.status)}</span></section>
 
           {selectedLead.message && <section className="crm-note"><p className="eyebrow">Inquiry</p><p>{selectedLead.message}</p></section>}
 
           {snapshot.canManage && <form className="crm-control-row" key={selectedLead.id} onSubmit={updateLead}><label>Pipeline stage<select name="status" defaultValue={selectedLead.status}>{LEAD_STATUSES.map((status) => <option key={status} value={status}>{labelCrmValue(status)}</option>)}</select></label><label>Owner<select name="assignedTo" defaultValue={selectedLead.assigned_to || ""}><option value="">Unassigned</option>{snapshot.team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label><button className="button button-dark" disabled={busy === "lead-update"}>{busy === "lead-update" ? "Saving…" : "Update lead →"}</button></form>}
 
           <div className="crm-work-grid">
-            <section className="crm-panel"><div className="crm-section-title"><div><p className="eyebrow">Appointments</p><h3>Next conversations</h3></div><span>{selectedAppointments.length}</span></div>{selectedAppointments.length ? selectedAppointments.map((appointment) => <article className="crm-list-item" key={appointment.id}><div><strong>{appointment.title}</strong><p>{dateTimeLabel(appointment.starts_at)}{appointment.location ? ` · ${appointment.location}` : ""}</p><small>{labelCrmValue(appointment.status)} · {appointment.assigned_to ? teamById.get(appointment.assigned_to) || "Assigned" : "Unassigned"}</small></div>{snapshot.canManage && appointment.status === "scheduled" && <div className="crm-row-actions"><button disabled={busy === appointment.id} onClick={() => void mutate(appointment.id, { action: "update_appointment", appointmentId: appointment.id, status: "completed" })}>Complete</button><button disabled={busy === appointment.id} onClick={() => void mutate(appointment.id, { action: "update_appointment", appointmentId: appointment.id, status: "canceled" })}>Cancel</button></div>}</article>) : <p className="crm-inline-empty">No appointment scheduled.</p>}</section>
-            <section className="crm-panel"><div className="crm-section-title"><div><p className="eyebrow">Follow-up</p><h3>Tasks</h3></div><span>{selectedTasks.filter((task) => !["completed", "canceled"].includes(task.status)).length}</span></div>{selectedTasks.length ? selectedTasks.map((task) => <article className="crm-list-item" key={task.id}><div><strong>{task.title}</strong><p>{dateTimeLabel(task.due_at)}</p><small>{labelCrmValue(task.priority)} · {task.assigned_to ? teamById.get(task.assigned_to) || "Assigned" : "Unassigned"}</small></div>{snapshot.canManage && <select aria-label={`Status for ${task.title}`} disabled={busy === task.id} value={task.status} onChange={(event) => void mutate(task.id, { action: "update_task", taskId: task.id, status: event.target.value })}>{TASK_STATUSES.map((status) => <option key={status} value={status}>{labelCrmValue(status)}</option>)}</select>}</article>) : <p className="crm-inline-empty">No follow-up tasks yet.</p>}</section>
+            <section className="crm-panel"><div className="crm-section-title"><div><p className="eyebrow">Appointments</p><h3>Next conversations</h3></div><span>{selectedAppointments.length}</span></div>{selectedAppointments.length ? selectedAppointments.map((appointment) => <article className="crm-list-item" key={appointment.id}><div><strong>{appointment.title}</strong><p>{dateTimeLabel(appointment.starts_at)}{appointment.location ? ` · ${appointment.location}` : ""}</p><small>{labelCrmValue(appointment.status)} · {appointment.assigned_to ? teamById.get(appointment.assigned_to) || "Assigned" : "Unassigned"}</small></div>{snapshot.canManage && appointment.status === "scheduled" && <div className="crm-row-actions"><button disabled={busy === appointment.id} onClick={() => void mutate(appointment.id, { action: "update_appointment", clientId: selectedLead.client_id, appointmentId: appointment.id, status: "completed" })}>Complete</button><button disabled={busy === appointment.id} onClick={() => void mutate(appointment.id, { action: "update_appointment", clientId: selectedLead.client_id, appointmentId: appointment.id, status: "canceled" })}>Cancel</button></div>}</article>) : <p className="crm-inline-empty">No appointment scheduled.</p>}</section>
+            <section className="crm-panel"><div className="crm-section-title"><div><p className="eyebrow">Follow-up</p><h3>Tasks</h3></div><span>{selectedTasks.filter((task) => !["completed", "canceled"].includes(task.status)).length}</span></div>{selectedTasks.length ? selectedTasks.map((task) => <article className="crm-list-item" key={task.id}><div><strong>{task.title}</strong><p>{dateTimeLabel(task.due_at)}</p><small>{labelCrmValue(task.priority)} · {task.assigned_to ? teamById.get(task.assigned_to) || "Assigned" : "Unassigned"}</small></div>{snapshot.canManage && <select aria-label={`Status for ${task.title}`} disabled={busy === task.id} value={task.status} onChange={(event) => void mutate(task.id, { action: "update_task", clientId: selectedLead.client_id, taskId: task.id, status: event.target.value })}>{TASK_STATUSES.map((status) => <option key={status} value={status}>{labelCrmValue(status)}</option>)}</select>}</article>) : <p className="crm-inline-empty">No follow-up tasks yet.</p>}</section>
           </div>
 
           {snapshot.canManage && <details className="crm-appointment-form"><summary>Schedule appointment and follow-up <span>＋</span></summary><form onSubmit={scheduleAppointment}>
