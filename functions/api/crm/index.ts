@@ -7,15 +7,18 @@ import {
   type FunctionEnv,
 } from "../../_shared/auth";
 import { createNotification } from "../../_shared/notifications";
+import { crmConversationId } from "../../_shared/crm-chat";
 
 interface Env extends FunctionEnv {}
 
 type ClientRow = { id: string; organization_id: string | null; name: string };
 type OrganizationRow = { id: string };
-type LeadRow = { id: string; client_id: string; full_name: string; email: string; phone: string; company: string; service_interest: string; message: string; source: string; status: string; assigned_to: string | null; created_at: string; updated_at: string };
+type LeadRow = { id: string; client_id: string; full_name: string; email: string; phone: string; company: string; service_interest: string; message: string; source: string; status: string; assigned_to: string | null; external_provider: string; source_metadata: unknown; created_at: string; updated_at: string };
 type AppointmentRow = { id: string; lead_id: string; title: string; starts_at: string; ends_at: string; timezone: string; status: string; location: string; notes: string; assigned_to: string | null; created_at: string };
 type TaskRow = { id: string; lead_id: string | null; appointment_id: string | null; title: string; description: string; due_at: string | null; priority: string; status: string; assigned_to: string | null; completed_at: string | null; created_at: string };
 type ActivityRow = { id: string; lead_id: string; activity_type: string; title: string; detail: string; created_at: string };
+type ChatMessageRow = { id: string; conversation_id: string; direction: "inbound" | "outbound" | "system"; sender_name: string; body: string; status: string; created_at: string };
+type ReceptionistSessionRow = { conversation_id: string; state: string; ai_enabled: boolean };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const leadStatuses = new Set(["new", "qualified", "contacted", "appointment_scheduled", "won", "lost"]);
@@ -138,6 +141,39 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
   const appointments = await appointmentResponse.json().catch(() => []) as AppointmentRow[];
   const tasks = await taskResponse.json().catch(() => []) as TaskRow[];
   const activities = await activityResponse.json().catch(() => []) as ActivityRow[];
+  const chatLeadPairs = leads.flatMap((lead) => {
+    if (lead.external_provider !== "website_chat") return [];
+    const conversationId = crmConversationId(lead.source_metadata);
+    return conversationId ? [{ leadId: lead.id, conversationId }] : [];
+  });
+  const conversationIds = Array.from(new Set(chatLeadPairs.map((pair) => pair.conversationId)));
+  let chatMessages: ChatMessageRow[] = [];
+  let receptionistSessions: ReceptionistSessionRow[] = [];
+  if (conversationIds.length) {
+    const [messageResponse, sessionResponse] = await Promise.all([
+      fetch(`${url}/rest/v1/messages?conversation_id=in.(${conversationIds.join(",")})&channel=eq.webchat&select=id,conversation_id,direction,sender_name,body,status,created_at&order=created_at.asc`, { headers: serviceHeaders(serviceKey) }),
+      fetch(`${url}/rest/v1/receptionist_sessions?conversation_id=in.(${conversationIds.join(",")})&select=conversation_id,state,ai_enabled`, { headers: serviceHeaders(serviceKey) }),
+    ]);
+    chatMessages = messageResponse.ok ? await messageResponse.json().catch(() => []) as ChatMessageRow[] : [];
+    receptionistSessions = sessionResponse.ok ? await sessionResponse.json().catch(() => []) as ReceptionistSessionRow[] : [];
+  }
+  const messageGroups = new Map<string, ChatMessageRow[]>();
+  for (const chatMessage of chatMessages) {
+    const messages = messageGroups.get(chatMessage.conversation_id) || [];
+    messages.push(chatMessage);
+    messageGroups.set(chatMessage.conversation_id, messages);
+  }
+  const sessionByConversation = new Map(receptionistSessions.map((session) => [session.conversation_id, session]));
+  const websiteChats = chatLeadPairs.map((pair) => {
+    const receptionistSession = sessionByConversation.get(pair.conversationId);
+    return {
+      leadId: pair.leadId,
+      conversationId: pair.conversationId,
+      state: receptionistSession?.state || "identified",
+      aiEnabled: receptionistSession?.ai_enabled ?? false,
+      messages: messageGroups.get(pair.conversationId) || [],
+    };
+  });
   return {
     scope: { type: client ? "client" : "organization", clientId: client?.id || null, label: client?.name || "All leads" },
     client: client ? { id: client.id, name: client.name } : null,
@@ -147,6 +183,7 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     appointments,
     tasks,
     activities,
+    websiteChats,
     team,
     summary: summary(leads, tasks, appointments),
   };
@@ -258,6 +295,50 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const assignmentChanged = (lead.assigned_to || "") !== assignedTo;
     await writeActivity(url, serviceKey, { organizationId, clientId: client.id, leadId, type: assignmentChanged ? "lead.assigned" : "lead.stage_changed", title: assignmentChanged ? "Assignment updated" : "Pipeline stage updated", detail: assignmentChanged ? `${lead.full_name} was assigned to a team member.` : `${lead.full_name} moved to ${status.replaceAll("_", " ")}.`, userId: context.userId, metadata: { status, assigned_to: assignedTo || null } });
     if (assignmentChanged && assignedTo) { notificationUserId = assignedTo; notificationTitle = "Lead assigned to you"; notificationBody = `${lead.full_name} needs follow-up for ${client.name}.`; }
+  } else if (action === "reply_to_website_chat") {
+    const lead = await readLead(url, serviceKey, client.id, leadId);
+    const body = clean(input?.body, 2000);
+    const conversationId = lead ? crmConversationId(lead.source_metadata) : "";
+    if (!lead || lead.external_provider !== "website_chat" || !conversationId || !body) return authJson({ error: "Choose a website-chat lead and enter a reply." }, 400);
+    const conversationResponse = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}&channel=eq.webchat&select=id&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const conversations = conversationResponse.ok ? await conversationResponse.json().catch(() => []) as Array<{ id?: string }> : [];
+    if (!conversations[0]?.id) return authJson({ error: "That website chat is no longer available." }, 404);
+    const sender = team.find((member) => member.id === context.userId);
+    const senderName = sender?.name || "Joseph";
+    const ownershipResponse = await fetch(`${url}/rest/v1/receptionist_sessions?conversation_id=eq.${encodeURIComponent(conversationId)}`, {
+      method: "PATCH",
+      headers: serviceHeaders(serviceKey, "return=minimal"),
+      body: JSON.stringify({ state: "staff_owned", ai_enabled: false, last_seen_at: now, updated_at: now }),
+    });
+    if (!ownershipResponse.ok) return authJson({ error: "The chat could not be transferred from the AI receptionist to staff." }, 502);
+    const messageResponse = await fetch(`${url}/rest/v1/messages`, {
+      method: "POST",
+      headers: serviceHeaders(serviceKey, "return=representation"),
+      body: JSON.stringify({
+        organization_id: organizationId,
+        client_id: client.id,
+        conversation_id: conversationId,
+        direction: "outbound",
+        channel: "webchat",
+        status: "sent",
+        sender_name: senderName,
+        sender_address: sender?.email || "",
+        recipients: [],
+        subject: "Website chat",
+        body,
+        client_visible: false,
+        sent_by: context.userId,
+        sent_at: now,
+      }),
+    });
+    const messages = messageResponse.ok ? await messageResponse.json().catch(() => []) as Array<{ id?: string }> : [];
+    const messageId = messages[0]?.id || "";
+    if (!messageResponse.ok || !uuidPattern.test(messageId)) return authJson({ error: "The website-chat reply could not be sent." }, 502);
+    await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "PATCH", headers: serviceHeaders(serviceKey, "return=minimal"), body: JSON.stringify({ last_message_at: now, updated_at: now }) });
+    entityId = messageId;
+    entityType = "message";
+    lifecycleAction = "crm.website_chat.replied";
+    await writeActivity(url, serviceKey, { organizationId, clientId: client.id, leadId, type: "chat.replied", title: "Website chat reply sent", detail: `${senderName} replied to ${lead.full_name} in the website chat.`, userId: context.userId, metadata: { conversation_id: conversationId, message_id: messageId } });
   } else if (action === "schedule_appointment") {
     const lead = await readLead(url, serviceKey, client.id, leadId);
     const title = clean(input?.title, 180);
