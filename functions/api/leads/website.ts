@@ -26,11 +26,29 @@ function serviceHeaders(serviceKey: string, prefer?: string) {
   };
 }
 
-function json(data: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(data), {
+function json(data: Record<string, unknown>, status = 200, requestId?: string) {
+  return new Response(JSON.stringify(requestId ? { ...data, requestId } : data), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      ...(requestId ? { "X-Request-ID": requestId } : {}),
+    },
   });
+}
+
+function logIntakeFailure(requestId: string, stage: string, detail: Record<string, unknown> = {}) {
+  console.error(JSON.stringify({
+    event: "website_intake_failed",
+    request_id: requestId,
+    stage,
+    ...detail,
+  }));
+}
+
+async function responseDetail(response: Response) {
+  const text = await response.text().catch(() => "");
+  return text.replace(/\s+/g, " ").trim().slice(0, 800);
 }
 
 async function findNotificationUser(url: string, serviceKey: string, organizationId: string) {
@@ -45,32 +63,60 @@ async function findNotificationUser(url: string, serviceKey: string, organizatio
 }
 
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
-  if (!websiteIntakeConfigured(env)) return json({ error: "Website intake is not configured." }, 503);
-  if (!await verifyWebsiteIntakeSecret(env, request.headers.get("X-Website-Intake-Secret"))) return json({ error: "Invalid intake credentials." }, 401);
+  const requestId = crypto.randomUUID();
+  if (!websiteIntakeConfigured(env)) {
+    logIntakeFailure(requestId, "configuration", {
+      has_intake_secret: Boolean(env.WEBSITE_INTAKE_SECRET?.trim()),
+      has_client_id: Boolean(env.WEBSITE_LEADS_CLIENT_ID?.trim()),
+    });
+    return json({ error: "Website intake is not configured." }, 503, requestId);
+  }
+  if (!await verifyWebsiteIntakeSecret(env, request.headers.get("X-Website-Intake-Secret"))) {
+    logIntakeFailure(requestId, "authorization");
+    return json({ error: "Invalid intake credentials." }, 401, requestId);
+  }
   const declaredLength = Number(request.headers.get("content-length") || "0");
-  if (Number.isFinite(declaredLength) && declaredLength > maximumBodyBytes) return json({ error: "Payload too large." }, 413);
+  if (Number.isFinite(declaredLength) && declaredLength > maximumBodyBytes) return json({ error: "Payload too large." }, 413, requestId);
   const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > maximumBodyBytes) return json({ error: "Payload too large." }, 413);
+  if (new TextEncoder().encode(rawBody).byteLength > maximumBodyBytes) return json({ error: "Payload too large." }, 413, requestId);
 
   let payload: WebsitePayload;
   try {
     payload = JSON.parse(rawBody) as WebsitePayload;
   } catch {
-    return json({ error: "Invalid JSON payload." }, 400);
+    return json({ error: "Invalid JSON payload." }, 400, requestId);
   }
-  if (!validWebsiteSubmissionId(payload.submissionId)) return json({ error: "Invalid submission identifier." }, 422);
+  if (!validWebsiteSubmissionId(payload.submissionId)) return json({ error: "Invalid submission identifier." }, 422, requestId);
   const lead = mapFormspreeLead({ submission: payload });
-  if (lead.isSpam) return json({ accepted: true }, 202);
-  if (!lead.fullName || (!lead.email && !lead.phone) || (lead.email && !emailPattern.test(lead.email))) return json({ error: "Submission is missing a valid lead name or contact method." }, 422);
+  if (lead.isSpam) return json({ accepted: true }, 202, requestId);
+  if (!lead.fullName || (!lead.email && !lead.phone) || (lead.email && !emailPattern.test(lead.email))) return json({ error: "Submission is missing a valid lead name or contact method." }, 422, requestId);
 
   const url = getSupabaseUrl(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
   const clientId = env.WEBSITE_LEADS_CLIENT_ID?.trim() || "";
-  if (!url || !serviceKey || !uuidPattern.test(clientId)) return json({ error: "Lead storage is not configured." }, 503);
+  if (!url || !serviceKey || !uuidPattern.test(clientId)) {
+    logIntakeFailure(requestId, "storage_configuration", {
+      has_supabase_url: Boolean(url),
+      has_service_key: Boolean(serviceKey),
+      has_valid_client_id: uuidPattern.test(clientId),
+    });
+    return json({ error: "Lead storage is not configured." }, 503, requestId);
+  }
   const clientResponse = await fetch(`${url}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id,organization_id,name&limit=1`, { headers: serviceHeaders(serviceKey) });
-  const clients = clientResponse.ok ? await clientResponse.json().catch(() => []) as ClientRow[] : [];
+  if (!clientResponse.ok) {
+    logIntakeFailure(requestId, "client_lookup", {
+      status: clientResponse.status,
+      response: await responseDetail(clientResponse),
+      client_id: clientId,
+    });
+    return json({ error: "Configured client workspace could not be loaded." }, 502, requestId);
+  }
+  const clients = await clientResponse.json().catch(() => []) as ClientRow[];
   const client = clients[0];
-  if (!client?.organization_id) return json({ error: "Configured client workspace was not found." }, 503);
+  if (!client?.organization_id) {
+    logIntakeFailure(requestId, "client_not_found", { client_id: clientId });
+    return json({ error: "Configured client workspace was not found." }, 503, requestId);
+  }
 
   const submissionId = String(payload.submissionId).trim();
   const sourceMetadata = {
@@ -98,14 +144,31 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       source_metadata: sourceMetadata,
     }),
   });
-  if (!insertResponse.ok) return json({ error: "Lead could not be recorded." }, 502);
+  if (!insertResponse.ok) {
+    logIntakeFailure(requestId, "lead_insert", {
+      status: insertResponse.status,
+      response: await responseDetail(insertResponse),
+      client_id: client.id,
+      submission_id: submissionId,
+    });
+    return json({ error: "Lead could not be recorded." }, 502, requestId);
+  }
   const inserted = await insertResponse.json().catch(() => []) as Array<{ id?: string }>;
   let leadId = inserted[0]?.id || "";
   const duplicate = !leadId;
   let repaired = false;
   if (!leadId) {
     const existingResponse = await fetch(`${url}/rest/v1/crm_leads?external_provider=eq.torres_website&external_submission_id=eq.${encodeURIComponent(submissionId)}&select=id,email,phone,company,service_interest,message&limit=1`, { headers: serviceHeaders(serviceKey) });
-    const existing = existingResponse.ok ? await existingResponse.json().catch(() => []) as ExistingLeadRow[] : [];
+    if (!existingResponse.ok) {
+      logIntakeFailure(requestId, "duplicate_lookup", {
+        status: existingResponse.status,
+        response: await responseDetail(existingResponse),
+        client_id: client.id,
+        submission_id: submissionId,
+      });
+      return json({ error: "Lead could not be confirmed." }, 502, requestId);
+    }
+    const existing = await existingResponse.json().catch(() => []) as ExistingLeadRow[];
     const existingLead = existing[0];
     leadId = existingLead?.id || "";
     const missingContact = existingLead ? missingFormspreeLeadContact(existingLead, lead) : {};
@@ -115,12 +178,23 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
         headers: serviceHeaders(serviceKey, "return=minimal"),
         body: JSON.stringify({ ...missingContact, updated_at: new Date().toISOString() }),
       });
-      if (!repairResponse.ok) return json({ error: "Lead contact details could not be updated." }, 502);
+      if (!repairResponse.ok) {
+        logIntakeFailure(requestId, "duplicate_repair", {
+          status: repairResponse.status,
+          response: await responseDetail(repairResponse),
+          client_id: client.id,
+          submission_id: submissionId,
+        });
+        return json({ error: "Lead contact details could not be updated." }, 502, requestId);
+      }
       repaired = true;
     }
   }
-  if (!uuidPattern.test(leadId)) return json({ error: "Lead could not be confirmed." }, 502);
-  if (duplicate) return json({ accepted: true, duplicate: true, repaired });
+  if (!uuidPattern.test(leadId)) {
+    logIntakeFailure(requestId, "lead_confirmation", { client_id: client.id, submission_id: submissionId });
+    return json({ error: "Lead could not be confirmed." }, 502, requestId);
+  }
+  if (duplicate) return json({ accepted: true, duplicate: true, repaired }, 200, requestId);
 
   const eventMetadata = { client_id: client.id, lead_id: leadId, provider: "torres_website" };
   await Promise.allSettled([
@@ -149,5 +223,5 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     body: `${lead.fullName} requested help${lead.serviceInterest ? ` with ${lead.serviceInterest}` : ""}.`,
     href: "/crm/",
   });
-  return json({ accepted: true });
+  return json({ accepted: true }, 200, requestId);
 };
