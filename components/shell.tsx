@@ -156,7 +156,10 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       setWorkspaceBusy("");
     }
   };
-  if (!checked || !session) return <BrandedAppLoader />;
+  if (!checked) {
+    return <AppEntryTransition ready={false} status="Opening your secure workspace" variant="dark"><div /></AppEntryTransition>;
+  }
+  if (!session) return <BrandedAppLoader />;
   const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
   const nav = APP_NAVIGATION[effectiveRole];
   const displayName = displayNameFor(session.profile);
