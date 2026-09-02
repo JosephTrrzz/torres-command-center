@@ -10,6 +10,7 @@ import { readProfileAvatar } from "./profile-picture-editor";
 import { fetchClients } from "../lib/supabase-data";
 import { fetchNotifications, markNotificationsRead, type WorkspaceNotification } from "../lib/notifications";
 import { AppIcon, type AppIconName } from "./ui-foundation";
+import { AppEntryTransition, BrandedAppLoader, markSignatureEntrySeen, shouldShowSignatureEntry } from "./loading-system";
 
 const NAV_ICONS: Record<string, AppIconName> = { Today: "today", Overview: "overview", Clients: "clients", CRM: "crm", Projects: "projects", Operations: "operations", Inbox: "inbox", Campaigns: "campaigns", Onboarding: "onboarding", Portal: "portal", "My account": "portal", Integrations: "integrations", Reports: "reports", Settings: "settings" };
 
@@ -42,6 +43,8 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const [workspaceError, setWorkspaceError] = useState("");
   const [session, setSession] = useState<AuthSession | null>(null);
   const [checked, setChecked] = useState(false);
+  const [firstEntry, setFirstEntry] = useState(false);
+  const [entryReady, setEntryReady] = useState(true);
   const [avatarImage, setAvatarImage] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const pathname = usePathname();
@@ -64,6 +67,10 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       setChecked(true);
       return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
     }
+    const showSignatureEntry = shouldShowSignatureEntry();
+    setFirstEntry(showSignatureEntry);
+    setEntryReady(!showSignatureEntry);
+    markSignatureEntrySeen();
     setSession(stored);
     if (!Array.isArray(stored.organizations)) {
       void createAuthSessionFromTokens(stored.access_token, stored.refresh_token, stored.expires_at, stored.user).then((freshSession) => {
@@ -80,6 +87,12 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   useEffect(() => {
     fetchClients().then(setClients).catch(() => setClients([]));
   }, []);
+
+  useEffect(() => {
+    if (!checked || !session || !firstEntry || entryReady) return;
+    const frame = window.requestAnimationFrame(() => setEntryReady(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [checked, entryReady, firstEntry, session]);
 
   useEffect(() => {
     if (!notice && !profile && !workspaceOpen) return;
@@ -134,14 +147,14 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       setWorkspaceBusy("");
     }
   };
-  if (!checked || !session) return <main className="auth-loading" aria-live="polite">Opening your secure workspace…</main>;
+  if (!checked || !session) return <BrandedAppLoader />;
   const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
   const nav = APP_NAVIGATION[effectiveRole];
   const displayName = displayNameFor(session.profile);
   const avatar = initials(displayName);
   const accessLabel = organizationRoleLabel(session.organization?.role, session.profile.role);
   const organizations = session.organizations?.length ? session.organizations : session.organization ? [session.organization] : [];
-  return <div className="app-shell" data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}>
+  const shell = <div className="app-shell" data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}>
     <a className="skip-link" href="#workspace-content">Skip to workspace content</a>
     {open && <button type="button" className="shell-overlay" aria-label="Close navigation" onClick={() => setOpen(false)} />}
     <aside className={`sidebar ${open ? "open" : ""}`}>
@@ -166,4 +179,5 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       <div className="content" id="workspace-content" tabIndex={-1}>{children}</div>
     </main>
   </div>;
+  return firstEntry ? <AppEntryTransition ready={entryReady} status="Opening your secure workspace" variant="dark">{shell}</AppEntryTransition> : shell;
 }

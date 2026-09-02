@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
+import { LoadingRegion } from "../../components/loading-system";
 import { appRoleForOrganizationRole } from "../../lib/access-control";
 import { changeOperations, fetchOperations } from "../../lib/operations-api";
 import {
@@ -196,7 +197,7 @@ export default function OperationsPage() {
 
     {error && <p className="integration-notice operations-error" role="alert">{error}</p>}
     {message && <p className="integration-notice operations-success" role="status">{message}</p>}
-    {loading ? <section className="operations-loading"><strong>Loading operations…</strong><span>Checking customer, job, schedule, and approval records.</span></section> : !snapshot ? <section className="empty-state"><h2>Operations workspace unavailable</h2><p>Choose a client or apply the Phase 3 operations migration.</p></section> : <>
+    {loading ? <LoadingRegion active label="Loading operations workspace" variant="operations" /> : !snapshot ? <section className="empty-state"><h2>Operations workspace unavailable</h2><p>Choose a client or apply the Phase 3 operations migration.</p></section> : <>
       <section className="operations-summary" aria-label="Operations summary">
         <div><span>Active jobs</span><strong>{snapshot.summary.activeJobs}</strong><small>In the delivery queue</small></div>
         <div><span>Upcoming</span><strong>{snapshot.summary.upcomingJobs}</strong><small>Scheduled service</small></div>

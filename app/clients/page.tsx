@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientCard } from "../../components/client-card";
 import { Shell } from "../../components/shell";
+import { ButtonLoader, LoadingRegion } from "../../components/loading-system";
 import { FeedbackBanner, PageHeader } from "../../components/ui-foundation";
 import { fetchClients, updateClient } from "../../lib/supabase-data";
 import { readStoredSession } from "../../lib/supabase-auth";
@@ -11,6 +12,7 @@ import { ClientDetail } from "../../lib/types";
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<ClientDetail[]>([]);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("Loading connected clients…");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ClientDetail | null>(null);
@@ -28,7 +30,8 @@ export default function ClientsPage() {
         setClients(rows);
         setMessage(rows.length ? "Connected to Supabase" : "No clients added yet");
       })
-      .catch(() => setMessage("Unable to load live client records. Check the Supabase connection."));
+      .catch(() => setError("Unable to load live client records. Check the Supabase connection."))
+      .finally(() => setLoading(false));
   }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -127,7 +130,8 @@ export default function ClientsPage() {
   return (
     <Shell active="Clients">
       <PageHeader eyebrow="Workspace" title="Clients" description="A clear, current view of every account you manage." actions={<button className="button button-dark" type="button" onClick={openCreate}>Add client</button>} />
-      {message && <FeedbackBanner tone="success" title="Client workspace updated"><p>{message}</p></FeedbackBanner>}
+      {!loading && message && <FeedbackBanner tone="success" title="Client workspace updated"><p>{message}</p></FeedbackBanner>}
+      {error && !showForm && <FeedbackBanner tone="error" title="Client records unavailable"><p>{error}</p></FeedbackBanner>}
 
       {showForm && (
         <form className="detail-card client-form" onSubmit={submit}>
@@ -171,7 +175,7 @@ export default function ClientsPage() {
           {error && <p className="login-notice error">{error}</p>}
           <div className="form-actions">
             <button className="button button-dark" disabled={busy}>
-              {busy ? "Saving…" : editing ? "Save changes" : "Save client"}
+              <span>{editing ? "Save changes" : "Save client"}</span>{busy && <ButtonLoader />}
             </button>
             <button className="button button-secondary" type="button" onClick={closeForm}>
               Cancel
@@ -187,7 +191,7 @@ export default function ClientsPage() {
 
       {activationLink && <section className="detail-card activation-link-card" aria-live="polite"><div><p className="eyebrow">{activationDelivery?.sent ? "Activation email accepted" : "Activation link ready"}</p><h2>{activationDelivery?.sent ? `Invitation sent to ${activationDelivery.email}` : "Copy and send this secure link"}</h2><p>{activationDelivery?.sent ? "Resend accepted the branded invitation. Keep this private link as a fallback in case the client needs it again." : "The email provider did not accept the invitation. Copy this private link and send it to the client manually."}</p>{!activationDelivery?.sent && activationDelivery?.error && <small className="updated">{activationDelivery.error}</small>}</div><div className="activation-link-row"><input aria-label="Client activation link" readOnly value={activationLink} onFocus={(event) => event.currentTarget.select()} /><button className="button button-dark" type="button" onClick={() => void navigator.clipboard?.writeText(activationLink)}>{activationDelivery?.sent ? "Copy fallback link" : "Copy link"}</button></div></section>}
 
-      <section className="client-grid client-grid-wide">
+      {loading ? <LoadingRegion active label="Loading connected client records" variant="clients" /> : <section className="client-grid client-grid-wide">
         {clients.map((client) => (
           <article className="client-account-card" key={client.id}>
             <ClientCard client={client} />
@@ -204,7 +208,7 @@ export default function ClientsPage() {
             </div>
           </article>
         ))}
-      </section>
+      </section>}
     </Shell>
   );
 }

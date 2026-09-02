@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
+import { LoadingRegion } from "../../components/loading-system";
 import { changeMarketing, fetchMarketing } from "../../lib/marketing-api";
 import {
   CAMPAIGN_TYPES,
@@ -170,7 +171,7 @@ export default function CampaignsPage() {
     {error && <p className="integration-notice marketing-error" role="alert">{error}</p>}
     {message && <p className="integration-notice marketing-success" role="status">{message}</p>}
 
-    {loading ? <section className="marketing-loading"><strong>Loading campaigns…</strong><span>Checking contacts, consent, delivery, and completed service records.</span></section> : !snapshot ? <section className="empty-state"><h2>Campaigns workspace unavailable</h2><p>Choose a client or apply the Phase 4 marketing migration.</p></section> : <>
+    {loading ? <LoadingRegion active label="Loading campaigns workspace" variant="campaigns" /> : !snapshot ? <section className="empty-state"><h2>Campaigns workspace unavailable</h2><p>Choose a client or apply the Phase 4 marketing migration.</p></section> : <>
       <section className="marketing-summary" aria-label="Campaign summary">
         <div><span>Drafts</span><strong>{snapshot.summary.drafts}</strong><small>Waiting for review</small></div>
         <div><span>Sent</span><strong>{snapshot.summary.sentCampaigns}</strong><small>Completed campaigns</small></div>

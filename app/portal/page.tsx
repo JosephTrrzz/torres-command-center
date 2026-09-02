@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Shell } from "../../components/shell";
+import { LoadingRegion } from "../../components/loading-system";
 import { fetchClient, fetchClientPeople, fetchCustomerAccount, fetchCustomerAccountByEmail } from "../../lib/supabase-data";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { fetchOnboarding } from "../../lib/onboarding-api";
@@ -115,7 +116,7 @@ export default function PortalPage() {
   return (
     <Shell active="Portal">
       {loading ? (
-        <section className="portal-empty"><span className="eyebrow">Customer portal</span><h1>Loading your workspace…</h1><p>We’re securely finding the company account connected to your sign-in.</p></section>
+        <LoadingRegion active label="Loading the secure customer portal" variant="dashboard" />
       ) : message ? (
         <section className="portal-empty"><span className="eyebrow">Customer portal</span><h1>Your workspace is almost ready</h1><p>{message}</p><Link className="button button-dark" href="/login/?returnTo=/portal/">Sign in to customer portal</Link></section>
       ) : client && account ? (

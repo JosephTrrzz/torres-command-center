@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
+import { LoadingRegion } from "../../components/loading-system";
 import { appRoleForOrganizationRole } from "../../lib/access-control";
 import { changeProject, fetchProjects } from "../../lib/projects-api";
 import {
@@ -171,7 +172,7 @@ export default function ProjectsPage() {
 
     {error && <p className="integration-notice projects-error" role="alert">{error}</p>}
     {message && <p className="integration-notice projects-success" role="status">{message}</p>}
-    {loading ? <section className="projects-loading" aria-live="polite"><strong>Loading project workspace…</strong><span>Checking the client scope and current delivery records.</span></section> : !snapshot ? <section className="empty-state"><h2>Project workspace unavailable</h2><p>Choose a client or retry after the project database migration is applied.</p></section> : <>
+    {loading ? <LoadingRegion active label="Loading project workspace" variant="projects" /> : !snapshot ? <section className="empty-state"><h2>Project workspace unavailable</h2><p>Choose a client or retry after the project database migration is applied.</p></section> : <>
       <section className="project-summary" aria-label="Project workspace summary">
         <div><span>Projects</span><strong>{snapshot.projects.length}</strong><small>Live client records</small></div>
         <div><span>Milestones complete</span><strong>{completedMilestones}</strong><small>Measured checkpoints</small></div>

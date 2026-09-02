@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
+import { ButtonLoader, LoadingRegion } from "../../components/loading-system";
 import { changeCrm, fetchCrm } from "../../lib/crm-api";
 import {
   APPOINTMENT_STATUSES,
@@ -287,7 +288,7 @@ export default function CrmPage() {
           <span><i aria-hidden="true" />{lastUpdatedAt ? `Updated ${lastUpdatedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connecting…"}</span>
           <button type="button" onClick={() => void refreshPipeline()} disabled={!session || refreshing} aria-label="Refresh CRM leads">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>
-            {refreshing ? "Refreshing…" : "Refresh leads"}
+            <span>Refresh leads</span>{refreshing && <ButtonLoader />}
           </button>
         </div>
       </div>
@@ -295,7 +296,7 @@ export default function CrmPage() {
 
     {error && <p className="integration-notice crm-error" role="alert">{error}</p>}
     {message && <p className="integration-notice crm-success" role="status">{message}</p>}
-    {loading ? <section className="crm-loading"><strong>Loading agency pipeline…</strong><span>Checking assignments, appointments, tasks, and activity.</span></section> : !snapshot ? <section className="empty-state"><h2>CRM is unavailable</h2><p>The agency pipeline could not be loaded.</p></section> : <>
+    {loading ? <LoadingRegion active label="Loading agency pipeline" variant="crm" /> : !snapshot ? <section className="empty-state"><h2>CRM is unavailable</h2><p>The agency pipeline could not be loaded.</p></section> : <>
       <section className="crm-summary" aria-label="CRM summary">
         <article><span>Active leads</span><strong>{snapshot.summary.activeLeads}</strong><small>{snapshot.summary.wonLeads} won</small></article>
         <article><span>Unassigned</span><strong>{snapshot.summary.unassigned}</strong><small>Needs an owner</small></article>

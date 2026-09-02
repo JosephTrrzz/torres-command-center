@@ -3,6 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
+import { ButtonLoader, LoadingRegion } from "../../components/loading-system";
 import { appRoleForOrganizationRole } from "../../lib/access-control";
 import {
   changeCommunications,
@@ -405,7 +406,7 @@ export default function InboxPage() {
               </span>
               <button className="inbox-refresh-button" type="button" onClick={refreshInbox} disabled={refreshing || loading} aria-label="Refresh inbox messages">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M18.1 9A7 7 0 0 0 6.4 6.4L4 9m16 6-2.4 2.6A7 7 0 0 1 5.9 15" /></svg>
-                {refreshing ? "Refreshing…" : "Refresh"}
+                <span>Refresh</span>{refreshing && <ButtonLoader />}
               </button>
             </div>
           </div>
@@ -418,7 +419,7 @@ export default function InboxPage() {
       </div>
 
       {loading ? (
-        <section className="operations-loading"><strong>Loading shared inbox…</strong><span>Checking secure client conversations and message history.</span></section>
+        <LoadingRegion active label="Loading secure conversations" variant="inbox" />
       ) : !snapshot ? (
         <section className="empty-state"><h2>Inbox unavailable</h2><p>Choose a client or apply the Phase 4 communications migration.</p></section>
       ) : (

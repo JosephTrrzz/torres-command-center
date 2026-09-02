@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
+import { LoadingRegion } from "../../components/loading-system";
 import { fetchOnboarding, saveOnboardingStep } from "../../lib/onboarding-api";
 import { ONBOARDING_STEPS, emptyOnboardingData, type OnboardingData, type OnboardingGoal, type OnboardingService, type OnboardingSnapshot, type OnboardingStepKey } from "../../lib/onboarding";
 import { readStoredSession } from "../../lib/supabase-auth";
@@ -66,7 +67,7 @@ export default function OnboardingPage() {
     } finally { setBusy(false); }
   }
 
-  if (loading) return <Shell active="Onboarding"><section className="onboarding-loading"><span className="eyebrow">Secure onboarding</span><h1>Opening the business profile…</h1><p>Loading saved progress and workspace permissions.</p></section></Shell>;
+  if (loading) return <Shell active="Onboarding"><LoadingRegion active label="Opening the secure business profile" variant="clients" /></Shell>;
   if (!snapshot) return <Shell active="Onboarding"><section className="empty-state"><span className="eyebrow">Onboarding unavailable</span><h1>We couldn’t open this profile</h1><p>{error}</p><Link className="button button-dark" href={adminMode ? "/clients/" : "/portal/"}>Return to workspace</Link></section></Shell>;
 
   return <Shell active="Onboarding">
