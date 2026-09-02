@@ -38,7 +38,7 @@ Updated 2026-09-02.
 
 ## Verified baseline
 
-On 2026-09-02: 104 unit tests, application TypeScript, Cloudflare Function TypeScript, and the Next.js production build passed. The integration automation migration is additive and creates no client or provider records.
+On 2026-09-02: 108 unit tests, application TypeScript, Cloudflare Function TypeScript, and the Next.js production build passed. The integration automation and Apple Calendar migrations are additive and create no client, provider, or calendar-subscription records.
 
 ## Known limitations
 
