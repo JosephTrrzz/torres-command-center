@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
+import { ClientPrivateOfficeHome } from "../../components/client-private-office-home";
 import { FeedbackBanner, PageHeader, StatePanel } from "../../components/ui-foundation";
+import { appRoleForOrganizationRole } from "../../lib/access-control";
 import { fetchNotifications, type WorkspaceNotification } from "../../lib/notifications";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { fetchClients } from "../../lib/supabase-data";
 import { buildTodayPriorities, type TodayReport } from "../../lib/today";
-import type { ClientDetail } from "../../lib/types";
+import type { AuthSession, ClientDetail } from "../../lib/types";
 
 export default function TodayPage() {
   const [clients, setClients] = useState<ClientDetail[]>([]);
@@ -16,10 +18,17 @@ export default function TodayPage() {
   const [notifications, setNotifications] = useState<WorkspaceNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [viewerSession, setViewerSession] = useState<AuthSession | null>(null);
+  const [roleChecked, setRoleChecked] = useState(false);
 
   useEffect(() => {
     const session = readStoredSession();
-    if (!session) return;
+    setViewerSession(session);
+    setRoleChecked(true);
+    if (!session || appRoleForOrganizationRole(session.organization?.role, session.profile.role) === "customer") {
+      setLoading(false);
+      return;
+    }
 
     const load = async () => {
       try {
@@ -61,6 +70,9 @@ export default function TodayPage() {
   const unread = notifications.filter((notification) => !notification.read).length;
   const attention = clients.filter((client) => client.health < 80).length;
   const dateLabel = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+
+  if (!roleChecked) return <Shell active="Today"><StatePanel state="loading" title="Opening your workspace" description="Confirming your secure account access." /></Shell>;
+  if (viewerSession && appRoleForOrganizationRole(viewerSession.organization?.role, viewerSession.profile.role) === "customer") return <Shell active="Today"><ClientPrivateOfficeHome session={viewerSession} /></Shell>;
 
   return <Shell active="Today">
     <PageHeader className="today-heading" eyebrow={dateLabel} title="Today" description="Your live operating brief, prioritized from connected workspace activity." actions={<Link className="button button-dark" href="/reports/">Review reports <span aria-hidden="true">→︎</span></Link>} />

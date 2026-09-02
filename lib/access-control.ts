@@ -38,6 +38,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
     { href: "/projects/", label: "Projects" },
     { href: "/operations/", label: "Operations" },
     { href: "/inbox/", label: "Inbox" },
+    { href: "/reports/", label: "Reports" },
     { href: "/portal/", label: "My account" },
   ],
 };
@@ -59,7 +60,7 @@ export function organizationRoleLabel(role: OrganizationRole | undefined, legacy
 }
 
 export function defaultRouteForRole(role: AppRole) {
-  return role === "customer" ? "/portal/" : "/";
+  return role === "customer" ? "/today/" : "/";
 }
 
 export function isSafeReturnTo(path: string | null) {
@@ -78,7 +79,7 @@ function matchesRoute(pathname: string, route: string) {
 export function canAccessPath(role: AppRole, pathname: string) {
   if (matchesRoute(pathname, "/login")) return true;
   if (role === "owner") return true;
-  if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects") || matchesRoute(pathname, "/operations") || matchesRoute(pathname, "/inbox");
+  if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects") || matchesRoute(pathname, "/operations") || matchesRoute(pathname, "/inbox") || matchesRoute(pathname, "/reports");
 
   const employeeRoots = ["/today", "/clients", "/crm", "/projects", "/operations", "/inbox", "/campaigns", "/integrations", "/reports", "/portal"];
   return pathname === "/" || employeeRoots.some((root) => matchesRoute(pathname, root));

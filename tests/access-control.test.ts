@@ -15,6 +15,7 @@ describe("role access control", () => {
     expect(canAccessPath("customer", "/projects/")).toBe(true);
     expect(canAccessPath("customer", "/operations/")).toBe(true);
     expect(canAccessPath("customer", "/inbox/")).toBe(true);
+    expect(canAccessPath("customer", "/reports/")).toBe(true);
     expect(canAccessPath("customer", "/crm/")).toBe(false);
     expect(canAccessPath("customer", "/portal/account/")).toBe(true);
     expect(canAccessPath("customer", "/portal-impersonation/")).toBe(false);
@@ -35,7 +36,7 @@ describe("role access control", () => {
 
   it("uses safe role landing pages", () => {
     expect(defaultRouteForRole("owner")).toBe("/");
-    expect(defaultRouteForRole("customer")).toBe("/portal/");
+    expect(defaultRouteForRole("customer")).toBe("/today/");
   });
 
   it("rejects external and protocol-relative return paths", () => {

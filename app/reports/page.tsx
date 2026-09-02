@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
-import { fetchClients } from "../../lib/supabase-data";
+import { fetchClient, fetchClients } from "../../lib/supabase-data";
 import { ClientDetail } from "../../lib/types";
 import { readStoredSession } from "../../lib/supabase-auth";
+import { appRoleForOrganizationRole } from "../../lib/access-control";
+import { fetchProjects } from "../../lib/projects-api";
 
 type ReportData = { clientId: string; available?: boolean; analytics?: { totals?: { sessions: number; activeUsers: number; pageViews: number; conversions: number } } | null; searchConsole?: { totals?: { clicks: number; impressions: number } } | null; errors?: string[] };
 const reportDefinitions = [
@@ -20,6 +22,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [clientView, setClientView] = useState(false);
   const selected = reportDefinitions.find((report) => report.id === selectedId) ?? reportDefinitions[0];
   const averageHealth = useMemo(() => clients.length ? Math.round(clients.reduce((sum, client) => sum + client.health, 0) / clients.length) : null, [clients]);
   const generatedDate = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(new Date());
@@ -27,14 +30,22 @@ export default function ReportsPage() {
 
   useEffect(() => {
     const session = readStoredSession();
-    fetchClients().then(async (loadedClients) => {
+    const isCustomer = Boolean(session && appRoleForOrganizationRole(session.organization?.role, session.profile.role) === "customer");
+    setClientView(isCustomer);
+    const loadPermittedClients = async () => {
+      if (!session || !isCustomer) return fetchClients();
+      const clientId = session.profile.client_id || (await fetchProjects(session)).client.id;
+      const customer = await fetchClient(clientId);
+      return customer ? [customer] : [];
+    };
+    loadPermittedClients().then(async (loadedClients) => {
       setClients(loadedClients);
       const results = await Promise.all(loadedClients.map(async (client) => {
         try { const response = await fetch(`/api/reports?client=${encodeURIComponent(client.id)}`, { cache: "no-store", headers: { Authorization: `Bearer ${session?.access_token ?? ""}` } }); return response.ok ? await response.json() as ReportData : { clientId: client.id, errors: ["Report metrics could not be loaded."] }; }
         catch { return { clientId: client.id, errors: ["Report metrics could not be loaded."] }; }
       }));
       setReportData(results);
-    }).catch(() => setError("Connect Supabase to load live report data.")).finally(() => { setLoading(false); setMetricsLoading(false); });
+    }).catch(() => setError(isCustomer ? "Your tenant-scoped performance data could not be loaded." : "Connect Supabase to load live report data.")).finally(() => { setLoading(false); setMetricsLoading(false); });
   }, []);
 
   function downloadReport() {
@@ -44,7 +55,7 @@ export default function ReportsPage() {
   }
 
   return <Shell active="Reports">
-    <div className="page-heading"><div><p className="eyebrow">Reporting studio</p><h1>Reports</h1><p className="lede">Review live performance evidence before printing or exporting it for a client or leadership meeting.</p></div><div className="report-actions"><button className="button button-light" onClick={() => window.print()} disabled={!clients.length}>Print / Save PDF</button><button className="button button-dark" onClick={downloadReport} disabled={!clients.length}>Download report <span>↓︎</span></button></div></div>
+    <div className="page-heading"><div><p className="eyebrow">{clientView ? "Private performance" : "Reporting studio"}</p><h1>{clientView ? "Performance" : "Reports"}</h1><p className="lede">{clientView ? "A private, evidence-backed view of your connected website and search performance." : "Review live performance evidence before printing or exporting it for a client or leadership meeting."}</p></div><div className="report-actions"><button className="button button-light" onClick={() => window.print()} disabled={!clients.length}>Print / Save PDF</button><button className="button button-dark" onClick={downloadReport} disabled={!clients.length}>Download report <span>↓︎</span></button></div></div>
     {error && <p className="integration-notice">{error}</p>}
     <section className="report-grid" aria-label="Report types">{reportDefinitions.map((report, index) => <button className={`report-card ${selectedId === report.id ? "selected" : ""}`} key={report.id} onClick={() => setSelectedId(report.id)}><span className="eyebrow">Report 0{index + 1}</span><h2>{report.label}</h2><p>{report.description}</p><strong>Preview report →︎</strong></button>)}</section>
     <section className="report-document" aria-label="Report preview"><header className="report-document-header"><div><p className="eyebrow">Torres &amp; Co. Technology</p><h2>{selected.label}</h2><p>Prepared {generatedDate}</p></div><span className="report-document-mark">TC</span></header>

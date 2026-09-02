@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const shell = readFileSync(join(process.cwd(), "components", "shell.tsx"), "utf8");
 const portal = readFileSync(join(process.cwd(), "app", "portal", "page.tsx"), "utf8");
+const clientHome = readFileSync(join(process.cwd(), "components", "client-private-office-home.tsx"), "utf8");
 const login = readFileSync(join(process.cwd(), "app", "login", "page.tsx"), "utf8");
 const component = readFileSync(join(process.cwd(), "components", "private-office.tsx"), "utf8");
 const styles = readFileSync(join(process.cwd(), "app", "private-office-production.css"), "utf8");
@@ -13,15 +14,18 @@ describe("Private Office production integration", () => {
   it("keeps the role-aware shell while presenting client language", () => {
     expect(shell).toContain('data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}');
     expect(shell).toContain('Today: "Home"');
+    expect(shell).toContain('Reports: "Performance"');
     expect(shell).toContain('"My account": "Account"');
     expect(shell).toContain("Private Office");
   });
 
   it("builds the client arrival from live portal values", () => {
-    expect(portal).toContain("PrivateOfficePortfolioPanel");
-    expect(portal).toContain("businessName={client.name}");
-    expect(portal).toContain("clientSince={account.created_at}");
-    expect(portal).toContain("people[0]?.name || account.portal_email");
+    expect(clientHome).toContain("PrivateOfficePortfolioPanel");
+    expect(clientHome).toContain("businessName={client.name}");
+    expect(clientHome).toContain("clientSince={account.created_at}");
+    expect(clientHome).toContain("people[0]?.name || account.portal_email");
+    expect(clientHome).toContain("fetchNotifications(session)");
+    expect(portal).toContain("AccountIdentityEditor");
     expect(component).not.toContain("$12,400");
   });
 

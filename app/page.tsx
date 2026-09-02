@@ -16,12 +16,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reportData, setReportData] = useState<OverviewReport[]>([]);
+  const [viewerName, setViewerName] = useState("there");
   const healthy = clients.filter((client) => client.status === "healthy").length;
   const averageHealth = useMemo(() => clients.length ? Math.round(clients.reduce((sum, client) => sum + client.health, 0) / clients.length) : null, [clients]);
   const totals = useMemo(() => reportData.reduce((sum, report) => ({ sessions: sum.sessions + (report.analytics?.totals?.sessions || 0), clicks: sum.clicks + (report.searchConsole?.totals?.clicks || 0), impressions: sum.impressions + (report.searchConsole?.totals?.impressions || 0) }), { sessions: 0, clicks: 0, impressions: 0 }), [reportData]);
 
   useEffect(() => {
     const session = readStoredSession();
+    const savedName = session?.profile.full_name.trim().split(/\s+/)[0];
+    const emailName = (session?.profile.email || session?.user.email || "").split("@")[0].split(/[._-]/)[0];
+    setViewerName(savedName || (emailName ? emailName.charAt(0).toUpperCase() + emailName.slice(1).toLowerCase() : "there"));
     fetchClients().then(async (loadedClients) => {
       setClients(loadedClients);
       const results = await Promise.all(loadedClients.map(async (client) => {
@@ -37,7 +41,7 @@ export default function DashboardPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   return <Shell active="Overview">
-    <div className="page-heading"><div><p className="eyebrow">{dateLabel}</p><h1>{greeting}, Joseph.</h1><p className="lede">Here’s what’s happening across your client portfolio.</p></div><Link className="button button-dark" href="/clients">View all clients <span>→︎</span></Link></div>
+    <div className="page-heading"><div><p className="eyebrow">{dateLabel}</p><h1>{greeting}, {viewerName}.</h1><p className="lede">Here’s what’s happening across your client portfolio.</p></div><Link className="button button-dark" href="/clients">View all clients <span>→︎</span></Link></div>
     <section className="stat-grid" aria-label="Portfolio summary"><div className="stat-card"><span>Portfolio health</span><strong>{averageHealth ?? "—"}<span className="muted">{averageHealth === null ? "" : "/100"}</span></strong><small className="neutral">Live client health scores</small></div><div className="stat-card"><span>GA4 sessions</span><strong>{loading ? "—" : totals.sessions.toLocaleString()}</strong><small className={totals.sessions ? "positive" : "neutral"}>{totals.sessions ? "Last 28 days" : "Awaiting a mapped property"}</small></div><div className="stat-card"><span>Search clicks</span><strong>{loading ? "—" : totals.clicks.toLocaleString()}</strong><small className={totals.clicks ? "positive" : "neutral"}>{totals.clicks ? `${totals.impressions.toLocaleString()} impressions` : "Awaiting Search Console data"}</small></div><div className="stat-card"><span>Clients monitored</span><strong>{clients.length}</strong><small className="positive">{healthy} healthy <em>right now</em></small></div></section>
     <section className="integration-banner"><div><p className="eyebrow">Proof layer</p><h2>Connect the signals behind every client scorecard.</h2><p>Bring reviews, traffic, search visibility, and website performance into one place.</p></div><Link className="button button-dark" href="/integrations/">Manage integrations <span>→︎</span></Link></section>
     <div className="section-heading"><div><p className="eyebrow">Your portfolio</p><h2>Client health</h2></div><Link className="text-link" href="/clients">See all clients →︎</Link></div>

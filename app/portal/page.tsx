@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Shell } from "../../components/shell";
 import { LoadingRegion } from "../../components/loading-system";
-import { PrivateOfficeNextAction, PrivateOfficePortfolioPanel } from "../../components/private-office";
 import { AccountIdentityEditor } from "../../components/profile-picture-editor";
+import { PageHeader } from "../../components/ui-foundation";
 import { fetchClient, fetchClientPeople, fetchCustomerAccount, fetchCustomerAccountByEmail } from "../../lib/supabase-data";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { fetchOnboarding } from "../../lib/onboarding-api";
@@ -37,7 +37,6 @@ export default function PortalPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [onboarding, setOnboarding] = useState<OnboardingSnapshot | null>(null);
-  const [viewerName, setViewerName] = useState("there");
 
   useEffect(() => {
     let cancelled = false;
@@ -46,8 +45,6 @@ export default function PortalPage() {
       const requestedPreviewClientId = new URLSearchParams(window.location.search).get("previewClient") || "";
       setPreviewClientId(requestedPreviewClientId);
       const session = readStoredSession();
-      const firstName = session?.profile.full_name.trim().split(/\s+/)[0];
-      if (firstName) setViewerName(firstName);
       if (requestedPreviewClientId) {
         if (!session || session.profile.role === "customer") {
           if (!cancelled) {
@@ -128,17 +125,7 @@ export default function PortalPage() {
         <>
           {previewClientId && <div className="portal-preview-banner"><strong>Admin preview</strong><span>The portal content below is client-facing. Your admin navigation stays visible so you can exit safely.</span><Link href="/clients/">Exit preview →︎</Link></div>}
           {onboarding && onboarding.status !== "complete" && <div className="onboarding-portal-banner"><div><span className="eyebrow">Finish account setup</span><strong>Your business profile is {onboarding.completionPercent}% complete.</strong><p>Complete the guided steps so reports, recommendations, and workspace details use accurate business information.</p></div><Link className="button button-dark" href={`/onboarding/${previewClientId ? `?client=${encodeURIComponent(client.id)}` : ""}`}>Continue onboarding <span>→︎</span></Link></div>}
-          <section className="private-office-arrival">
-            <div><span className="private-office-kicker">Private Office</span><h1>Welcome back, {viewerName}.</h1><p>A composed view of your relationship with Torres &amp; Co.—current work, account standing, performance, and the next useful action.</p></div>
-            <aside><span>Account standing</span><strong>{account.portal_status === "active" ? "In good standing" : formatStatus(account.portal_status)}</strong><small>{client.name}</small></aside>
-          </section>
-
-          <div className="private-office-home-grid">
-            <PrivateOfficePortfolioPanel businessName={client.name} clientSince={account.created_at} servicePlan={client.services[0]} accountStatus={account.portal_status === "active" ? "Relationship active" : formatStatus(account.portal_status)} contact={people[0]?.name || account.portal_email} recordId={client.id} />
-            <PrivateOfficeNextAction href={onboarding && onboarding.status !== "complete" ? `/onboarding/${previewClientId ? `?client=${encodeURIComponent(client.id)}` : ""}` : previewClientId ? `/projects/?client=${encodeURIComponent(client.id)}` : "/projects/"} eyebrow="Next action" title={onboarding && onboarding.status !== "complete" ? "Complete your private profile" : "Review current work"} description={onboarding && onboarding.status !== "complete" ? "Finish the remaining setup details so every recommendation and report reflects your business accurately." : "Open your project portfolio to review milestones, deliverables, dates, and requests."} label={onboarding && onboarding.status !== "complete" ? "Continue setup" : "Open projects"} />
-          </div>
-
-          <div className="private-office-chapter-heading"><span className="private-office-kicker">Your office</span><h2>Everything connected to your account.</h2><p>Operational details remain available below, organized by the decision or task they support.</p></div>
+          <PageHeader className="private-office-account-heading" eyebrow="Private Office account" title="Your account" description="Identity, company details, contacts, billing status, and connected services for this private workspace." actions={<div className="private-office-account-standing"><span>Account standing</span><strong>{account.portal_status === "active" ? "In good standing" : formatStatus(account.portal_status)}</strong><small>{client.name}</small></div>} />
 
           <div className="portal-grid">
             {!previewClientId && <AccountIdentityEditor surface="portal" />}
