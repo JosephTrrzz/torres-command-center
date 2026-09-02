@@ -41,6 +41,7 @@ Status: complete for the protected operations vertical slice.
 - Lead capture, assignment, explicit pipeline status, appointments, follow-up tasks, and activity history: implemented, migrated, and production-verified as the first protected vertical slice.
 - The completed workflow runs website/referral lead → assignment → appointment → follow-up task without seeded demo data.
 - Customer 360, jobs, schedules, estimates, documents, client approvals, activity, and task/calendar operations are implemented, migrated, and production-verified.
+- Secure Apple Calendar subscription: implemented as a revocable, read-only Operations feed with staff/client visibility boundaries; migration applied and user handoff smoke verification pending.
 
 ## Phase 4 — communications and marketing
 

@@ -5,6 +5,7 @@ import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { LoadingRegion } from "../../components/loading-system";
 import { appRoleForOrganizationRole } from "../../lib/access-control";
+import { changeAppleCalendar } from "../../lib/calendar-api";
 import { changeOperations, fetchOperations } from "../../lib/operations-api";
 import {
   DOCUMENT_STATUSES,
@@ -53,6 +54,8 @@ export default function OperationsPage() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [appleCalendarUrl, setAppleCalendarUrl] = useState("");
+  const [appleCalendarHttpsUrl, setAppleCalendarHttpsUrl] = useState("");
   const [jobForm, setJobForm] = useState({ title: "", description: "", leadId: "", projectId: "", priority: "normal", assignedTo: "", locationId: "", scheduledStart: "", scheduledEnd: "", clientVisible: true });
   const [locationForm, setLocationForm] = useState({ label: "", addressLine1: "", city: "", region: "", postalCode: "", country: "US", accessNotes: "", isPrimary: false });
   const [noteForm, setNoteForm] = useState({ title: "", detail: "", clientVisible: false });
@@ -106,11 +109,45 @@ export default function OperationsPage() {
     if (!session) return;
     setSelectedClientId(clientId);
     setMessage("");
+    setAppleCalendarUrl("");
+    setAppleCalendarHttpsUrl("");
     const url = new URL(window.location.href);
     url.searchParams.set("client", clientId);
     url.searchParams.delete("job");
     window.history.replaceState({}, "", url);
     void loadWorkspace(session, clientId);
+  };
+
+  const updateAppleCalendar = async (action: "create" | "revoke") => {
+    if (!session || !snapshot) return;
+    setBusy(`apple-calendar-${action}`);
+    setError("");
+    setMessage("");
+    try {
+      const response = await changeAppleCalendar(session, snapshot.client.id || selectedClientId, action);
+      if (action === "create") {
+        setAppleCalendarUrl(response.subscriptionUrl || "");
+        setAppleCalendarHttpsUrl(response.httpsUrl || "");
+      } else {
+        setAppleCalendarUrl("");
+        setAppleCalendarHttpsUrl("");
+      }
+      setMessage(response.message || "Apple Calendar updated.");
+    } catch (calendarError) {
+      setError(calendarError instanceof Error ? calendarError.message : "Apple Calendar could not be updated.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const copyAppleCalendarLink = async () => {
+    if (!appleCalendarHttpsUrl) return;
+    try {
+      await navigator.clipboard.writeText(appleCalendarHttpsUrl);
+      setMessage("Private Apple Calendar link copied.");
+    } catch {
+      setError("The private link could not be copied. Select it and copy it manually.");
+    }
   };
 
   const chooseJob = (jobId: string) => {
@@ -255,7 +292,19 @@ export default function OperationsPage() {
         {selectedJob && <JobWorkspace job={selectedJob} snapshot={snapshot} busy={busy} noteForm={noteForm} setNoteForm={setNoteForm} taskForm={taskForm} setTaskForm={setTaskForm} estimateForm={estimateForm} setEstimateForm={setEstimateForm} estimateItems={estimateItems} setEstimateItems={setEstimateItems} estimatePreview={estimatePreview} documentForm={documentForm} setDocumentForm={setDocumentForm} updateJob={updateJob} addNote={addNote} createTask={createTask} createEstimate={createEstimate} createDocument={createDocument} mutate={mutate} />}
       </div>}
 
-      <section className="operations-panel operations-calendar"><div className="operations-section-heading"><div><p className="eyebrow">Shared calendar</p><h2>Upcoming delivery schedule</h2></div><span>{snapshot.calendar.length} scheduled items</span></div>{snapshot.calendar.length ? <div className="calendar-agenda">{snapshot.calendar.slice(0, 20).map((item) => <article key={`${item.kind}-${item.id}`}><time>{dateTimeLabel(item.starts_at)}</time><span>{labelOperationsValue(item.kind)}</span><strong>{item.title}</strong><small>{labelOperationsValue(item.status)}</small></article>)}</div> : <p className="operations-inline-empty">Nothing is scheduled yet. Add a job date, appointment, or task deadline.</p>}</section>
+      <section className="operations-panel operations-calendar">
+        <div className="operations-section-heading"><div><p className="eyebrow">Shared calendar</p><h2>Upcoming delivery schedule</h2></div><span>{snapshot.calendar.length} scheduled items</span></div>
+        <div className="apple-calendar-panel">
+          <div><span className="apple-calendar-mark" aria-hidden="true">Cal</span><div><strong>Apple Calendar</strong><p>Subscribe to this live schedule. Apple controls refresh timing, and your private link stays active until you revoke it.</p></div></div>
+          {!appleCalendarUrl ? <button className="button button-dark" type="button" disabled={busy.startsWith("apple-calendar-")} onClick={() => void updateAppleCalendar("create")}>{busy === "apple-calendar-create" ? "Preparing…" : "Connect Apple Calendar"}</button> : <div className="apple-calendar-actions">
+            <a className="button button-dark" href={appleCalendarUrl}>Open in Apple Calendar</a>
+            <button className="text-button" type="button" onClick={() => void copyAppleCalendarLink()}>Copy private link</button>
+            <button className="text-button danger-link" type="button" disabled={busy === "apple-calendar-revoke"} onClick={() => void updateAppleCalendar("revoke")}>{busy === "apple-calendar-revoke" ? "Revoking…" : "Revoke link"}</button>
+          </div>}
+          {appleCalendarHttpsUrl && <label className="apple-calendar-link">Private subscription URL<input readOnly value={appleCalendarHttpsUrl} onFocus={(event) => event.currentTarget.select()} /></label>}
+        </div>
+        {snapshot.calendar.length ? <div className="calendar-agenda">{snapshot.calendar.slice(0, 20).map((item) => <article key={`${item.kind}-${item.id}`}><time>{dateTimeLabel(item.starts_at)}</time><span>{labelOperationsValue(item.kind)}</span><strong>{item.title}</strong><small>{labelOperationsValue(item.status)}</small></article>)}</div> : <p className="operations-inline-empty">Nothing is scheduled yet. Add a job date, appointment, or task deadline.</p>}
+      </section>
     </>}
   </Shell>;
 }

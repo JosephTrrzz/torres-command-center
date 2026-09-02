@@ -19,7 +19,7 @@ Updated 2026-09-02.
 | Business Profile | External gate | Google project quota remains 0 QPM pending API approval. |
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
 | CRM | Live vertical slice | Organization-wide pipeline, client-linked lead capture, pinning, assignment, updates, appointments, follow-up tasks, activity history, secure first-party website intake with Formspree email notification, qualified website-chat transcripts with reversible archiving, and provider-tracked direct replies. |
-| Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, customer-safe visibility, and provider-tracked estimate approvals. |
+| Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, customer-safe visibility, provider-tracked estimate approvals, and a revocable read-only Apple Calendar feed. |
 | Shared inbox | Phase 4 vertical slice | Email and client-account conversations, profile-named agency/client replies, durable categories, reversible staff archiving, priorities, statuses, notifications, audit/outbox history, provider-backed email delivery, private attachments, and automatic signature/confidentiality notices. Qualified website chat is routed to its CRM lead record. |
 | SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
 | Campaigns and review requests | Phase 4B ready to migrate | Client-scoped drafts, consent basis, recipient review, durable suppression, staff test sends, explicit production confirmation, unsubscribe handling, and provider delivery truth. |
@@ -47,6 +47,7 @@ On 2026-09-02: 104 unit tests, application TypeScript, Cloudflare Function TypeS
 - Some preferences remain browser-local and are not yet portable across devices.
 - Business Profile metrics cannot load until Google grants API quota.
 - Operational documents currently use validated HTTPS resource links; managed file uploads and storage lifecycle controls remain a later enhancement.
+- Apple Calendar is a read-only subscription and Apple controls its refresh interval. Two-way Apple event import and editing are not enabled.
 - Secure in-app communications, branded transactional email, controlled campaign/review-request delivery, the AI receptionist, and the consent-safe SMS/voice data and webhook foundation are implemented. Qualified website chats are retained as private CRM transcripts and staff replies pause the AI for that conversation. Live SMS/voice delivery requires Twilio credentials and a verified sender.
 - AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
 - Reports are live but still need persisted snapshots, provenance display, scheduled delivery, and broader tests.

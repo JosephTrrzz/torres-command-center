@@ -59,3 +59,13 @@ Use this checklist before calling a backend or provider production-ready.
 ## Planned providers
 
 PageSpeed, Cloudflare telemetry, Square, email, SMS/voice, storage, and AI remain unchecked until their adapters, secrets, server routes, mapping, sync, errors, disconnect flow, tests, and production smoke checks are complete.
+
+## Apple Calendar
+
+- [x] Use a revocable read-only iCalendar subscription; do not store Apple ID credentials.
+- [x] Store only the SHA-256 hash of each high-entropy subscription token.
+- [x] Restrict customer feeds to client-visible service work.
+- [x] Include internal appointments and task deadlines only for staff subscriptions.
+- [x] Record subscription creation and revocation in the audit ledger.
+- [x] Apply `supabase/apple_calendar.sql`.
+- [ ] Verify creation, Apple handoff, feed refresh, and revocation in production.

@@ -96,6 +96,10 @@ Correct: retain a loaded inbox thread while a small refresh indicator reports a 
 
 New permanent visual or interaction patterns must be added here and implemented as reusable components before they are repeated across feature pages.
 
+### Private calendar connection
+
+Calendar subscriptions are presented as compact connection panels beside the real schedule they export. The panel must name the provider, explain refresh behavior, distinguish the private subscription URL from ordinary navigation, and provide an explicit revoke action. A raw subscription URL is shown only after creation in the current browser session; it is not persisted in browser storage. Client feeds contain only client-visible service work, while staff feeds may include internal CRM appointments and task deadlines.
+
 ## Private Office production mode
 
 Private Office is the approved presentation system for authenticated client roles. It is a role-aware layer inside Torres OS—not a separate application—and therefore retains the same routes, Supabase records, APIs, permission checks, and workflows as the internal command center.

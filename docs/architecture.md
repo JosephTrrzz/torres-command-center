@@ -78,6 +78,8 @@ Customer 360 is assembled server-side from the client master record, contacts, l
 
 RLS applies both tenant membership and explicit client scope. Customer roles can read only records marked client-visible for their own `current_client_id()` and can respond only to estimates awaiting a decision. Owners and authorized employees manage scheduling, assignments, status, estimates, documents, and tasks. Operational documents are represented as validated HTTPS resources; secrets and provider tokens are never stored as document URLs.
 
+Apple Calendar uses a revocable, read-only iCalendar subscription rather than Apple credentials. The authenticated Operations API creates a high-entropy token, stores only its SHA-256 hash, and returns the private `webcal` URL once. Calendar clients later read the feed through the opaque token. Staff feeds include scheduled jobs, CRM appointments, and task deadlines; customer feeds are restricted to service jobs already marked client-visible. Revocation disables the feed immediately. Two-way CalDAV access is intentionally outside this foundation because it would require separately governed Apple credentials and write-conflict handling.
+
 ## Phase 4 communications domain
 
 The shared Inbox is a provider-independent communication boundary:
