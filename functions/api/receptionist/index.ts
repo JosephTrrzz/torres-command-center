@@ -1,6 +1,9 @@
 import { getSupabaseUrl, type FunctionEnv } from "../../_shared/auth";
 import { createNotification } from "../../_shared/notifications";
 import { websiteChatCrmHref } from "../../_shared/crm-chat";
+import type { EmailEnv } from "../../_shared/email";
+import { readCommunicationSettings } from "../../_shared/communications-settings";
+import { sendLeadAcknowledgment } from "../../_shared/lead-acknowledgment";
 import {
   DEFAULT_RECEPTIONIST_KNOWLEDGE,
   allowedReceptionistOrigins,
@@ -15,7 +18,7 @@ import {
   type ReceptionistAiBinding,
 } from "../../_shared/receptionist";
 
-interface Env extends FunctionEnv {
+interface Env extends FunctionEnv, EmailEnv {
   AI?: ReceptionistAiBinding;
   RECEPTIONIST_CLIENT_ID?: string;
   RECEPTIONIST_ALLOWED_ORIGINS?: string;
@@ -267,6 +270,20 @@ export const onRequestOptions = async ({ request, env }: { request: Request; env
   return cors ? new Response(null, { status: 204, headers: cors }) : new Response(null, { status: 403 });
 };
 
+export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
+  const origin = request.headers.get("Origin") || "";
+  const cors = receptionistCorsHeaders(origin, env.RECEPTIONIST_ALLOWED_ORIGINS);
+  if (!cors) return new Response(JSON.stringify({ error: "This website is not allowed to use the receptionist." }), { status: 403, headers: { "Content-Type": "application/json" } });
+  const url = getSupabaseUrl(env);
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const clientId = env.RECEPTIONIST_CLIENT_ID?.trim() || "";
+  if (!url || !serviceKey || !uuidPattern.test(clientId)) return json({ chatEnabled: false }, 200, cors);
+  const client = await resolveClient(url, serviceKey, clientId);
+  if (!client?.organization_id) return json({ chatEnabled: false }, 200, cors);
+  const settings = await readCommunicationSettings(url, serviceKey, client.organization_id);
+  return json({ chatEnabled: settings.websiteChatEnabled }, 200, cors);
+};
+
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
   const origin = request.headers.get("Origin") || "";
   const cors = receptionistCorsHeaders(origin, env.RECEPTIONIST_ALLOWED_ORIGINS);
@@ -288,6 +305,8 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   if (!await applyRateLimit(url, serviceKey, request, origin, token || "new")) return json({ error: "Please wait a minute before sending another message." }, 429, cors);
   const client = await resolveClient(url, serviceKey, clientId);
   if (!client?.organization_id) return json({ error: "The receptionist workspace is unavailable." }, 503, cors);
+  const communicationSettings = await readCommunicationSettings(url, serviceKey, client.organization_id);
+  if (!communicationSettings.websiteChatEnabled) return json({ error: "Website chat is currently unavailable." }, 403, cors);
   const { config, migrationMissing } = await readConfig(url, serviceKey, client.id);
   if (migrationMissing) return json({ error: "The receptionist database migration has not been applied." }, 503, cors);
   const assistantName = config?.assistant_name || "Torres & Co. automated assistant";
@@ -362,6 +381,21 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     await insertMessage(url, serviceKey, { session, direction: "outbound", senderName: assistantName, body: "Thank you. Your contact details were saved for the Torres & Co. team. No appointment or service has been confirmed yet." });
     await recordAction(url, serviceKey, session, "lead_created", {}, { lead_id: lead.leadId });
     await lifecycle(url, serviceKey, session, "crm.lead.created", "crm_lead", lead.leadId, { conversation_id: session.conversation_id });
+    if (lead.email) {
+      try {
+        await sendLeadAcknowledgment(env, {
+          supabaseUrl: url,
+          serviceKey,
+          organizationId: session.organization_id,
+          clientId: session.client_id,
+          leadId: lead.leadId,
+          email: lead.email,
+          fullName: lead.fullName,
+        });
+      } catch (error) {
+        console.error("Receptionist acknowledgment failed", error);
+      }
+    }
     await notifyTeam(env, url, serviceKey, { ...session, state: "qualified", visitor_name: lead.fullName, visitor_email: lead.email, visitor_phone: lead.phone }, "New receptionist lead", `${lead.fullName} requested follow-up${lead.requestedService ? ` about ${lead.requestedService}` : ""}.`, websiteChatCrmHref(lead.leadId));
     return json({ state: "qualified", saved: true, messages: await publicMessages(url, serviceKey, session.conversation_id) }, 201, cors);
   }

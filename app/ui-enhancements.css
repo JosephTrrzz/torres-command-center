@@ -782,7 +782,39 @@ form textarea:disabled {
 .crm-chat-queue-grid .pending{background:#f1e8d9;color:#8a6736}
 .crm-chat-queue-grid time{grid-area:time;align-self:end;color:var(--muted);font:500 .54rem 'DM Mono',monospace;text-align:right}
 .crm-chat-workspace{min-height:420px}
-@media(max-width:800px){.crm-chat-queue-grid{grid-template-columns:1fr}.crm-chat-contact{align-items:flex-start;flex-direction:column}.crm-chat-contact small{text-align:left}}
+.crm-chat-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:.45rem;flex-wrap:wrap}
+.crm-chat-header-actions button{padding:.5rem .65rem;border:1px solid transparent;border-radius:999px;color:var(--green);font-size:.64rem;font-weight:750;line-height:1;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.crm-chat-header-actions button:hover{border-color:#d4c6ae;background:#fff}
+.crm-chat-header-actions .crm-chat-archive{border-color:#d8cdbb;background:#fff;color:#7a5730}
+.crm-chat-header-actions .crm-chat-archive:hover{border-color:#b89054;background:#f5ecdd}
+.crm-chat-header-actions .crm-chat-archive.restore{border-color:#b9c8ac;background:#edf3e8;color:#526b3e}
+.crm-chat-header-actions button:disabled,.crm-pin-button:disabled{cursor:wait;opacity:.58}
+.crm-chat-archived-notice{margin:1rem 0 0;padding:.85rem 1rem;border:1px solid #d8cdbb;border-radius:12px;background:#f3eee5;color:#6d6254;font-size:.7rem;line-height:1.5}
+.crm-chat-queue.is-archived{padding:0;overflow:hidden;background:#f7f4ed}
+.crm-chat-queue.is-archived>summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.15rem;cursor:pointer;list-style:none;color:var(--ink);font-size:.72rem;font-weight:750}
+.crm-chat-queue.is-archived>summary::-webkit-details-marker{display:none}
+.crm-chat-queue.is-archived>summary b{display:grid;place-items:center;min-width:1.65rem;height:1.65rem;padding:0 .4rem;border-radius:999px;background:#e7e0d4;font:600 .6rem 'DM Mono',monospace}
+.crm-chat-queue.is-archived[open]>summary{border-bottom:1px solid var(--line)}
+.crm-chat-queue.is-archived .crm-chat-queue-grid{margin:0;padding:1rem 1.15rem 1.15rem}
+.crm-lead-hero-actions{display:flex;align-items:flex-start;justify-content:flex-end;gap:.55rem;flex-wrap:wrap}
+.crm-pin-button{align-self:flex-start;padding:.55rem .75rem;border:1px solid #d8cdbb;border-radius:999px;background:#fff;color:#745735;font:650 .62rem 'DM Mono',monospace;text-transform:uppercase;white-space:nowrap}
+.crm-pin-button:hover{border-color:#b89054;background:#f7f0e3}
+.crm-pin-button.active{border-color:#aa844e;background:#efe3cf;color:#6c4b22;box-shadow:0 5px 14px rgba(90,63,29,.08)}
+.crm-email-composer{display:grid;gap:1rem;padding:1.2rem;border:1px solid #ddd4c6;border-radius:18px;background:#fff}
+.crm-email-composer-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+.crm-email-composer-heading h3{margin:.15rem 0 .25rem;color:#15243a;font-size:1.12rem}
+.crm-email-composer-heading p{margin:0;color:#716c63;font-size:.78rem;line-height:1.5}
+.crm-email-composer-heading>span{padding:.4rem .55rem;border-radius:999px;background:#edf4e8;color:#557145;font:650 .57rem 'DM Mono',monospace;text-transform:uppercase;white-space:nowrap}
+.crm-email-composer form{display:grid;gap:.85rem}
+.crm-email-composer label{display:grid;gap:.42rem;color:#18253a;font-size:.72rem;font-weight:700}
+.crm-email-composer input,.crm-email-composer textarea{width:100%;border:1px solid #d9d1c5;border-radius:10px;background:#fbfaf7;color:#17243a;font:inherit;line-height:1.5;padding:.78rem .85rem}
+.crm-email-composer textarea{min-height:9rem;resize:vertical}
+.crm-email-composer input:focus,.crm-email-composer textarea:focus{outline:2px solid rgba(174,133,73,.3);outline-offset:2px;border-color:#ae8549}
+.crm-email-composer-actions{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}
+.crm-email-composer-actions small{max-width:34rem;color:#777067;font-size:.68rem;line-height:1.45}
+.crm-email-composer-actions .button{flex:0 0 auto}
+.crm-lead-pinned-marker{display:inline-block;margin-left:.38rem;color:#a3773b;font-style:normal;font-size:.78rem;vertical-align:.02em}
+@media(max-width:800px){.crm-chat-queue-grid{grid-template-columns:1fr}.crm-chat-contact{align-items:flex-start;flex-direction:column}.crm-chat-contact small{text-align:left}.crm-chat>header{display:grid}.crm-chat-header-actions{justify-content:flex-start}.crm-lead-hero-actions{justify-content:flex-start}.crm-chat-queue.is-archived .crm-chat-queue-grid{padding:.85rem}.crm-email-composer-heading,.crm-email-composer-actions{align-items:stretch;flex-direction:column}.crm-email-composer-actions .button{width:100%}}
 
 /* Phase 4 communications: secure shared inbox with honest delivery states. */
 .communications-heading{align-items:flex-end}.communications-heading .brand-select-field{width:100%}.communications-heading-actions{display:grid;justify-items:end;gap:9px;width:min(390px,100%)}.inbox-live-control{display:flex;align-items:center;justify-content:flex-end;gap:10px;width:100%}.inbox-live-status{display:inline-flex;align-items:center;gap:7px;min-width:0;color:var(--muted);font-size:7px;line-height:1.4}.inbox-live-status i{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:#769552;box-shadow:0 0 0 4px rgba(118,149,82,.11)}.inbox-live-status span{min-width:0;overflow-wrap:anywhere}.inbox-refresh-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:0 12px;border:1px solid #d8d1c5;border-radius:10px;background:#fff;color:var(--ink);font-size:8px;font-weight:800;white-space:nowrap;box-shadow:0 5px 14px rgba(19,34,56,.045);transition:border-color .18s ease,background .18s ease,transform .18s ease}.inbox-refresh-button:hover,.inbox-refresh-button:focus-visible{border-color:#b08d57;background:#fffaf0;outline:none;transform:translateY(-1px)}.inbox-refresh-button:disabled{cursor:wait;opacity:.58;transform:none}.inbox-refresh-button svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.inbox-refresh-button:disabled svg{animation:inbox-refresh-spin .9s linear infinite}@keyframes inbox-refresh-spin{to{transform:rotate(360deg)}}

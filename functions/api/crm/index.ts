@@ -8,17 +8,20 @@ import {
 } from "../../_shared/auth";
 import { createNotification } from "../../_shared/notifications";
 import { crmConversationId } from "../../_shared/crm-chat";
+import { buildTransactionalEmailHtml, type EmailEnv } from "../../_shared/email";
+import { sendLeadAcknowledgment } from "../../_shared/lead-acknowledgment";
+import { sendTrackedEmail } from "../../_shared/tracked-email";
 
-interface Env extends FunctionEnv {}
+interface Env extends FunctionEnv, EmailEnv {}
 
 type ClientRow = { id: string; organization_id: string | null; name: string };
 type OrganizationRow = { id: string };
-type LeadRow = { id: string; client_id: string; full_name: string; email: string; phone: string; company: string; service_interest: string; message: string; source: string; status: string; assigned_to: string | null; external_provider: string; source_metadata: unknown; created_at: string; updated_at: string };
+type LeadRow = { id: string; client_id: string; full_name: string; email: string; phone: string; company: string; service_interest: string; message: string; source: string; status: string; assigned_to: string | null; external_provider: string; source_metadata: unknown; is_pinned: boolean; pinned_at: string | null; created_at: string; updated_at: string };
 type AppointmentRow = { id: string; lead_id: string; title: string; starts_at: string; ends_at: string; timezone: string; status: string; location: string; notes: string; assigned_to: string | null; created_at: string };
 type TaskRow = { id: string; lead_id: string | null; appointment_id: string | null; title: string; description: string; due_at: string | null; priority: string; status: string; assigned_to: string | null; completed_at: string | null; created_at: string };
 type ActivityRow = { id: string; lead_id: string; activity_type: string; title: string; detail: string; created_at: string };
 type ChatMessageRow = { id: string; conversation_id: string; direction: "inbound" | "outbound" | "system"; sender_name: string; body: string; status: string; created_at: string };
-type ConversationRow = { id: string; client_id: string; subject: string; status: string; priority: string; last_message_at: string; updated_at: string };
+type ConversationRow = { id: string; client_id: string; subject: string; status: string; priority: string; last_message_at: string; updated_at: string; archived_at: string | null };
 type ReceptionistSessionRow = { conversation_id: string; state: string; ai_enabled: boolean; visitor_name: string; visitor_email: string; visitor_phone: string };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -131,11 +134,11 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
       ? readAgencyTeam(url, serviceKey, agencyId)
       : Promise.resolve([]);
   const [leadResponse, appointmentResponse, taskResponse, activityResponse, conversationResponse, team] = await Promise.all([
-    fetch(`${url}/rest/v1/crm_leads?client_id=${clientFilter}&select=*&order=created_at.desc`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/crm_leads?client_id=${clientFilter}&select=*&order=is_pinned.desc,pinned_at.desc.nullslast,created_at.desc`, { headers: serviceHeaders(serviceKey) }),
     fetch(`${url}/rest/v1/crm_appointments?client_id=${clientFilter}&select=*&order=starts_at.asc`, { headers: serviceHeaders(serviceKey) }),
     fetch(`${url}/rest/v1/crm_tasks?client_id=${clientFilter}&select=*&order=due_at.asc.nullslast,created_at.desc`, { headers: serviceHeaders(serviceKey) }),
     fetch(`${url}/rest/v1/crm_activities?client_id=${clientFilter}&select=id,lead_id,activity_type,title,detail,created_at&order=created_at.desc&limit=100`, { headers: serviceHeaders(serviceKey) }),
-    fetch(`${url}/rest/v1/conversations?client_id=${clientFilter}&channel=eq.webchat&archived_at=is.null&select=id,client_id,subject,status,priority,last_message_at,updated_at&order=last_message_at.desc.nullslast,updated_at.desc&limit=100`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/conversations?client_id=${clientFilter}&channel=eq.webchat&select=id,client_id,subject,status,priority,last_message_at,updated_at,archived_at&order=last_message_at.desc.nullslast,updated_at.desc&limit=100`, { headers: serviceHeaders(serviceKey) }),
     teamPromise,
   ]);
   if (![leadResponse, appointmentResponse, taskResponse, activityResponse, conversationResponse].every((response) => response.ok)) return null;
@@ -168,7 +171,7 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     messageGroups.set(chatMessage.conversation_id, messages);
   }
   const sessionByConversation = new Map(receptionistSessions.map((session) => [session.conversation_id, session]));
-  const websiteChats = conversations.map((conversation) => {
+  const allWebsiteChats = conversations.map((conversation) => {
     const receptionistSession = sessionByConversation.get(conversation.id);
     const messages = messageGroups.get(conversation.id) || [];
     const latestMessage = messages[messages.length - 1];
@@ -185,9 +188,12 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
       latestMessage: latestMessage?.body || "New website conversation",
       state: receptionistSession?.state || (leadByConversation.has(conversation.id) ? "qualified" : "anonymous"),
       aiEnabled: receptionistSession?.ai_enabled ?? false,
+      archivedAt: conversation.archived_at,
       messages,
     };
   });
+  const websiteChats = allWebsiteChats.filter((chat) => !chat.archivedAt);
+  const archivedWebsiteChats = allWebsiteChats.filter((chat) => Boolean(chat.archivedAt));
   return {
     scope: { type: client ? "client" : "organization", clientId: client?.id || null, label: client?.name || "All leads" },
     client: client ? { id: client.id, name: client.name } : null,
@@ -198,6 +204,7 @@ async function readSnapshot(url: string, serviceKey: string, context: AuthContex
     tasks,
     activities,
     websiteChats,
+    archivedWebsiteChats,
     team,
     summary: summary(leads, tasks, appointments),
   };
@@ -281,6 +288,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   let notificationUserId = "";
   let notificationTitle = "";
   let notificationBody = "";
+  let responseMessage = "CRM workflow updated.";
 
   if (action === "create_lead") {
     const fullName = clean(input?.fullName, 180);
@@ -296,6 +304,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     leadId = entityId;
     lifecycleAction = "crm.lead.created";
     await writeActivity(url, serviceKey, { organizationId, clientId: client.id, leadId, type: "lead.created", title: "Lead captured", detail: `${fullName} entered the ${source} pipeline.`, userId: context.userId });
+    if (email) await sendLeadAcknowledgment(env, { supabaseUrl: url, serviceKey, organizationId, clientId: client.id, leadId, fullName, email }).catch(() => undefined);
     if (assignedTo) { notificationUserId = assignedTo; notificationTitle = "New lead assigned"; notificationBody = `${fullName} is ready for first contact in ${client.name}.`; }
   } else if (action === "update_lead") {
     const lead = await readLead(url, serviceKey, client.id, leadId);
@@ -309,6 +318,90 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const assignmentChanged = (lead.assigned_to || "") !== assignedTo;
     await writeActivity(url, serviceKey, { organizationId, clientId: client.id, leadId, type: assignmentChanged ? "lead.assigned" : "lead.stage_changed", title: assignmentChanged ? "Assignment updated" : "Pipeline stage updated", detail: assignmentChanged ? `${lead.full_name} was assigned to a team member.` : `${lead.full_name} moved to ${status.replaceAll("_", " ")}.`, userId: context.userId, metadata: { status, assigned_to: assignedTo || null } });
     if (assignmentChanged && assignedTo) { notificationUserId = assignedTo; notificationTitle = "Lead assigned to you"; notificationBody = `${lead.full_name} needs follow-up for ${client.name}.`; }
+  } else if (action === "toggle_lead_pin") {
+    const lead = await readLead(url, serviceKey, client.id, leadId);
+    const pinned = input?.pinned === true;
+    if (!lead) return authJson({ error: "Choose a valid lead to pin." }, 400);
+    const response = await fetch(`${url}/rest/v1/crm_leads?id=eq.${encodeURIComponent(lead.id)}&client_id=eq.${encodeURIComponent(client.id)}`, {
+      method: "PATCH",
+      headers: serviceHeaders(serviceKey, "return=minimal"),
+      body: JSON.stringify({ is_pinned: pinned, pinned_at: pinned ? now : null, updated_at: now }),
+    });
+    if (!response.ok) return authJson({ error: "The lead priority could not be updated." }, 502);
+    entityId = lead.id;
+    lifecycleAction = pinned ? "crm.lead.pinned" : "crm.lead.unpinned";
+    await writeActivity(url, serviceKey, {
+      organizationId,
+      clientId: client.id,
+      leadId: lead.id,
+      type: pinned ? "lead.pinned" : "lead.unpinned",
+      title: pinned ? "Lead pinned" : "Lead unpinned",
+      detail: pinned ? `${lead.full_name} was moved to the top of the pipeline.` : `${lead.full_name} returned to normal pipeline order.`,
+      userId: context.userId,
+    });
+  } else if (action === "send_lead_email") {
+    const lead = await readLead(url, serviceKey, client.id, leadId);
+    const subject = clean(input?.subject, 160);
+    const body = clean(input?.body, 6000);
+    const requestId = clean(input?.requestId, 100);
+    if (!lead?.email || !subject || !body || !requestId) return authJson({ error: "Choose a lead with an email address and enter a subject and message." }, 400);
+    const result = await sendTrackedEmail(env, {
+      supabaseUrl: url,
+      serviceKey,
+      organizationId,
+      clientId: client.id,
+      recipient: lead.email,
+      subject,
+      text: body,
+      html: buildTransactionalEmailHtml({ heading: subject, body }),
+      templateKey: "crm_lead_reply",
+      idempotencyKey: `crm-reply:${lead.id}:${requestId}`,
+      replyTo: env.TRANSACTIONAL_EMAIL_REPLY_TO,
+    });
+    if (result.status === "not_configured") return authJson({ error: "Transactional email is not configured yet." }, 503);
+    if (!result.sent) return authJson({ error: result.error || "The email could not be sent." }, 502);
+    entityId = result.deliveryId || lead.id;
+    entityType = "email_delivery";
+    lifecycleAction = "crm.lead.email_sent";
+    await writeActivity(url, serviceKey, {
+      organizationId,
+      clientId: client.id,
+      leadId: lead.id,
+      type: "email.sent",
+      title: "Email sent",
+      detail: subject,
+      userId: context.userId,
+      metadata: { delivery_id: result.deliveryId || null },
+    });
+    responseMessage = `Email sent to ${lead.email}.`;
+  } else if (action === "set_website_chat_archived") {
+    const conversationId = clean(input?.conversationId, 36);
+    const archived = input?.archived === true;
+    if (!uuidPattern.test(conversationId)) return authJson({ error: "Choose a valid website conversation." }, 400);
+    const conversationResponse = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}&channel=eq.webchat&select=id,archived_at&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const conversations = conversationResponse.ok ? await conversationResponse.json().catch(() => []) as Array<{ id?: string; archived_at?: string | null }> : [];
+    if (!conversations[0]?.id) return authJson({ error: "That website conversation is no longer available." }, 404);
+    const response = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}`, {
+      method: "PATCH",
+      headers: serviceHeaders(serviceKey, "return=minimal"),
+      body: JSON.stringify({ archived_at: archived ? now : null, archived_by: archived ? context.userId : null, updated_at: now }),
+    });
+    if (!response.ok) return authJson({ error: archived ? "The conversation could not be archived." : "The conversation could not be restored." }, 502);
+    const linkedLead = Array.from((await readSnapshot(url, serviceKey, context, [client], client))?.leads || []).find((lead) => lead.external_provider === "website_chat" && crmConversationId(lead.source_metadata) === conversationId);
+    leadId = linkedLead?.id || "";
+    entityId = conversationId;
+    entityType = "conversation";
+    lifecycleAction = archived ? "crm.website_chat.archived" : "crm.website_chat.restored";
+    if (leadId) await writeActivity(url, serviceKey, {
+      organizationId,
+      clientId: client.id,
+      leadId,
+      type: archived ? "chat.archived" : "chat.restored",
+      title: archived ? "Website conversation archived" : "Website conversation restored",
+      detail: archived ? "The website chat was moved out of the active queue without deleting its history." : "The website chat was returned to the active queue.",
+      userId: context.userId,
+      metadata: { conversation_id: conversationId },
+    });
   } else if (action === "reply_to_website_chat") {
     const requestedConversationId = clean(input?.conversationId, 36);
     const lead = leadId ? await readLead(url, serviceKey, client.id, leadId) : null;
@@ -316,9 +409,10 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     const conversationId = requestedConversationId || (lead ? crmConversationId(lead.source_metadata) : "");
     if (!uuidPattern.test(conversationId) || !body) return authJson({ error: "Choose a website conversation and enter a reply." }, 400);
     if (lead && (lead.external_provider !== "website_chat" || crmConversationId(lead.source_metadata) !== conversationId)) return authJson({ error: "That lead is not linked to this website conversation." }, 400);
-    const conversationResponse = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}&channel=eq.webchat&select=id&limit=1`, { headers: serviceHeaders(serviceKey) });
-    const conversations = conversationResponse.ok ? await conversationResponse.json().catch(() => []) as Array<{ id?: string }> : [];
+    const conversationResponse = await fetch(`${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&client_id=eq.${encodeURIComponent(client.id)}&channel=eq.webchat&select=id,archived_at&limit=1`, { headers: serviceHeaders(serviceKey) });
+    const conversations = conversationResponse.ok ? await conversationResponse.json().catch(() => []) as Array<{ id?: string; archived_at?: string | null }> : [];
     if (!conversations[0]?.id) return authJson({ error: "That website chat is no longer available." }, 404);
+    if (conversations[0].archived_at) return authJson({ error: "Restore this website chat before replying." }, 409);
     const sender = team.find((member) => member.id === context.userId);
     const senderName = sender?.name || "Joseph";
     const ownershipResponse = await fetch(`${url}/rest/v1/receptionist_sessions?conversation_id=eq.${encodeURIComponent(conversationId)}`, {
@@ -421,5 +515,5 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const clients = await readAccessibleClients(url, serviceKey, context);
   const snapshot = await readSnapshot(url, serviceKey, context, clients, client);
   if (!snapshot) return authJson({ error: "The change saved, but the refreshed CRM view is unavailable." }, 502);
-  return authJson({ snapshot, message: "CRM workflow updated." });
+  return authJson({ snapshot, message: responseMessage });
 };

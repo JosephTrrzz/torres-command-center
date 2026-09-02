@@ -1,6 +1,6 @@
 # Torres OS architecture decisions
 
-Updated 2026-08-25.
+Updated 2026-09-01.
 
 ## D-001 — evolve the existing product
 
@@ -67,3 +67,9 @@ Reason: milestone-derived progress gives agency staff and clients the same expla
 Decision: Inbox categories use a controlled taxonomy, and archive is a reversible state rather than deletion. Archived conversations remain available to authorized staff but are removed from active workload totals and client portal visibility until restored.
 
 Reason: durable categories make triage consistent across devices, while reversible archiving preserves communication history and prevents an old thread from disappearing permanently or remaining actionable to a client.
+
+## D-012 — CRM owns pre-client communication
+
+Decision: website inquiries and qualified receptionist conversations remain organization-wide CRM leads until they are intentionally linked to a client. Staff can reply through the provider-tracked CRM workflow, pin important leads, and reversibly archive website-chat transcripts. New email leads receive one idempotent acknowledgment when the organization setting is enabled.
+
+Reason: prospects are not clients yet. Keeping acquisition communication in CRM avoids inventing tenant relationships, while the shared delivery ledger, reversible archive state, and configurable acknowledgment preserve operational truth and communication history.

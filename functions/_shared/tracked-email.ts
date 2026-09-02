@@ -11,6 +11,7 @@ interface TrackedEmailInput {
   html: string;
   templateKey: string;
   idempotencyKey: string;
+  replyTo?: string;
 }
 
 export interface TrackedEmailResult {
@@ -75,6 +76,7 @@ export async function sendTrackedEmail(env: EmailEnv, input: TrackedEmailInput):
       text: input.text,
       html: input.html,
       idempotencyKey: input.idempotencyKey,
+      replyTo: input.replyTo,
     });
     const now = new Date().toISOString();
     const update = await fetch(`${input.supabaseUrl}/rest/v1/email_deliveries?id=eq.${encodeURIComponent(delivery.id)}`, {
