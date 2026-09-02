@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
+import { FeedbackBanner, PageHeader, StatePanel } from "../../components/ui-foundation";
 import { fetchNotifications, type WorkspaceNotification } from "../../lib/notifications";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { fetchClients } from "../../lib/supabase-data";
@@ -62,12 +63,9 @@ export default function TodayPage() {
   const dateLabel = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
   return <Shell active="Today">
-    <div className="page-heading today-heading">
-      <div><p className="eyebrow">{dateLabel}</p><h1>Today</h1><p className="lede">Your live operating brief, prioritized from connected workspace activity.</p></div>
-      <Link className="button button-dark" href="/reports/">Review reports <span>→︎</span></Link>
-    </div>
+    <PageHeader className="today-heading" eyebrow={dateLabel} title="Today" description="Your live operating brief, prioritized from connected workspace activity." actions={<Link className="button button-dark" href="/reports/">Review reports <span aria-hidden="true">→︎</span></Link>} />
 
-    {error && <p className="integration-notice today-error" role="alert">{error}</p>}
+    {error && <FeedbackBanner tone="error" title="The operating brief could not load"><p>{error}</p></FeedbackBanner>}
 
     <section className="today-stats" aria-label="Today summary">
       <div><span>Unread actions</span><strong>{loading ? "—" : unread}</strong><small>{unread ? "Open the priority queue" : "No unread workspace actions"}</small></div>
@@ -79,7 +77,7 @@ export default function TodayPage() {
     <section className="today-layout">
       <div className="today-priority-panel">
         <div className="section-heading"><div><p className="eyebrow">Priority queue</p><h2>What needs attention</h2></div></div>
-        {loading ? <p className="today-loading">Checking connected accounts and workspace activity…</p> : <div className="today-priority-list">{priorities.map((priority, index) => <Link href={priority.href} className={`today-priority ${priority.level}`} key={priority.id}><span className="today-priority-number">{String(index + 1).padStart(2, "0")}</span><div><strong>{priority.title}</strong><p>{priority.detail}</p></div><b aria-hidden="true">→︎</b></Link>)}</div>}
+        {loading ? <StatePanel state="loading" title="Building your priority queue" description="Checking connected accounts and recent workspace activity." /> : priorities.length ? <div className="today-priority-list">{priorities.map((priority, index) => <Link href={priority.href} className={`today-priority ${priority.level}`} key={priority.id}><span className="today-priority-number">{String(index + 1).padStart(2, "0")}</span><div><strong>{priority.title}</strong><p>{priority.detail}</p></div><b aria-hidden="true">→︎</b></Link>)}</div> : <StatePanel state="empty" title="No priorities need attention" description="New client, reporting, and integration activity will appear here." />}
       </div>
 
       <aside className="today-flow-panel">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientCard } from "../../components/client-card";
 import { Shell } from "../../components/shell";
+import { FeedbackBanner, PageHeader } from "../../components/ui-foundation";
 import { fetchClients, updateClient } from "../../lib/supabase-data";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { ClientDetail } from "../../lib/types";
@@ -125,17 +126,8 @@ export default function ClientsPage() {
 
   return (
     <Shell active="Clients">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Workspace</p>
-          <h1>Clients</h1>
-          <p className="lede">A clear, current view of every account you manage.</p>
-          <small className="updated">{message}</small>
-        </div>
-        <button className="button button-dark" type="button" onClick={openCreate}>
-          + Add client
-        </button>
-      </div>
+      <PageHeader eyebrow="Workspace" title="Clients" description="A clear, current view of every account you manage." actions={<button className="button button-dark" type="button" onClick={openCreate}>Add client</button>} />
+      {message && <FeedbackBanner tone="success" title="Client workspace updated"><p>{message}</p></FeedbackBanner>}
 
       {showForm && (
         <form className="detail-card client-form" onSubmit={submit}>
