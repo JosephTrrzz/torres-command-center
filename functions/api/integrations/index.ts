@@ -4,12 +4,18 @@ import { formspreeConfigured, type FormspreeEnv } from "../../_shared/formspree"
 import { websiteIntakeConfigured, type WebsiteIntakeEnv } from "../../_shared/website-intake";
 import { INTEGRATION_PROVIDERS, type IntegrationConnection, type IntegrationHealth, type IntegrationProvider, type IntegrationSyncRun, type IntegrationsSnapshot } from "../../../lib/integrations";
 
-interface Env extends FunctionEnv, EmailEnv, FormspreeEnv, WebsiteIntakeEnv {}
+export interface Env extends FunctionEnv, EmailEnv, FormspreeEnv, WebsiteIntakeEnv {
+  INTEGRATION_CRON_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+}
 
-type ClientRow = { id: string; name: string; organization_id?: string | null };
+export type ClientRow = { id: string; name: string; organization_id?: string | null };
 type GoogleRow = {
   google_email?: string;
   access_token?: string;
+  refresh_token?: string | null;
+  expires_at?: string | null;
   business_profile_location?: string | null;
   search_console_site?: string | null;
   analytics_property?: string | null;
@@ -25,6 +31,11 @@ type RegistryRow = {
   last_checked_at?: string | null;
   last_success_at?: string | null;
   last_error_message?: string | null;
+  automation_enabled?: boolean;
+  next_check_at?: string | null;
+  consecutive_failures?: number;
+  alert_opened_at?: string | null;
+  last_trigger?: IntegrationConnection["lastTrigger"];
 };
 type RunRow = {
   id?: string;
@@ -34,11 +45,12 @@ type RunRow = {
   records_read?: number;
   records_written?: number;
   error_message?: string | null;
+  trigger?: IntegrationSyncRun["trigger"];
   started_at?: string;
   completed_at?: string | null;
 };
 
-const PROVIDERS: Record<IntegrationProvider, Pick<IntegrationConnection, "name" | "category" | "description" | "scope" | "canReconnect" | "canDisconnect">> = {
+export const PROVIDERS: Record<IntegrationProvider, Pick<IntegrationConnection, "name" | "category" | "description" | "scope" | "canReconnect" | "canDisconnect">> = {
   google: { name: "Google business data", category: "Analytics & search", description: "GA4, Search Console, and Business Profile resources mapped to this client.", scope: "client", canReconnect: true, canDisconnect: true },
   resend: { name: "Resend email", category: "Transactional email", description: "Onboarding, notifications, CRM replies, and delivery events from the verified agency domain.", scope: "organization", canReconnect: false, canDisconnect: false },
   website_intake: { name: "Website lead intake", category: "Forms & website chat", description: "Verified Formspree submissions and website conversations routed into the agency CRM.", scope: "organization", canReconnect: false, canDisconnect: false },
@@ -46,7 +58,7 @@ const PROVIDERS: Record<IntegrationProvider, Pick<IntegrationConnection, "name" 
   cloudflare: { name: "Cloudflare", category: "Hosting & edge", description: "Production pages, protected Functions, environment configuration, and edge delivery.", scope: "platform", canReconnect: false, canDisconnect: false },
 };
 
-function serviceHeaders(serviceKey: string, prefer?: string) {
+export function serviceHeaders(serviceKey: string, prefer?: string) {
   return {
     apikey: serviceKey,
     Authorization: `Bearer ${serviceKey}`,
@@ -64,7 +76,7 @@ function configured(value: string | undefined) {
   return Boolean(normalized && !/^(optional|replace-|your-)/i.test(normalized));
 }
 
-async function resolveClient(url: string, serviceKey: string, clientId: string) {
+export async function resolveClient(url: string, serviceKey: string, clientId: string) {
   const response = await fetch(`${url}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=id,name,organization_id&limit=1`, { headers: serviceHeaders(serviceKey) });
   const rows = await response.json().catch(() => []) as ClientRow[];
   if (!response.ok || !rows[0]) return null;
@@ -75,7 +87,7 @@ async function resolveClient(url: string, serviceKey: string, clientId: string) 
 }
 
 async function readGoogle(url: string, serviceKey: string, clientId: string) {
-  const response = await fetch(`${url}/rest/v1/google_connections?client_id=eq.${encodeURIComponent(clientId)}&select=google_email,access_token,business_profile_location,search_console_site,analytics_property,updated_at&limit=1`, { headers: serviceHeaders(serviceKey) });
+  const response = await fetch(`${url}/rest/v1/google_connections?client_id=eq.${encodeURIComponent(clientId)}&select=google_email,access_token,refresh_token,expires_at,business_profile_location,search_console_site,analytics_property,updated_at&limit=1`, { headers: serviceHeaders(serviceKey) });
   const rows = await response.json().catch(() => []) as GoogleRow[];
   return response.ok ? rows[0] ?? null : null;
 }
@@ -131,6 +143,11 @@ function providerConnection(provider: IntegrationProvider, env: Env, google: Goo
     capabilities: stored?.capabilities?.length ? stored.capabilities : capabilities,
     lastCheckedAt: stored?.last_checked_at || (provider === "google" ? google?.updated_at || null : null),
     lastSuccessAt: stored?.last_success_at || null,
+    automationEnabled: stored?.automation_enabled !== false,
+    nextCheckAt: stored?.next_check_at || null,
+    consecutiveFailures: Number(stored?.consecutive_failures || 0),
+    alertOpen: Boolean(stored?.alert_opened_at),
+    lastTrigger: stored?.last_trigger || null,
   };
 }
 
@@ -144,6 +161,7 @@ function mapRun(row: RunRow): IntegrationSyncRun | null {
     recordsRead: Number(row.records_read || 0),
     recordsWritten: Number(row.records_written || 0),
     errorMessage: row.error_message || "",
+    trigger: row.trigger || "manual",
     startedAt: row.started_at,
     completedAt: row.completed_at || null,
   };
@@ -152,8 +170,8 @@ function mapRun(row: RunRow): IntegrationSyncRun | null {
 async function buildSnapshot(env: Env, url: string, serviceKey: string, client: ClientRow & { organization_id: string }, canManage: boolean): Promise<IntegrationsSnapshot> {
   const [google, registryResponse, runsResponse] = await Promise.all([
     readGoogle(url, serviceKey, client.id),
-    fetch(`${url}/rest/v1/integration_connections?client_id=eq.${encodeURIComponent(client.id)}&select=id,provider,scope,status,account_label,capabilities,last_checked_at,last_success_at,last_error_message`, { headers: serviceHeaders(serviceKey) }),
-    fetch(`${url}/rest/v1/integration_sync_runs?client_id=eq.${encodeURIComponent(client.id)}&select=id,provider,operation,status,records_read,records_written,error_message,started_at,completed_at&order=started_at.desc&limit=12`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/integration_connections?client_id=eq.${encodeURIComponent(client.id)}&select=id,provider,scope,status,account_label,capabilities,last_checked_at,last_success_at,last_error_message,automation_enabled,next_check_at,consecutive_failures,alert_opened_at,last_trigger`, { headers: serviceHeaders(serviceKey) }),
+    fetch(`${url}/rest/v1/integration_sync_runs?client_id=eq.${encodeURIComponent(client.id)}&select=id,provider,operation,trigger,status,records_read,records_written,error_message,started_at,completed_at&order=started_at.desc&limit=12`, { headers: serviceHeaders(serviceKey) }),
   ]);
   const registryReady = registryResponse.ok && runsResponse.ok;
   const registry = registryResponse.ok ? await registryResponse.json().catch(() => []) as RegistryRow[] : [];
@@ -170,15 +188,48 @@ async function buildSnapshot(env: Env, url: string, serviceKey: string, client: 
       connected: connections.filter((connection) => connection.status === "connected").length,
       actionRequired: connections.filter((connection) => connection.status === "action_required" || connection.status === "degraded").length,
       checkedRecently: connections.filter((connection) => connection.lastCheckedAt && now - new Date(connection.lastCheckedAt).getTime() < 24 * 60 * 60 * 1000).length,
+      automated: connections.filter((connection) => connection.automationEnabled).length,
+      openAlerts: connections.filter((connection) => connection.alertOpen).length,
     },
   };
 }
 
-async function checkProvider(provider: IntegrationProvider, env: Env, url: string, serviceKey: string, clientId: string) {
+async function checkProviderUnsafe(provider: IntegrationProvider, env: Env, url: string, serviceKey: string, clientId: string) {
   if (provider === "google") {
     const google = await readGoogle(url, serviceKey, clientId);
     if (!google?.access_token) return { status: "disconnected" as IntegrationHealth, detail: "Connect Google before running a health check.", accountLabel: "", capabilities: [] as string[] };
-    const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${google.access_token}` } });
+    let accessToken = google.access_token;
+    const expiresSoon = google.expires_at && new Date(google.expires_at).getTime() < Date.now() + 60_000;
+    if (expiresSoon && google.refresh_token && configured(env.GOOGLE_CLIENT_ID) && configured(env.GOOGLE_CLIENT_SECRET)) {
+      const refreshResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: env.GOOGLE_CLIENT_ID!.trim(),
+          client_secret: env.GOOGLE_CLIENT_SECRET!.trim(),
+          refresh_token: google.refresh_token,
+          grant_type: "refresh_token",
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const refreshPayload = await refreshResponse.json().catch(() => null) as { access_token?: string; expires_in?: number } | null;
+      if (refreshResponse.ok && refreshPayload?.access_token) {
+        accessToken = refreshPayload.access_token;
+        await fetch(`${url}/rest/v1/google_connections?client_id=eq.${encodeURIComponent(clientId)}`, {
+          method: "PATCH",
+          headers: serviceHeaders(serviceKey, "return=minimal"),
+          body: JSON.stringify({
+            access_token: accessToken,
+            expires_at: new Date(Date.now() + (refreshPayload.expires_in || 3600) * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          }),
+        });
+      }
+    }
+    const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10_000),
+    });
     const capabilities = [google.analytics_property && "GA4", google.search_console_site && "Search Console", google.business_profile_location && "Business Profile"].filter(Boolean) as string[];
     return response.ok
       ? { status: "connected" as IntegrationHealth, detail: "Google authorization responded successfully.", accountLabel: google.google_email || "", capabilities }
@@ -186,7 +237,10 @@ async function checkProvider(provider: IntegrationProvider, env: Env, url: strin
   }
   if (provider === "resend") {
     if (!emailConfigured(env)) return { status: "action_required" as IntegrationHealth, detail: "Resend configuration is incomplete in Cloudflare.", accountLabel: "", capabilities: [] as string[] };
-    const response = await fetch("https://api.resend.com/domains", { headers: { Authorization: `Bearer ${env.RESEND_API_KEY!.trim()}` } });
+    const response = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY!.trim()}` },
+      signal: AbortSignal.timeout(10_000),
+    });
     return response.ok
       ? { status: "connected" as IntegrationHealth, detail: "Resend accepted the provider health request.", accountLabel: env.TRANSACTIONAL_EMAIL_FROM!.trim(), capabilities: ["Transactional email", "Delivery webhooks", "CRM replies"] }
       : { status: response.status === 401 ? "action_required" as IntegrationHealth : "degraded" as IntegrationHealth, detail: `Resend health check returned ${response.status}.`, accountLabel: env.TRANSACTIONAL_EMAIL_FROM!.trim(), capabilities: ["Transactional email"] };
@@ -197,6 +251,19 @@ async function checkProvider(provider: IntegrationProvider, env: Env, url: strin
   }
   if (provider === "supabase") return { status: "connected" as IntegrationHealth, detail: "Supabase responded to the authenticated client lookup.", accountLabel: "", capabilities: ["Authentication", "Tenant data", "Private files"] };
   return { status: "connected" as IntegrationHealth, detail: "Cloudflare Pages Functions are responding at the production edge.", accountLabel: new URL("https://admin.torrescotechnology.com").host, capabilities: ["Pages", "Functions", "Edge delivery"] };
+}
+
+export async function checkProvider(provider: IntegrationProvider, env: Env, url: string, serviceKey: string, clientId: string) {
+  try {
+    return await checkProviderUnsafe(provider, env, url, serviceKey, clientId);
+  } catch {
+    return {
+      status: "degraded" as IntegrationHealth,
+      detail: `${PROVIDERS[provider].name} did not answer the health request. The next automated check will retry.`,
+      accountLabel: "",
+      capabilities: [] as string[],
+    };
+  }
 }
 
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
@@ -224,11 +291,11 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   if (!client) return authJson({ error: "This client is not linked to an organization workspace." }, 409);
   const requestId = crypto.randomUUID();
   const now = new Date().toISOString();
-  const existingConnectionResponse = await fetch(`${url}/rest/v1/integration_connections?client_id=eq.${encodeURIComponent(clientId)}&provider=eq.${body.provider}&select=id,last_success_at&limit=1`, {
+  const existingConnectionResponse = await fetch(`${url}/rest/v1/integration_connections?client_id=eq.${encodeURIComponent(clientId)}&provider=eq.${body.provider}&select=id,last_success_at,consecutive_failures,alert_opened_at&limit=1`, {
     headers: serviceHeaders(serviceKey),
   });
   if (!existingConnectionResponse.ok) return authJson({ error: "Apply supabase/integration_control.sql before managing provider health." }, 503);
-  const existingConnectionRows = await existingConnectionResponse.json().catch(() => []) as Array<{ id?: string; last_success_at?: string | null }>;
+  const existingConnectionRows = await existingConnectionResponse.json().catch(() => []) as Array<{ id?: string; last_success_at?: string | null; consecutive_failures?: number; alert_opened_at?: string | null }>;
   const existingConnection = existingConnectionRows[0];
   let result: Awaited<ReturnType<typeof checkProvider>>;
 
@@ -242,6 +309,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   } else {
     result = await checkProvider(body.provider, env, url, serviceKey, clientId);
   }
+  const succeeded = result.status === "connected" || result.status === "disconnected";
 
   const connectionResponse = await fetch(`${url}/rest/v1/integration_connections?on_conflict=client_id,provider`, {
     method: "POST",
@@ -260,6 +328,13 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       last_error_code: result.status === "connected" || result.status === "disconnected" ? null : "provider_health_failed",
       last_error_message: result.status === "connected" || result.status === "disconnected" ? null : result.detail,
       metadata: { health_detail: result.detail },
+      automation_enabled: true,
+      check_interval_minutes: 360,
+      next_check_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+      consecutive_failures: succeeded ? 0 : Number(existingConnection?.consecutive_failures || 0) + 1,
+      alert_opened_at: succeeded ? null : undefined,
+      alert_resolved_at: succeeded && existingConnection?.alert_opened_at ? now : undefined,
+      last_trigger: "manual",
       created_by: auth.context.userId,
       updated_at: now,
     }),
@@ -267,7 +342,6 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const connectionRows = await connectionResponse.json().catch(() => []) as Array<{ id?: string }>;
   if (!connectionResponse.ok || !connectionRows[0]?.id) return authJson({ error: "Apply supabase/integration_control.sql before saving provider health." }, 503);
 
-  const succeeded = result.status === "connected" || result.status === "disconnected";
   const runResponse = await fetch(`${url}/rest/v1/integration_sync_runs`, {
     method: "POST",
     headers: serviceHeaders(serviceKey, "return=minimal"),

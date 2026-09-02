@@ -52,7 +52,8 @@ Use this checklist before calling a backend or provider production-ready.
 - [x] Custom admin domain and SSL active.
 - [x] Pages Functions and required production variables deployed.
 - [ ] Add application error/latency alerts.
-- [ ] Add scheduled invocation mechanism for outbox/sync workers.
+- [x] Add a protected scheduled invocation mechanism for integration health checks.
+- [ ] Add scheduled consumers for the general event outbox and provider sync workloads.
 - [ ] Test rollback to the previous successful deployment.
 
 ## Planned providers

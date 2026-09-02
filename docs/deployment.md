@@ -10,6 +10,8 @@ Before deployment, run tests, both TypeScript checks, `git diff --check`, and th
 
 Set the values listed in `.env.example` in the appropriate Cloudflare Pages environment. Public keys may be exposed to the browser; service-role, OAuth secret, and provider credentials must be server-only secrets.
 
+For automated integration health, generate one random credential of at least 32 bytes. Save it as `INTEGRATION_CRON_SECRET` in Cloudflare and as `integration_scheduler_secret` in Supabase Vault. Save `https://admin.torrescotechnology.com/api/integrations/scheduled` as the Vault entry `integration_scheduler_url`, then redeploy so the protected Function receives the Cloudflare value. Never place the credential in source, browser code, migration SQL, screenshots, or logs.
+
 ## Change control
 
 Production changes must follow the verified path above, use an auditable commit, and preserve unrelated local work. Database migrations and provider authorization remain explicit operator actions; credentials must never be copied into source control or support logs.

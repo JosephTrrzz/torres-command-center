@@ -15,6 +15,11 @@ export interface IntegrationConnection {
   capabilities: string[];
   lastCheckedAt: string | null;
   lastSuccessAt: string | null;
+  automationEnabled: boolean;
+  nextCheckAt: string | null;
+  consecutiveFailures: number;
+  alertOpen: boolean;
+  lastTrigger: "manual" | "scheduled" | "webhook" | "system" | null;
   canReconnect: boolean;
   canDisconnect: boolean;
 }
@@ -27,6 +32,7 @@ export interface IntegrationSyncRun {
   recordsRead: number;
   recordsWritten: number;
   errorMessage: string;
+  trigger: "manual" | "scheduled" | "webhook" | "system";
   startedAt: string;
   completedAt: string | null;
 }
@@ -41,6 +47,8 @@ export interface IntegrationsSnapshot {
     connected: number;
     actionRequired: number;
     checkedRecently: number;
+    automated: number;
+    openAlerts: number;
   };
 }
 
@@ -55,3 +63,14 @@ export function integrationScopeLabel(scope: IntegrationConnection["scope"]) {
   return "This client";
 }
 
+export function integrationAutomationState(status: IntegrationHealth, previousFailures: number, alertWasOpen: boolean) {
+  const succeeded = status === "connected" || status === "disconnected";
+  const consecutiveFailures = succeeded ? 0 : Math.max(0, previousFailures) + 1;
+  return {
+    succeeded,
+    consecutiveFailures,
+    alertOpen: !succeeded && (alertWasOpen || consecutiveFailures >= 2),
+    alertOpened: !succeeded && !alertWasOpen && consecutiveFailures >= 2,
+    alertResolved: succeeded && alertWasOpen,
+  };
+}

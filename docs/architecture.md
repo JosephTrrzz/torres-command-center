@@ -39,9 +39,13 @@ Each provider implements a common adapter lifecycle: authorize, verify, discover
 
 Integration reads and mutations cross an authenticated Cloudflare Function boundary with organization permission and client-access checks. Browser code cannot write health directly. A confirmed Google disconnect attempts provider revocation, removes local authorization and saved mappings, records the resulting disconnected state, and emits an audit event.
 
+Automated provider health is invoked hourly by Supabase `pg_cron` through `pg_net`. The database reads the endpoint and shared credential from Vault and calls a protected Cloudflare Pages Function; the matching credential exists only in Cloudflare's encrypted environment. Each invocation performs at most 25 due checks with bounded provider requests, records the trigger and next run, and opens a single administrator notification only after two consecutive failures. Recovery resolves the open alert and emits a recovery notification. The scheduler cannot be invoked by browser credentials and never stores provider secrets in health metadata.
+
 ## Background work
 
 Durable work is represented in an event outbox before execution. Workers claim pending events, record attempts, apply bounded retries, and move exhausted work to a dead-letter state. User-facing state distinguishes queued, running, delayed, failed, and complete.
+
+Scheduled integration checks are a bounded exception to the general outbox-consumer flow: the protected scheduler performs the due health request directly and writes every alert transition to both the audit ledger and event outbox. A failed check remains due again at its next interval, while alert delivery is idempotent across an open incident.
 
 ## AI boundary
 

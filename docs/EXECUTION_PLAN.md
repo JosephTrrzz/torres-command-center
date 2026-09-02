@@ -58,6 +58,7 @@ Status: in progress.
 ## Phase 5 — integrations and normalization
 
 - Common adapter framework, durable sync, normalized data, webhook verification, provider health, and disconnect behavior.
+- In progress: the secret-free provider registry, durable health ledger, safe Google disconnect, six-hour automated health checks, consecutive-failure alerting, and recovery notices are implemented.
 
 ## Phase 6 — analytics and reports
 
