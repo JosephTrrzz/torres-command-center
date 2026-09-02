@@ -8,6 +8,7 @@
 .login-page{display:block;padding:0;background:#f7f4ed}
 .login-private-office-layout{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(430px,.92fr);min-height:100dvh}
 .login-private-office-intro{position:relative;display:grid;align-content:end;min-height:100dvh;padding:clamp(38px,7vw,92px);overflow:hidden;background:radial-gradient(circle at 76% 24%,rgba(199,168,111,.15),transparent 28%),linear-gradient(145deg,#07111e,#10223a 58%,#172d49);color:#fff}
+.login-private-office-intro::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg,#f1dfa8,#b68b43 48%,#f6e7b9);-webkit-mask-image:url("/brand/private-office-pattern.png"),url("/brand/private-office-pattern.png");mask-image:url("/brand/private-office-pattern.png"),url("/brand/private-office-pattern.png");-webkit-mask-position:0 0,132px 132px;mask-position:0 0,132px 132px;-webkit-mask-repeat:repeat;mask-repeat:repeat;-webkit-mask-size:264px 264px;mask-size:264px 264px;opacity:.055}
 .login-private-office-intro::after{content:"";position:absolute;right:-18%;bottom:-22%;width:62%;aspect-ratio:1;border:1px solid rgba(199,168,111,.18);transform:rotate(45deg)}
 .login-private-office-intro .login-brand{position:absolute;top:clamp(30px,5vw,64px);left:clamp(38px,7vw,92px);z-index:1;filter:brightness(0) invert(1);opacity:.92}
 .login-private-office-intro .login-wordmark{width:210px;margin:0}
@@ -22,7 +23,9 @@
 .login-private-office-layout .button-login{min-height:50px;margin-top:6px;border-radius:4px}
 
 /* Client mode is intentionally quieter and distinct from the internal command center. */
-.app-shell[data-shell-variant=client]{background:#f8f5ee}
+.app-shell[data-shell-variant=client]{position:relative;isolation:isolate;background:#f8f5ee}
+.app-shell[data-shell-variant=client]::before{content:"";position:fixed;z-index:0;inset:0 0 0 224px;pointer-events:none;background:linear-gradient(135deg,#9b7438,#c9aa70 52%,#87642e);-webkit-mask-image:url("/brand/private-office-pattern.png"),url("/brand/private-office-pattern.png");mask-image:url("/brand/private-office-pattern.png"),url("/brand/private-office-pattern.png");-webkit-mask-position:0 0,138px 138px;mask-position:0 0,138px 138px;-webkit-mask-repeat:repeat;mask-repeat:repeat;-webkit-mask-size:276px 276px;mask-size:276px 276px;opacity:.04}
+.app-shell[data-shell-variant=client]>.sidebar{z-index:1}.app-shell[data-shell-variant=client]>.main{position:relative;z-index:1}
 .app-shell[data-shell-variant=client] .sidebar{width:224px;border-right-color:rgba(199,168,111,.18);background:#091422;color:#fff}
 .app-shell[data-shell-variant=client] .brand{color:#fff}
 .app-shell[data-shell-variant=client] .brand>span:last-child{display:grid}
@@ -51,13 +54,13 @@
 .private-office-portfolio:hover::after{transform:translateX(105%)}
 .private-office-portfolio-top,.private-office-portfolio footer,.private-office-status{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
 .private-office-portfolio h2{max-width:650px;margin:9px 0 0;color:#fff;font-family:var(--font-display);font-size:clamp(25px,3vw,38px);font-weight:400;line-height:1.05}
-.private-office-diamond{width:14px;height:14px;margin:5px;transform:rotate(45deg);border:1px solid #c7a86f}
+.private-office-diamond{flex:0 0 auto;width:clamp(54px,6vw,72px);height:clamp(54px,6vw,72px);background:linear-gradient(135deg,#f2dda2,#b98e45 48%,#f4e3b2);filter:drop-shadow(0 8px 16px rgba(0,0,0,.18));-webkit-mask:url("/brand/private-office-pattern.png") center/contain no-repeat;mask:url("/brand/private-office-pattern.png") center/contain no-repeat}
 .private-office-status{align-items:center;padding:13px 0;border-block:1px solid rgba(255,255,255,.12)}
 .private-office-status span{font-size:10px}.private-office-status i{display:inline-block;width:6px;height:6px;margin-right:8px;border-radius:50%;background:#87a17f}.private-office-status small{color:#aeb8c5;font:600 8px "DM Mono",monospace;text-transform:uppercase}
 .private-office-portfolio-details{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;margin:0}
 .private-office-portfolio-details div{min-width:0}.private-office-portfolio-details dt{margin-bottom:7px;color:#9eabb9;font:600 8px "DM Mono",monospace;letter-spacing:.06em;text-transform:uppercase}.private-office-portfolio-details dd{margin:0;overflow-wrap:anywhere;font-size:10px;font-weight:700;line-height:1.45}
 .private-office-portfolio footer{align-items:end;color:#9eabb9;font:600 8px "DM Mono",monospace;letter-spacing:.08em;text-transform:uppercase}
-.private-office-monogram{display:grid;place-items:center;width:35px;height:35px;border:1px solid rgba(199,168,111,.45);border-radius:50%;color:#dfc17f;font-family:var(--font-display);font-size:18px}
+.private-office-monogram{display:block;width:42px;height:42px;background:linear-gradient(135deg,#f2dda2,#b98e45 48%,#f4e3b2);color:transparent;font-size:0;-webkit-mask:url("/brand/private-office-pattern.png") center/contain no-repeat;mask:url("/brand/private-office-pattern.png") center/contain no-repeat}
 .private-office-next-action{display:grid;align-content:start;min-height:340px;padding:clamp(25px,4vw,38px);border-top:2px solid var(--color-brand-brass);background:#fffdfa}
 .private-office-next-action h2{margin:26px 0 13px;color:var(--color-brand-navy);font-family:var(--font-display);font-size:clamp(28px,3vw,41px);font-weight:400;letter-spacing:-.035em;line-height:1.02}
 .private-office-next-action p{margin:0;color:var(--color-text-subtle);font-size:11px;line-height:1.65}
@@ -78,4 +81,5 @@
 
 @media(max-width:980px){.login-private-office-layout{grid-template-columns:1fr}.login-private-office-intro{min-height:460px}.login-private-office-layout>.login-card{min-height:auto}.private-office-arrival,.private-office-home-grid{grid-template-columns:1fr}.private-office-arrival aside{max-width:420px}.private-office-portfolio-details{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.login-private-office-intro{min-height:420px;padding:30px 24px}.login-private-office-intro .login-brand{top:26px;left:24px}.login-private-office-intro .login-wordmark{width:176px}.login-private-office-intro>div:nth-child(2){padding-bottom:58px}.login-private-office-intro h2{font-size:50px}.login-private-office-layout>.login-card{width:100%;margin:0;padding:42px 24px 72px;background:#fffdfa}.login-footer{display:none}.app-shell[data-shell-variant=client] .mobile-header{background:#091422;color:#fff}.app-shell[data-shell-variant=client] .mobile-header .brand-mark{border-color:rgba(199,168,111,.42);background:transparent;color:#e1c17d}.app-shell[data-shell-variant=client] .mobile-header button{color:#fff}.private-office-arrival{gap:26px;margin:18px 0 44px}.private-office-arrival h1{font-size:52px}.private-office-arrival aside{padding-left:18px}.private-office-portfolio,.private-office-next-action{min-height:310px;padding:24px}.private-office-portfolio-details{gap:18px 14px}.private-office-chapter-heading{grid-template-columns:1fr;margin-top:68px}.private-office-chapter-heading p{grid-column:1}.app-shell[data-shell-variant=client] .portal-grid{grid-template-columns:1fr}.app-shell[data-shell-variant=client] .portal-card{min-height:0}.app-shell[data-shell-variant=client] .project-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.app-shell[data-shell-variant=client] .project-summary>div:nth-child(2){border-right:0}}
+@media(max-width:680px){.login-private-office-intro::before,.app-shell[data-shell-variant=client]::before{-webkit-mask-position:0 0,96px 96px;mask-position:0 0,96px 96px;-webkit-mask-size:192px 192px;mask-size:192px 192px}.app-shell[data-shell-variant=client]::before{left:0}.private-office-diamond{width:56px;height:56px}}
 @media(prefers-reduced-motion:reduce){.private-office-portfolio::after{transition:none}}

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -35,5 +35,14 @@ describe("Private Office production integration", () => {
   it("records Private Office as a permanent role-aware pattern", () => {
     expect(design).toContain("Private Office production mode");
     expect(design).toContain("same routes, Supabase records, APIs, permission checks, and workflows");
+  });
+
+  it("uses the official Torres artwork for the gold security pattern and emblem", () => {
+    expect(existsSync(join(process.cwd(), "public", "brand", "private-office-pattern.png"))).toBe(true);
+    expect(styles).toContain('url("/brand/private-office-pattern.png")');
+    expect(styles).toContain(".app-shell[data-shell-variant=client]::before");
+    expect(styles).toContain(".private-office-diamond");
+    expect(styles).toContain("mask:");
+    expect(design).toContain("security-print pattern");
   });
 });

@@ -58,9 +58,10 @@ describe("signature Torres logo-fill loader", () => {
     expect(component).not.toContain("branded-loader-mark");
     expect(foundation).not.toContain("brand-line");
     expect(shell).toContain("shouldShowSignatureEntry()");
-    expect(shell).toContain("SIGNATURE_ENTRY_HANDOFF_MS = 900");
+    expect(shell).toContain("SIGNATURE_ENTRY_HANDOFF_MS = 1420");
+    expect(shell).toContain('className="signature-entry-sequence"');
     expect(shell).toContain('if (!checked)');
-    expect(shell).toContain('<AppEntryTransition ready={false} status="Opening your secure workspace"');
+    expect(shell).toContain('ready={false} status="Opening your secure workspace"');
     expect(shell).toContain("<AppEntryTransition");
     expect(login).toContain("<BrandedAppLoader animate");
     expect(login).toContain("prepareSignatureEntryHandoff()");
