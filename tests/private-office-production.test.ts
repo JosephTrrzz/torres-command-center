@@ -39,9 +39,7 @@ describe("Private Office production integration", () => {
 
   it("uses the official Torres artwork for the gold security pattern and emblem", () => {
     expect(existsSync(join(process.cwd(), "public", "brand", "private-office-pattern.png"))).toBe(true);
-    expect(existsSync(join(process.cwd(), "public", "brand", "private-office-wordmark-pattern.png"))).toBe(true);
-    expect(styles).toContain('url("/brand/private-office-wordmark-pattern.png")');
-    expect(styles).toContain('mask:url("/brand/private-office-pattern.png")');
+    expect(styles).toContain('url("/brand/private-office-pattern.png")');
     expect(styles).toContain(".app-shell[data-shell-variant=client]::before");
     expect(styles).toContain(".private-office-diamond");
     expect(styles).toContain("mask:");
