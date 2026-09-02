@@ -47,6 +47,8 @@ For the customer/client role. It has a quieter visual treatment and only exposes
 
 Both shells require a skip link, labeled navigation, deterministic inline SVG icons, visible current location, keyboard focus, and a mobile navigation scrim that dismisses the drawer.
 
+Header popovers are viewport-bounded floating surfaces. They must render above page content, keep their heading and footer visible, and scroll only their internal list when content is long. Opening one shell menu closes the others; Escape dismisses every open shell menu.
+
 ## Shared patterns
 
 - `PageHeader`: eyebrow, one H1, concise description, optional actions.
@@ -62,6 +64,7 @@ Both shells require a skip link, labeled navigation, deterministic inline SVG ic
 
 - 1440px and wide: fixed sidebar, bounded content, layouts may use two working columns.
 - 768px: collapse dense summary rows and working columns without changing task order.
+- Sidebar-aware workspaces begin collapsing around 1180px because the usable content column is narrower than the browser viewport. Page titles and large selectors stack before their combined minimum widths collide.
 - 390px: one-column flow, 16px side padding, 44px targets, 16px input text, no clipped primary action, no horizontal page overflow.
 - Respect `prefers-reduced-motion`; the system remains fully usable with animation disabled.
 

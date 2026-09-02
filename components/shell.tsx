@@ -81,6 +81,18 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     fetchClients().then(setClients).catch(() => setClients([]));
   }, []);
 
+  useEffect(() => {
+    if (!notice && !profile && !workspaceOpen) return;
+    const closeMenus = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setNotice(false);
+      setProfile(false);
+      setWorkspaceOpen(false);
+    };
+    window.addEventListener("keydown", closeMenus);
+    return () => window.removeEventListener("keydown", closeMenus);
+  }, [notice, profile, workspaceOpen]);
+
   const logout = () => {
     clearAuthSession();
     router.replace("/login/");
@@ -150,7 +162,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     </aside>
     <main className="main">
       <header className="mobile-header"><button onClick={() => setOpen(!open)} aria-label="Toggle menu">☰</button><span className="brand-mark">T</span><strong>Torres &amp; Co.</strong><button className="mobile-logout" onClick={logout}>Log out</button></header>
-      <div className="topbar"><span className="breadcrumb">Torres &amp; Co. <b>/</b> {active}</span><div className="top-actions"><div className="header-menu"><button type="button" className="round-button notification-trigger" onClick={() => setNotice(!notice)} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={notice}><span className="notification-bell" aria-hidden="true" />{unreadCount > 0 && <b className="notification-count">{unreadCount}</b>}</button>{notice && <NotificationPanel items={workspaceNotifications} error={notificationError} unreadCount={unreadCount} onClose={() => setNotice(false)} onRetry={loadNotifications} onMarkAllRead={markAllRead} />}</div><div className="header-menu"><button type="button" className="top-avatar" onClick={() => setProfile(!profile)} aria-label="Open profile menu" aria-expanded={profile}>{avatarImage ? <Image src={avatarImage} alt="" width={30} height={30} unoptimized /> : avatar}</button>{profile && <div className="menu-popover profile-popover"><strong>{displayName}</strong><small>{accessLabel}</small><button type="button" onClick={logout}>Log out</button></div>}</div></div></div>
+      <div className="topbar"><span className="breadcrumb">Torres &amp; Co. <b>/</b> {active}</span><div className="top-actions"><div className="header-menu"><button type="button" className="round-button notification-trigger" onClick={() => { setNotice(!notice); setProfile(false); setWorkspaceOpen(false); }} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={notice}><span className="notification-bell" aria-hidden="true" />{unreadCount > 0 && <b className="notification-count">{unreadCount}</b>}</button>{notice && <NotificationPanel items={workspaceNotifications} error={notificationError} unreadCount={unreadCount} onClose={() => setNotice(false)} onRetry={loadNotifications} onMarkAllRead={markAllRead} />}</div><div className="header-menu"><button type="button" className="top-avatar" onClick={() => { setProfile(!profile); setNotice(false); setWorkspaceOpen(false); }} aria-label="Open profile menu" aria-expanded={profile}>{avatarImage ? <Image src={avatarImage} alt="" width={30} height={30} unoptimized /> : avatar}</button>{profile && <div className="menu-popover profile-popover"><strong>{displayName}</strong><small>{accessLabel}</small><button type="button" onClick={logout}>Log out</button></div>}</div></div></div>
       <div className="content" id="workspace-content" tabIndex={-1}>{children}</div>
     </main>
   </div>;
