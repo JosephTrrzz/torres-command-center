@@ -41,6 +41,7 @@ export const LOADING_TIMING = {
 } as const;
 
 const APP_ENTRY_SESSION_KEY = "torres-os-signature-entry-seen";
+const APP_ENTRY_EXIT_MS = 580;
 let appEntrySeenInMemory = false;
 
 export function shouldShowSignatureEntry() {
@@ -284,7 +285,10 @@ export function AppEntryTransition({
     if (!ready) {
       setShowLoader(true);
     } else if (showLoader) {
-      timer = setTimeout(() => setShowLoader(false), prefersReducedMotion ? 40 : 280);
+      timer = setTimeout(
+        () => setShowLoader(false),
+        prefersReducedMotion ? 40 : APP_ENTRY_EXIT_MS,
+      );
     }
     return () => {
       if (timer) clearTimeout(timer);

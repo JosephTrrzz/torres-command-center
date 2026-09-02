@@ -89,7 +89,7 @@ export default function LogoLoaderConceptPage() {
         <article>
           <span>02</span>
           <h2>Content always wins</h2>
-          <p>When initialization finishes, the loader releases immediately through a short crossfade. Slow operations settle into a calm full-color hold instead of replaying.</p>
+          <p>When initialization finishes, the loader releases in one clean upward pass while the ready workspace rises into place beneath it. Slow operations settle into a calm full-color hold instead of replaying.</p>
         </article>
         <article>
           <span>03</span>
@@ -101,7 +101,7 @@ export default function LogoLoaderConceptPage() {
       <section className={styles.transitionDemo}>
         <div className={styles.transitionCopy}>
           <p>Application handoff</p>
-          <h2>Loader to workspace, without a flash.</h2>
+          <h2>Loader to workspace, in one composed upward reveal.</h2>
           <p>The frame holds its geometry while content becomes ready. Use the control above to reveal this internal-shell study.</p>
           <button className={styles.secondary} onClick={replay} type="button">Reset handoff</button>
         </div>

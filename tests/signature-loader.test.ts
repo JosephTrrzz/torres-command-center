@@ -6,6 +6,7 @@ const component = readFileSync(join(process.cwd(), "components", "loading-system
 const styles = readFileSync(join(process.cwd(), "components", "signature-loader.module.css"), "utf8");
 const foundation = readFileSync(join(process.cwd(), "app", "design-foundation.css"), "utf8");
 const preview = readFileSync(join(process.cwd(), "app", "logo-loader-concept", "page.tsx"), "utf8");
+const design = readFileSync(join(process.cwd(), "DESIGN.md"), "utf8");
 
 describe("signature Torres logo-fill loader", () => {
   it("uses optimized layers derived from the official logo", () => {
@@ -36,6 +37,14 @@ describe("signature Torres logo-fill loader", () => {
     expect(preview).toContain("Approved system · active on first secure entry");
     expect(preview).toContain("TorresLogoLoader");
     expect(preview).toContain("Complete and reveal");
+  });
+
+  it("releases upward into ready content without looping", () => {
+    expect(component).toContain("APP_ENTRY_EXIT_MS = 580");
+    expect(styles).toContain("position: fixed");
+    expect(styles).toContain("translateY(-101%)");
+    expect(styles).toContain(".entryLoader::after");
+    expect(design).toContain("upward viewport release");
   });
 
   it("promotes the signature loader to session-scoped authenticated startup", () => {
