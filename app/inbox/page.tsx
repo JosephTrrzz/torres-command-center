@@ -452,7 +452,7 @@ export default function InboxPage() {
                     <label>Status<select value={consentForm.status} onChange={(event) => setConsentForm({ ...consentForm, status: event.target.value })}><option value="pending">Pending</option><option value="granted">Granted</option><option value="revoked">Revoked</option></select></label>
                   </div>
                   <label>Evidence or note<input required={consentForm.status === "granted"} value={consentForm.evidence} onChange={(event) => setConsentForm({ ...consentForm, evidence: event.target.value })} placeholder="How and when consent was recorded" /></label>
-                  <button className="button button-dark" disabled={busy === "channel-consent"}>{busy === "channel-consent" ? "Saving…" : "Save consent →"}</button>
+                  <button className="button button-dark" disabled={busy === "channel-consent"}>{busy === "channel-consent" ? "Saving…" : "Save consent →︎"}</button>
                 </form>
                 <div className="communications-consent-list">
                   <strong>Recorded permissions</strong>
@@ -502,7 +502,7 @@ export default function InboxPage() {
                   <label>Message<textarea required value={newThread.body} onChange={(event) => setNewThread({ ...newThread, body: event.target.value })} placeholder={newThread.channel === "email" ? "Write the email draft…" : newThread.channel === "sms" ? "Write the SMS draft…" : "Write the first shared update…"} /></label>
                   {newThread.channel === "email" && <p className="draft-warning"><strong>{snapshot.delivery.email === "ready" ? "Review before sending." : "Draft only."}</strong> {snapshot.delivery.email === "ready" ? "This saves a draft. Open the thread and send it when the recipient and content are correct." : "This will be saved for review and will not be sent."}</p>}
                   {newThread.channel === "sms" && <p className="draft-warning"><strong>{snapshot.delivery.sms === "ready" ? "Review consent before sending." : "Draft only."}</strong> {snapshot.delivery.sms === "ready" ? "The Send action will remain protected until this exact number has granted consent." : "Connect Twilio after saving; this draft cannot leave the workspace yet."}</p>}
-                  <button className="button button-dark" disabled={busy === "new-thread"}>{busy === "new-thread" ? "Saving…" : newThread.channel === "email" ? "Save email draft →" : newThread.channel === "sms" ? "Save SMS draft →" : "Share conversation →"}</button>
+                  <button className="button button-dark" disabled={busy === "new-thread"}>{busy === "new-thread" ? "Saving…" : newThread.channel === "email" ? "Save email draft →︎" : newThread.channel === "sms" ? "Save SMS draft →︎" : "Share conversation →︎"}</button>
                 </form>
               )}
 
@@ -550,7 +550,7 @@ export default function InboxPage() {
                   ) : canWrite && (selectedConversation.channel === "internal" || selectedConversation.channel === "webchat") ? (
                     <form className="communications-form reply-form" onSubmit={addReply}>
                       <label>{selectedConversation.channel === "webchat" ? "Reply to the website visitor" : "Reply to this conversation"}<textarea required value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder={selectedConversation.channel === "webchat" ? "Write a live response…" : "Write a secure update…"} /></label>
-                      <div className="reply-form-footer"><small>{selectedConversation.channel === "webchat" ? "Your first reply transfers this chat to staff and pauses automated responses." : "This reply is shared with the client workspace."}</small><button className="button button-dark" disabled={busy === "reply"}>{busy === "reply" ? "Sending…" : selectedConversation.channel === "webchat" ? "Send live reply →" : "Share reply →"}</button></div>
+                      <div className="reply-form-footer"><small>{selectedConversation.channel === "webchat" ? "Your first reply transfers this chat to staff and pauses automated responses." : "This reply is shared with the client workspace."}</small><button className="button button-dark" disabled={busy === "reply"}>{busy === "reply" ? "Sending…" : selectedConversation.channel === "webchat" ? "Send live reply →︎" : "Share reply →︎"}</button></div>
                     </form>
                   ) : selectedConversation.channel === "email" ? snapshot.delivery.email === "ready" && snapshot.canManage ? (
                     <div className="email-draft-boundary is-ready">
@@ -587,7 +587,7 @@ export default function InboxPage() {
                               </label>
                               <button className="email-delivery-action" type="button" onClick={() => void sendEmail(emailMessage.id)} disabled={Boolean(busy)}>
                                 <span><strong>{emailMessage.status === "failed" ? "Retry email" : "Send email"}</strong><small>{emailMessage.attachments.length ? `${emailMessage.attachments.length} secure ${emailMessage.attachments.length === 1 ? "attachment" : "attachments"}` : "No attachments"}</small></span>
-                                <b>{busy === `send-${emailMessage.id}` ? "Sending…" : "→"}</b>
+                                <b>{busy === `send-${emailMessage.id}` ? "Sending…" : "→︎"}</b>
                               </button>
                             </div>
                             <small className="email-attachment-help">PDF, images, TXT, CSV, Word, or Excel · 10 MB each · 20 MB total</small>
@@ -610,7 +610,7 @@ export default function InboxPage() {
                           return (
                             <button className="email-delivery-action" key={smsMessage.id} type="button" onClick={() => void sendSms(smsMessage.id)} disabled={Boolean(busy) || !canSend}>
                               <span><strong>{canSend ? (smsMessage.status === "failed" ? "Retry SMS" : "Send SMS") : `Consent ${consent?.status || "not recorded"}`}</strong><small>To: {recipient || "No recipient"}</small></span>
-                              <b>{busy === `send-${smsMessage.id}` ? "Sending…" : canSend ? "→" : "—"}</b>
+                              <b>{busy === `send-${smsMessage.id}` ? "Sending…" : canSend ? "→︎" : "—"}</b>
                             </button>
                           );
                         })}

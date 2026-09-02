@@ -64,7 +64,7 @@ export default function TodayPage() {
   return <Shell active="Today">
     <div className="page-heading today-heading">
       <div><p className="eyebrow">{dateLabel}</p><h1>Today</h1><p className="lede">Your live operating brief, prioritized from connected workspace activity.</p></div>
-      <Link className="button button-dark" href="/reports/">Review reports <span>→</span></Link>
+      <Link className="button button-dark" href="/reports/">Review reports <span>→︎</span></Link>
     </div>
 
     {error && <p className="integration-notice today-error" role="alert">{error}</p>}
@@ -79,7 +79,7 @@ export default function TodayPage() {
     <section className="today-layout">
       <div className="today-priority-panel">
         <div className="section-heading"><div><p className="eyebrow">Priority queue</p><h2>What needs attention</h2></div></div>
-        {loading ? <p className="today-loading">Checking connected accounts and workspace activity…</p> : <div className="today-priority-list">{priorities.map((priority, index) => <Link href={priority.href} className={`today-priority ${priority.level}`} key={priority.id}><span className="today-priority-number">{String(index + 1).padStart(2, "0")}</span><div><strong>{priority.title}</strong><p>{priority.detail}</p></div><b aria-hidden="true">→</b></Link>)}</div>}
+        {loading ? <p className="today-loading">Checking connected accounts and workspace activity…</p> : <div className="today-priority-list">{priorities.map((priority, index) => <Link href={priority.href} className={`today-priority ${priority.level}`} key={priority.id}><span className="today-priority-number">{String(index + 1).padStart(2, "0")}</span><div><strong>{priority.title}</strong><p>{priority.detail}</p></div><b aria-hidden="true">→︎</b></Link>)}</div>}
       </div>
 
       <aside className="today-flow-panel">

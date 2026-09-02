@@ -75,14 +75,14 @@ export default function LoginPage() {
           <p className="eyebrow">Account activation</p><h2>Activate your workspace.</h2><p className="login-role-copy">Create your password to open the private workspace assigned to {email}.</p>
           <label htmlFor="new_password">Create password</label><input id="new_password" name="new_password" type="password" autoComplete="new-password" minLength={8} required />
           <label htmlFor="confirm_password">Confirm password</label><input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" minLength={8} required />
-          <button className="button button-login" type="submit" disabled={busy}>{busy ? "Activating…" : "Activate account"}<span>→</span></button>
+          <button className="button button-login" type="submit" disabled={busy}>{busy ? "Activating…" : "Activate account"}<span>→︎</span></button>
         </form> : <form onSubmit={async (event) => { event.preventDefault(); setBusy(true); setMessage(""); try { const session = await createAuthSession(email, password); storeAuthSession(session); const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role); const requestedPath = new URLSearchParams(window.location.search).get("returnTo"); const destination = requestedPath && isSafeReturnTo(requestedPath) && canAccessPath(effectiveRole, requestedPath) ? requestedPath : defaultRouteForRole(effectiveRole); router.replace(destination); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to sign in."); } finally { setBusy(false); } }}>
           <label htmlFor="email">Work email</label>
           <input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           <label htmlFor="password">Password</label>
           <input id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           <div className="login-options"><label className="remember"><input type="checkbox" /> <span>Remember me</span></label><button type="button" className="forgot" onClick={async () => { setMessage(""); try { await requestPasswordReset(email); setNotice(true); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to request a password reset."); } }}>Forgot password?</button></div>
-          <button className="button button-login" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in securely"}<span>→</span></button>
+          <button className="button button-login" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in securely"}<span>→︎</span></button>
         </form>}
         {notice && <p className="login-notice" role="status">If that email exists, a password-reset link has been sent.</p>}
         {message && <p className="login-notice" role="alert">{message}</p>}
