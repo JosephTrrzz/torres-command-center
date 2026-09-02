@@ -23,6 +23,8 @@ This remains the production architecture. Torres OS will evolve as a modular mon
 
 An organization is the primary security boundary. Agency organizations can manage child client organizations through explicit memberships and relationships. Existing `clients` rows remain the customer master records and are linked one-to-one to client organizations during migration. The legacy `profiles.client_id` model remains active until all reads and Functions are organization-aware.
 
+An active client member may invite a trusted teammate only into the exact client organization currently selected. The protected server boundary always writes the invited account with the `client` organization role, records the invitation and audit event, and never updates agency membership or the client account's primary billing/contact email. Accepted teammates therefore receive the same permitted Private Office routes and tenant-scoped records, without internal administration access.
+
 ## Request flow
 
 Browser requests use the Supabase publishable key plus the signed-in user's access token. Direct reads are constrained by RLS. Privileged writes and third-party calls go through a Cloudflare Function, which validates the token, loads the caller's profile and membership, checks the requested tenant, performs the action with the service role, and writes audit or outbox records.

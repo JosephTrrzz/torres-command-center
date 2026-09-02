@@ -26,6 +26,64 @@ function displayNameFor(profile: AuthSession["profile"]) {
   return localPart.split(/\s+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(" ") || "Workspace member";
 }
 
+function ClientWorkspaceInvite({ session, organizationName }: { session: AuthSession; organizationName: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<{ message: string; activationLink?: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const invite = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setResult(null);
+    try {
+      const response = await fetch("/api/client/team-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ fullName, email }),
+      });
+      const body = await response.json().catch(() => ({})) as { error?: string; message?: string; activationLink?: string };
+      if (!response.ok) throw new Error(body.error || "The invitation could not be prepared.");
+      setResult({ message: body.message || "The teammate invitation is ready.", activationLink: body.activationLink });
+      setFullName("");
+      setEmail("");
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : "The invitation could not be prepared.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!result?.activationLink) return;
+    try {
+      await navigator.clipboard.writeText(result.activationLink);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setError("Copy was blocked. Select the link and copy it manually.");
+    }
+  };
+
+  return <section className="client-workspace-access" aria-labelledby="client-workspace-access-title">
+    <div className="client-workspace-access-copy">
+      <strong id="client-workspace-access-title">Workspace access</strong>
+      <small>Invite a trusted teammate to the same client-only view of {organizationName}.</small>
+    </div>
+    {!expanded ? <button type="button" className="client-workspace-invite-trigger" onClick={() => setExpanded(true)}><span aria-hidden="true">+</span> Add team member</button> : <form className="client-workspace-invite-form" onSubmit={invite}>
+      <label><span>Name</span><input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" placeholder="Team member name" required /></label>
+      <label><span>Email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="name@company.com" required /></label>
+      <div className="client-workspace-invite-actions"><button type="button" onClick={() => { setExpanded(false); setError(""); }}>Cancel</button><button type="submit" disabled={busy}>{busy ? "Preparing…" : "Send invitation"}</button></div>
+    </form>}
+    {result && <div className="client-workspace-invite-result" role="status"><p>{result.message}</p>{result.activationLink && <div><input value={result.activationLink} readOnly aria-label="Private activation link" /><button type="button" onClick={() => void copyLink()}>{copied ? "Copied" : "Copy link"}</button></div>}</div>}
+    {error && <p className="client-workspace-invite-error" role="alert">{error}</p>}
+  </section>;
+}
+
 function NotificationPanel({ items, error, unreadCount, onClose, onRetry, onMarkAllRead }: { items: WorkspaceNotification[]; error: string; unreadCount: number; onClose: () => void; onRetry: () => void; onMarkAllRead: () => void }) {
   return <div className="menu-popover notification-popover" role="dialog" aria-label="Workspace notifications">
     <div className="notification-heading"><div><strong>Notifications</strong><small>{unreadCount ? `${unreadCount} unread` : "All caught up"}</small></div>{unreadCount > 0 && <button type="button" className="mark-read" onClick={onMarkAllRead}>Mark all read</button>}</div>
@@ -172,12 +230,13 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="brand"><span className="brand-mark">T</span><span>Torres <i>&amp; Co.</i>{effectiveRole === "customer" && <small>Private Office</small>}</span></div>
       <div className="workspace-control">
-        <button className="workspace" type="button" onClick={() => { setWorkspaceOpen(!workspaceOpen); setWorkspaceError(""); }} aria-haspopup="menu" aria-expanded={workspaceOpen}>
+        <button className="workspace" type="button" onClick={() => { setWorkspaceOpen(!workspaceOpen); setWorkspaceError(""); }} aria-haspopup="dialog" aria-expanded={workspaceOpen}>
           <span className="workspace-avatar">{initials(session.organization?.name || "Torres & Co.")}</span><span className="workspace-copy"><small>{session.organization?.kind === "client" ? "Client workspace" : "Agency workspace"}</small><strong>{session.organization?.name || "Torres & Co."}</strong></span><span className="workspace-chevron"><AppIcon name="chevron" size={16} /></span>
         </button>
-        {workspaceOpen && <div className="workspace-menu" role="menu" aria-label="Choose a workspace">
-          <div className="workspace-menu-heading"><strong>Switch workspace</strong><small>Only workspaces you can access are shown.</small></div>
-          <div className="workspace-options">{organizations.map((organization) => <button type="button" role="menuitemradio" aria-checked={organization.id === session.organization?.id} className="workspace-option" key={organization.id} onClick={() => void chooseWorkspace(organization)} disabled={Boolean(workspaceBusy)}><span>{initials(organization.name)}</span><div><strong>{organization.name}</strong><small>{organization.kind === "agency" ? "Agency" : "Client"} · {organizationRoleLabel(organization.role, session.profile.role)}</small></div><b>{workspaceBusy === organization.id ? "…" : organization.id === session.organization?.id ? "✓" : "→︎"}</b></button>)}</div>
+        {workspaceOpen && <div className="workspace-menu" role="dialog" aria-label={effectiveRole === "customer" ? "Client workspace access" : "Choose a workspace"}>
+          <div className="workspace-menu-heading"><strong>{effectiveRole === "customer" ? "Client workspace" : "Switch workspace"}</strong><small>{effectiveRole === "customer" ? "Your access stays limited to this client workspace." : "Only workspaces you can access are shown."}</small></div>
+          <div className="workspace-options">{organizations.map((organization) => <button type="button" aria-pressed={organization.id === session.organization?.id} className="workspace-option" key={organization.id} onClick={() => void chooseWorkspace(organization)} disabled={Boolean(workspaceBusy)}><span>{initials(organization.name)}</span><div><strong>{organization.name}</strong><small>{organization.kind === "client" ? "Client access" : `Agency · ${organizationRoleLabel(organization.role, session.profile.role)}`}</small></div><b>{workspaceBusy === organization.id ? "…" : organization.id === session.organization?.id ? "✓" : "→︎"}</b></button>)}</div>
+          {effectiveRole === "customer" && session.organization?.kind === "client" && <ClientWorkspaceInvite session={session} organizationName={session.organization.name} />}
           {effectiveRole !== "customer" && clients.length > 0 && <div className="workspace-preview-section"><span>View as client</span><small>Preview mode is labeled and does not change your account.</small>{clients.map((client) => <Link href={`/portal/?previewClient=${encodeURIComponent(client.id)}`} onClick={() => { setWorkspaceOpen(false); setOpen(false); }} key={client.id}><i>{client.initials}</i><strong>{client.name}</strong><b>Preview →︎</b></Link>)}</div>}
           {workspaceError && <p className="workspace-error" role="alert">{workspaceError}</p>}
         </div>}
