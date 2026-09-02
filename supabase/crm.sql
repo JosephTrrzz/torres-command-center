@@ -32,6 +32,8 @@ create table if not exists public.crm_leads (
   message text not null default '',
   source text not null default 'website' check (source in ('website', 'referral', 'phone', 'email', 'social', 'other')),
   status text not null default 'new' check (status in ('new', 'qualified', 'contacted', 'appointment_scheduled', 'won', 'lost')),
+  is_pinned boolean not null default false,
+  pinned_at timestamptz,
   assigned_to uuid references public.profiles(id) on delete set null,
   created_by uuid references public.profiles(id) on delete set null,
   converted_at timestamptz,
@@ -39,6 +41,9 @@ create table if not exists public.crm_leads (
   updated_at timestamptz not null default now(),
   check (email <> '' or phone <> '')
 );
+
+alter table public.crm_leads add column if not exists is_pinned boolean not null default false;
+alter table public.crm_leads add column if not exists pinned_at timestamptz;
 
 create table if not exists public.crm_appointments (
   id uuid primary key default gen_random_uuid(),
@@ -93,6 +98,7 @@ create table if not exists public.crm_activities (
 
 create index if not exists crm_leads_client_status_idx on public.crm_leads (client_id, status, created_at desc);
 create index if not exists crm_leads_assignee_idx on public.crm_leads (assigned_to, status, updated_at desc);
+create index if not exists crm_leads_client_pin_idx on public.crm_leads (client_id, is_pinned desc, pinned_at desc, created_at desc);
 create index if not exists crm_appointments_client_starts_idx on public.crm_appointments (client_id, starts_at, status);
 create index if not exists crm_tasks_client_due_idx on public.crm_tasks (client_id, status, due_at);
 create index if not exists crm_activities_lead_created_idx on public.crm_activities (lead_id, created_at desc);
@@ -125,6 +131,8 @@ revoke all on public.crm_leads, public.crm_appointments, public.crm_tasks, publi
 grant select on public.crm_leads, public.crm_appointments, public.crm_tasks, public.crm_activities to authenticated;
 
 comment on table public.crm_leads is 'Leads captured for a client business and moved through the agency-managed sales pipeline.';
+comment on column public.crm_leads.is_pinned is 'Keeps an important lead at the top of its pipeline stage without changing its workflow status.';
+comment on column public.crm_leads.pinned_at is 'Records when a lead was pinned so recently pinned leads can be ordered first.';
 comment on table public.crm_appointments is 'Scheduled sales or service appointments connected to a lead and client workspace.';
 comment on table public.crm_tasks is 'Assigned follow-up work tied to a lead or appointment, with explicit due and completion state.';
 comment on table public.crm_activities is 'Immutable lead timeline entries produced by protected CRM workflows.';

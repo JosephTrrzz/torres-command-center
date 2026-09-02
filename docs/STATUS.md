@@ -1,6 +1,6 @@
 # Torres OS status
 
-Updated 2026-08-28.
+Updated 2026-09-01.
 
 ## Production foundation
 
@@ -18,7 +18,7 @@ Updated 2026-08-28.
 | Search Console | Live | Site mapping and real clicks/impressions. |
 | Business Profile | External gate | Google project quota remains 0 QPM pending API approval. |
 | Reports | Live foundation | Preview, print/PDF workflow, download, and connected metrics. |
-| CRM | Live vertical slice | Organization-wide pipeline, client-linked lead capture, assignment, updates, appointments, follow-up tasks, activity history, secure first-party website intake with Formspree email notification, and qualified website-chat transcripts with staff replies. |
+| CRM | Live vertical slice | Organization-wide pipeline, client-linked lead capture, pinning, assignment, updates, appointments, follow-up tasks, activity history, secure first-party website intake with Formspree email notification, qualified website-chat transcripts with reversible archiving, and provider-tracked direct replies. |
 | Operations | Phase 3 complete | Customer 360, locations, service jobs, scheduling, assignments, job activity, tasks, estimates, documents, shared calendar, customer-safe visibility, and provider-tracked estimate approvals. |
 | Shared inbox | Phase 4 vertical slice | Email and client-account conversations, profile-named agency/client replies, durable categories, reversible staff archiving, priorities, statuses, notifications, audit/outbox history, provider-backed email delivery, private attachments, and automatic signature/confidentiality notices. Qualified website chat is routed to its CRM lead record. |
 | SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
@@ -31,12 +31,12 @@ Updated 2026-08-28.
 - Phase 1 foundation: complete for the controlled organization cutover. Legacy profile fields remain only as a compatibility fallback for unmigrated accounts.
 - Phase 2 agency and client management: in progress; the membership-bound workspace selector and authorized client preview flow are implemented.
 - Phase 3 CRM and operations: implementation complete; the lead-to-appointment workflow now continues into customer 360, jobs, scheduling, estimates, documents, tasks, activity, and client-visible approvals.
-- Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded transactional emails, private draft attachments, automatic legal footer, controlled campaigns/newsletters/review requests, consent-safe SMS/voice foundation, and AI receptionist-to-CRM handoff are implemented. Live Twilio provider configuration remains.
+- Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded transactional emails, private draft attachments, automatic legal footer, automatic lead acknowledgments, CRM replies, controlled campaigns/newsletters/review requests, consent-safe SMS/voice foundation, AI receptionist-to-CRM handoff, and the website chat availability control are implemented. Live Twilio provider configuration remains.
 - Phases 5–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-08-28: the unit suite, application TypeScript, Cloudflare Function TypeScript, and Next.js production build passed. The communications, transactional-email, attachment, marketing, and SMS/voice migrations create no seeded conversations, messages, deliveries, provider events, calls, or files.
+On 2026-09-01: 74 unit tests, application TypeScript, Cloudflare Function TypeScript, and the Next.js production build passed. The additive CRM pinning migration completed successfully without changing existing lead state or creating records.
 
 ## Known limitations
 

@@ -22,6 +22,8 @@ export interface CrmLead {
   source: LeadSource;
   status: LeadStatus;
   assigned_to: string | null;
+  is_pinned: boolean;
+  pinned_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -85,6 +87,7 @@ export interface CrmWebsiteChat {
   latestMessage: string;
   state: string;
   aiEnabled: boolean;
+  archivedAt: string | null;
   messages: CrmChatMessage[];
 }
 
@@ -101,12 +104,24 @@ export interface CrmSnapshot {
   tasks: CrmTask[];
   activities: CrmActivity[];
   websiteChats: CrmWebsiteChat[];
+  archivedWebsiteChats: CrmWebsiteChat[];
   team: CrmTeamMember[];
   summary: ReturnType<typeof buildCrmSummary>;
 }
 
 export function labelCrmValue(value: string) {
   return value.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+export function sortCrmLeads<T extends Pick<CrmLead, "is_pinned" | "pinned_at" | "created_at">>(leads: T[]) {
+  return [...leads].sort((left, right) => {
+    if (Boolean(left.is_pinned) !== Boolean(right.is_pinned)) return left.is_pinned ? -1 : 1;
+    if (left.is_pinned && right.is_pinned) {
+      const pinnedOrder = (right.pinned_at || "").localeCompare(left.pinned_at || "");
+      if (pinnedOrder) return pinnedOrder;
+    }
+    return (right.created_at || "").localeCompare(left.created_at || "");
+  });
 }
 
 export function buildCrmSummary(leads: Array<Pick<CrmLead, "status" | "assigned_to">>, tasks: Array<Pick<CrmTask, "status" | "due_at">>, appointments: Array<Pick<CrmAppointment, "status" | "starts_at">>, now = new Date()) {

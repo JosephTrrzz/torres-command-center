@@ -27,6 +27,7 @@ function normalizeSettings(input: unknown) {
   const root = object(input);
   const preferences = object(root.preferences);
   const security = object(root.security);
+  const communications = object(root.communications);
   const email = normalizeEmail(preferences.email);
   if (!isValidEmail(email)) return null;
   const website = clean(preferences.website, 500);
@@ -61,6 +62,10 @@ function normalizeSettings(input: unknown) {
       audit: security.audit !== false,
       backups: security.backups !== false,
     },
+    communications: {
+      autoLeadAcknowledgment: communications.autoLeadAcknowledgment !== false,
+      websiteChatEnabled: communications.websiteChatEnabled !== false,
+    },
     compact: root.compact === true,
     completed: Array.isArray(root.completed) ? root.completed.slice(0, 4).map(Boolean) : [],
   };
@@ -84,6 +89,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const saved = object(preferences[0]?.value);
   const savedPreferences = object(saved.preferences);
   const contact = object(organizationSettings.contact);
+  const organizationCommunications = object(organizationSettings.communications);
   return authJson({
     settings: {
       ...saved,
@@ -95,6 +101,10 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
         website: contact.website ?? savedPreferences.website,
         email: contact.email ?? savedPreferences.email,
         phone: contact.phone ?? savedPreferences.phone,
+      },
+      communications: {
+        autoLeadAcknowledgment: organizationCommunications.autoLeadAcknowledgment !== false,
+        websiteChatEnabled: organizationCommunications.websiteChatEnabled !== false,
       },
     },
   });
@@ -128,6 +138,7 @@ export const onRequestPatch = async ({ request, env }: { request: Request; env: 
       email: settings.preferences.email,
       phone: settings.preferences.phone,
     },
+    communications: settings.communications,
   };
   const now = new Date().toISOString();
   const [organizationWrite, preferenceWrite] = await Promise.all([
@@ -153,9 +164,8 @@ export const onRequestPatch = async ({ request, env }: { request: Request; env: 
       action: emailChanged ? "organization.contact_email.updated" : "organization.settings.updated",
       entity_type: "organization",
       entity_id: organizationId,
-      metadata: { email_changed: emailChanged, settings_scope: ["contact", "preferences", "security"] },
+      metadata: { email_changed: emailChanged, settings_scope: ["contact", "preferences", "security", "communications"] },
     }),
   });
   return authJson({ settings, message: emailChanged ? "Admin contact email saved to Supabase." : "Admin settings saved to Supabase." });
 };
-

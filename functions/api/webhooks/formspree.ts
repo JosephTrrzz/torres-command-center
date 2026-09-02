@@ -1,4 +1,5 @@
 import { getSupabaseUrl, type FunctionEnv } from "../../_shared/auth";
+import type { EmailEnv } from "../../_shared/email";
 import {
   formspreeConfigured,
   formspreeSubmissionFingerprint,
@@ -10,8 +11,9 @@ import {
   type FormspreePayload,
 } from "../../_shared/formspree";
 import { createNotification } from "../../_shared/notifications";
+import { sendLeadAcknowledgment } from "../../_shared/lead-acknowledgment";
 
-interface Env extends FunctionEnv, FormspreeEnv {}
+interface Env extends FunctionEnv, FormspreeEnv, EmailEnv {}
 
 interface ClientRow { id: string; organization_id: string | null; name: string }
 interface ExistingLeadRow { id?: string; email?: string; phone?: string; company?: string; service_interest?: string; message?: string }
@@ -144,6 +146,23 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       body: JSON.stringify({ organization_id: client.organization_id, event_type: "crm.lead.created", aggregate_type: "crm_lead", aggregate_id: leadId, payload: eventMetadata }),
     }),
   ]);
+  if (lead.email) {
+    await sendLeadAcknowledgment(env, {
+      supabaseUrl: url,
+      serviceKey,
+      organizationId: client.organization_id,
+      clientId: client.id,
+      leadId,
+      fullName: lead.fullName,
+      email: lead.email,
+    }).catch((error) => {
+      console.error(JSON.stringify({
+        event: "formspree_lead_acknowledgment_failed",
+        lead_id: leadId,
+        detail: error instanceof Error ? error.message : "Unknown acknowledgment error",
+      }));
+    });
+  }
   const notificationUserId = await findNotificationUser(url, serviceKey, client.organization_id);
   if (notificationUserId) await createNotification(env, {
     userId: notificationUserId,

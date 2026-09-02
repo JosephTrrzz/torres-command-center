@@ -1,6 +1,6 @@
 # Torres OS execution plan
 
-Updated 2026-08-25.
+Updated 2026-09-01.
 
 ## Delivery approach
 
@@ -48,10 +48,12 @@ Status: in progress.
 
 - Secure shared inbox with client-scoped conversations, staff/client replies, visibility controls, lifecycle status, priority, notifications, and audit/outbox history: implemented as the first vertical slice.
 - Transactional email, signed delivery webhooks, private attachments, automatic signatures, and confidentiality notices: implemented.
+- CRM communication controls: implemented with pinned leads, reversible website-chat archiving, provider-tracked lead replies, and idempotent 24-hour acknowledgments for new website and Formspree email leads.
+- Website receptionist availability: implemented as an organization setting enforced by the public receptionist API and reflected by the public-site launcher.
 - Campaigns, newsletters, and completed-service review requests: implemented with consent basis, durable suppression, test sends, explicit send confirmation, unsubscribe links, and provider delivery truth.
 - SMS/voice foundation: implemented with explicit consent evidence, durable opt-out suppression, E.164 validation, truthful provider readiness, signed Twilio webhook handling, SMS lifecycle events, and call-history records.
 - External activation: configure Twilio credentials, a verified messaging sender, and webhook URL before live SMS/voice is enabled.
-- Next slice: AI receptionist foundations after the live communications provider is proven.
+- AI receptionist foundation and qualified lead handoff: implemented. Live SMS/voice activation remains the outstanding external provider slice.
 
 ## Phase 5 — integrations and normalization
 

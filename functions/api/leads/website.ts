@@ -1,5 +1,7 @@
 import { getSupabaseUrl, type FunctionEnv } from "../../_shared/auth";
+import type { EmailEnv } from "../../_shared/email";
 import { mapFormspreeLead, missingFormspreeLeadContact } from "../../_shared/formspree";
+import { sendLeadAcknowledgment } from "../../_shared/lead-acknowledgment";
 import { createNotification } from "../../_shared/notifications";
 import {
   validWebsiteSubmissionId,
@@ -8,7 +10,7 @@ import {
   type WebsiteIntakeEnv,
 } from "../../_shared/website-intake";
 
-interface Env extends FunctionEnv, WebsiteIntakeEnv {}
+interface Env extends FunctionEnv, WebsiteIntakeEnv, EmailEnv {}
 interface ClientRow { id: string; organization_id: string | null; name: string }
 interface ExistingLeadRow { id?: string; email?: string; phone?: string; company?: string; service_interest?: string; message?: string }
 interface WebsitePayload extends Record<string, unknown> { submissionId?: unknown }
@@ -214,6 +216,24 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       body: JSON.stringify({ organization_id: client.organization_id, event_type: "crm.lead.created", aggregate_type: "crm_lead", aggregate_id: leadId, payload: eventMetadata }),
     }),
   ]);
+  if (lead.email) {
+    await sendLeadAcknowledgment(env, {
+      supabaseUrl: url,
+      serviceKey,
+      organizationId: client.organization_id,
+      clientId: client.id,
+      leadId,
+      fullName: lead.fullName,
+      email: lead.email,
+    }).catch((error) => {
+      console.error(JSON.stringify({
+        event: "website_lead_acknowledgment_failed",
+        request_id: requestId,
+        lead_id: leadId,
+        detail: error instanceof Error ? error.message : "Unknown acknowledgment error",
+      }));
+    });
+  }
   const notificationUserId = await findNotificationUser(url, serviceKey, client.organization_id);
   if (notificationUserId) await createNotification(env, {
     userId: notificationUserId,
