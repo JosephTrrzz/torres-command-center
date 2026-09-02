@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, isSafeReturnTo } from "../../lib/access-control";
 import { createAuthSession, createAuthSessionFromTokens, requestPasswordReset, storeAuthSession } from "../../lib/supabase-auth";
+import { BrandedAppLoader, markSignatureEntrySeen } from "../../components/loading-system";
 
 export default function LoginPage() {
   const [notice, setNotice] = useState(false);
@@ -57,9 +58,30 @@ export default function LoginPage() {
       const session = await createAuthSessionFromTokens(inviteSession.access_token, inviteSession.refresh_token, inviteSession.expires_at, inviteSession.user);
       storeAuthSession(session);
       await fetch("/api/customer-activate", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` } });
+      markSignatureEntrySeen();
       router.replace(defaultRouteForRole(appRoleForOrganizationRole(session.organization?.role, session.profile.role)));
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to activate your portal."); } finally { setBusy(false); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to activate your portal."); setBusy(false); }
   }
+
+  async function signIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      const session = await createAuthSession(email, password);
+      storeAuthSession(session);
+      const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
+      const requestedPath = new URLSearchParams(window.location.search).get("returnTo");
+      const destination = requestedPath && isSafeReturnTo(requestedPath) && canAccessPath(effectiveRole, requestedPath) ? requestedPath : defaultRouteForRole(effectiveRole);
+      markSignatureEntrySeen();
+      router.replace(destination);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to sign in.");
+      setBusy(false);
+    }
+  }
+
+  if (busy) return <BrandedAppLoader animate label={inviteSession ? "Activating your private workspace" : "Verifying secure access"} />;
 
   return (
     <main className="login-page">
@@ -76,7 +98,7 @@ export default function LoginPage() {
           <label htmlFor="new_password">Create password</label><input id="new_password" name="new_password" type="password" autoComplete="new-password" minLength={8} required />
           <label htmlFor="confirm_password">Confirm password</label><input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" minLength={8} required />
           <button className="button button-login" type="submit" disabled={busy}>{busy ? "Activating…" : "Activate account"}<span>→︎</span></button>
-        </form> : <form onSubmit={async (event) => { event.preventDefault(); setBusy(true); setMessage(""); try { const session = await createAuthSession(email, password); storeAuthSession(session); const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role); const requestedPath = new URLSearchParams(window.location.search).get("returnTo"); const destination = requestedPath && isSafeReturnTo(requestedPath) && canAccessPath(effectiveRole, requestedPath) ? requestedPath : defaultRouteForRole(effectiveRole); router.replace(destination); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to sign in."); } finally { setBusy(false); } }}>
+        </form> : <form onSubmit={signIn}>
           <label htmlFor="email">Work email</label>
           <input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           <label htmlFor="password">Password</label>

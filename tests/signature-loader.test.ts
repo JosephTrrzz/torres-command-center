@@ -40,12 +40,16 @@ describe("signature Torres logo-fill loader", () => {
 
   it("promotes the signature loader to session-scoped authenticated startup", () => {
     const shell = readFileSync(join(process.cwd(), "components", "shell.tsx"), "utf8");
+    const login = readFileSync(join(process.cwd(), "app", "login", "page.tsx"), "utf8");
     expect(component).toContain("torres-os-signature-entry-seen");
     expect(component).toContain("markSignatureEntrySeen");
-    expect(component).toContain("<TorresLogoLoader reducedMotion");
+    expect(component).toContain("animate = false");
     expect(component).not.toContain("branded-loader-mark");
     expect(foundation).not.toContain("brand-line");
     expect(shell).toContain("shouldShowSignatureEntry()");
+    expect(shell).toContain("SIGNATURE_ENTRY_HANDOFF_MS = 900");
     expect(shell).toContain("<AppEntryTransition");
+    expect(login).toContain("<BrandedAppLoader animate");
+    expect(login).toContain("markSignatureEntrySeen()");
   });
 });

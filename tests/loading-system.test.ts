@@ -10,7 +10,10 @@ describe("luxury loading system", () => {
   it("uses delayed, stable loading timing without blocking completed content", () => {
     expect(component).toContain("delay: 180");
     expect(component).toContain("minimumVisible: 360");
+    expect(component).toContain("longWait: 1500");
     expect(component).toContain("useDelayedLoading(active)");
+    expect(component).toContain("useLongLoading(active)");
+    expect(component).toContain("loading-long-wait");
     expect(design).toContain("Real content always wins");
   });
 
@@ -39,6 +42,7 @@ describe("luxury loading system", () => {
     expect(component).toContain("aria-busy={active}");
     expect(component).toContain('aria-hidden="true"');
     expect(component).toContain('className="sr-only"');
+    expect(component).toContain('size="small"');
   });
 
   it("uses restrained motion tokens and disables movement when requested", () => {

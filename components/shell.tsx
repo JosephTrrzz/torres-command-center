@@ -13,6 +13,7 @@ import { AppIcon, type AppIconName } from "./ui-foundation";
 import { AppEntryTransition, BrandedAppLoader, markSignatureEntrySeen, shouldShowSignatureEntry } from "./loading-system";
 
 const NAV_ICONS: Record<string, AppIconName> = { Today: "today", Overview: "overview", Clients: "clients", CRM: "crm", Projects: "projects", Operations: "operations", Inbox: "inbox", Campaigns: "campaigns", Onboarding: "onboarding", Portal: "portal", "My account": "portal", Integrations: "integrations", Reports: "reports", Settings: "settings" };
+const SIGNATURE_ENTRY_HANDOFF_MS = 900;
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "TC";
@@ -90,8 +91,9 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
 
   useEffect(() => {
     if (!checked || !session || !firstEntry || entryReady) return;
-    const frame = window.requestAnimationFrame(() => setEntryReady(true));
-    return () => window.cancelAnimationFrame(frame);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => setEntryReady(true), reducedMotion ? 0 : SIGNATURE_ENTRY_HANDOFF_MS);
+    return () => window.clearTimeout(timer);
   }, [checked, entryReady, firstEntry, session]);
 
   useEffect(() => {

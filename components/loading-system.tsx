@@ -37,6 +37,7 @@ export type PageSkeletonVariant =
 export const LOADING_TIMING = {
   delay: 180,
   minimumVisible: 360,
+  longWait: 1500,
 } as const;
 
 const APP_ENTRY_SESSION_KEY = "torres-os-signature-entry-seen";
@@ -91,6 +92,21 @@ export function useDelayedLoading(
       if (timer) clearTimeout(timer);
     };
   }, [active, delay, minimumVisible]);
+
+  return visible;
+}
+
+function useLongLoading(active: boolean, delay = LOADING_TIMING.longWait) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setVisible(false);
+      return;
+    }
+    const timer = setTimeout(() => setVisible(true), delay);
+    return () => clearTimeout(timer);
+  }, [active, delay]);
 
   return visible;
 }
@@ -287,8 +303,14 @@ export function AppEntryTransition({
   );
 }
 
-export function BrandedAppLoader({ label = "Opening your secure workspace" }: { label?: string }) {
-  return <main className="branded-app-loader"><TorresLogoLoader reducedMotion size="medium" status={label} variant="dark" /></main>;
+export function BrandedAppLoader({
+  label = "Opening your secure workspace",
+  animate = false,
+}: {
+  label?: string;
+  animate?: boolean;
+}) {
+  return <main className="branded-app-loader"><TorresLogoLoader reducedMotion={animate ? undefined : true} size="medium" status={label} variant="dark" /></main>;
 }
 
 export function ContentReveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -311,12 +333,15 @@ export function PageSkeleton({ variant = "dashboard" }: { variant?: PageSkeleton
 export function LoadingRegion({
   active,
   label,
+  longWaitLabel = "Still preparing your workspace",
   variant = "dashboard",
 }: {
   active: boolean;
   label: string;
+  longWaitLabel?: string;
   variant?: PageSkeletonVariant;
 }) {
   const visible = useDelayedLoading(active);
-  return <section aria-busy={active} aria-live="polite" className={`loading-region ${visible ? "is-visible" : "is-pending"}`}><span className="sr-only">{label}</span>{visible ? <PageSkeleton variant={variant} /> : <div aria-hidden="true" className="loading-reserved-space" />}</section>;
+  const longWait = useLongLoading(active);
+  return <section aria-busy={active} aria-live="polite" className={`loading-region ${visible ? "is-visible" : "is-pending"} ${longWait ? "is-long-wait" : ""}`}><span className="sr-only">{longWait ? longWaitLabel : label}</span>{visible ? <><PageSkeleton variant={variant} />{longWait ? <div className="loading-long-wait"><TorresLogoLoader size="small" status={longWaitLabel} variant="light" /></div> : null}</> : <div aria-hidden="true" className="loading-reserved-space" />}</section>;
 }
