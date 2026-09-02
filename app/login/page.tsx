@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, isSafeReturnTo } from "../../lib/access-control";
 import { createAuthSession, createAuthSessionFromTokens, requestPasswordReset, storeAuthSession } from "../../lib/supabase-auth";
-import { BrandedAppLoader, markSignatureEntrySeen } from "../../components/loading-system";
+import { BrandedAppLoader, prepareSignatureEntryHandoff } from "../../components/loading-system";
 
 export default function LoginPage() {
   const [notice, setNotice] = useState(false);
@@ -58,7 +58,7 @@ export default function LoginPage() {
       const session = await createAuthSessionFromTokens(inviteSession.access_token, inviteSession.refresh_token, inviteSession.expires_at, inviteSession.user);
       storeAuthSession(session);
       await fetch("/api/customer-activate", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` } });
-      markSignatureEntrySeen();
+      prepareSignatureEntryHandoff();
       router.replace(defaultRouteForRole(appRoleForOrganizationRole(session.organization?.role, session.profile.role)));
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to activate your portal."); setBusy(false); }
   }
@@ -73,7 +73,7 @@ export default function LoginPage() {
       const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
       const requestedPath = new URLSearchParams(window.location.search).get("returnTo");
       const destination = requestedPath && isSafeReturnTo(requestedPath) && canAccessPath(effectiveRole, requestedPath) ? requestedPath : defaultRouteForRole(effectiveRole);
-      markSignatureEntrySeen();
+      prepareSignatureEntryHandoff();
       router.replace(destination);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to sign in.");

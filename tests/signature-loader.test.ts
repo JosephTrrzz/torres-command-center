@@ -41,6 +41,8 @@ describe("signature Torres logo-fill loader", () => {
 
   it("releases upward into ready content without looping", () => {
     expect(component).toContain("APP_ENTRY_EXIT_MS = 580");
+    expect(component).toContain("prepareSignatureEntryHandoff");
+    expect(component).toContain("consumeSignatureEntryHandoff");
     expect(styles).toContain("position: fixed");
     expect(styles).toContain("translateY(-101%)");
     expect(styles).toContain(".entryLoader::after");
@@ -59,6 +61,8 @@ describe("signature Torres logo-fill loader", () => {
     expect(shell).toContain("SIGNATURE_ENTRY_HANDOFF_MS = 900");
     expect(shell).toContain("<AppEntryTransition");
     expect(login).toContain("<BrandedAppLoader animate");
-    expect(login).toContain("markSignatureEntrySeen()");
+    expect(login).toContain("prepareSignatureEntryHandoff()");
+    expect(shell).toContain("consumeSignatureEntryHandoff()");
+    expect(shell).toContain("completedLogo={entryHandoff}");
   });
 });

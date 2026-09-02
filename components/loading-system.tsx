@@ -41,8 +41,10 @@ export const LOADING_TIMING = {
 } as const;
 
 const APP_ENTRY_SESSION_KEY = "torres-os-signature-entry-seen";
+const APP_ENTRY_HANDOFF_KEY = "torres-os-signature-entry-handoff";
 const APP_ENTRY_EXIT_MS = 580;
 let appEntrySeenInMemory = false;
+let appEntryHandoffInMemory = false;
 
 export function shouldShowSignatureEntry() {
   if (appEntrySeenInMemory) return false;
@@ -60,6 +62,28 @@ export function markSignatureEntrySeen() {
   } catch {
     // In-memory state still prevents repeat playback when storage is unavailable.
   }
+}
+
+export function prepareSignatureEntryHandoff() {
+  appEntryHandoffInMemory = true;
+  markSignatureEntrySeen();
+  try {
+    window.sessionStorage.setItem(APP_ENTRY_HANDOFF_KEY, "true");
+  } catch {
+    // The in-memory flag preserves the handoff when storage is unavailable.
+  }
+}
+
+export function consumeSignatureEntryHandoff() {
+  let pending = appEntryHandoffInMemory;
+  appEntryHandoffInMemory = false;
+  try {
+    pending = pending || window.sessionStorage.getItem(APP_ENTRY_HANDOFF_KEY) === "true";
+    window.sessionStorage.removeItem(APP_ENTRY_HANDOFF_KEY);
+  } catch {
+    // The in-memory result remains authoritative when storage is unavailable.
+  }
+  return pending;
 }
 
 export function useDelayedLoading(
@@ -267,12 +291,14 @@ export function TorresLogoLoader({
 export function AppEntryTransition({
   ready,
   children,
+  completedLogo = false,
   variant = "dark",
   status = "Loading Torres OS",
   className = "",
 }: {
   ready: boolean;
   children: React.ReactNode;
+  completedLogo?: boolean;
   variant?: "dark" | "light";
   status?: string;
   className?: string;
@@ -299,7 +325,7 @@ export function AppEntryTransition({
     <div className={`${signatureStyles.entry} ${className}`.trim()} data-ready={ready}>
       {showLoader ? (
         <div className={signatureStyles.entryLoader} data-complete={ready}>
-          <TorresLogoLoader complete={ready} reducedMotion={prefersReducedMotion} status={status} variant={variant} />
+          <TorresLogoLoader complete={ready || completedLogo} reducedMotion={prefersReducedMotion} status={status} variant={variant} />
         </div>
       ) : null}
       <div aria-hidden={!ready} className={signatureStyles.entryContent}>{children}</div>

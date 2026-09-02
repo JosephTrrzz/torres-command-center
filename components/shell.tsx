@@ -10,7 +10,7 @@ import { readProfileAvatar } from "./profile-picture-editor";
 import { fetchClients } from "../lib/supabase-data";
 import { fetchNotifications, markNotificationsRead, type WorkspaceNotification } from "../lib/notifications";
 import { AppIcon, type AppIconName } from "./ui-foundation";
-import { AppEntryTransition, BrandedAppLoader, markSignatureEntrySeen, shouldShowSignatureEntry } from "./loading-system";
+import { AppEntryTransition, BrandedAppLoader, consumeSignatureEntryHandoff, markSignatureEntrySeen, shouldShowSignatureEntry } from "./loading-system";
 
 const NAV_ICONS: Record<string, AppIconName> = { Today: "today", Overview: "overview", Clients: "clients", CRM: "crm", Projects: "projects", Operations: "operations", Inbox: "inbox", Campaigns: "campaigns", Onboarding: "onboarding", Portal: "portal", "My account": "portal", Integrations: "integrations", Reports: "reports", Settings: "settings" };
 const SIGNATURE_ENTRY_HANDOFF_MS = 900;
@@ -46,6 +46,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const [session, setSession] = useState<AuthSession | null>(null);
   const [checked, setChecked] = useState(false);
   const [firstEntry, setFirstEntry] = useState(false);
+  const [entryHandoff, setEntryHandoff] = useState(false);
   const [entryReady, setEntryReady] = useState(true);
   const [avatarImage, setAvatarImage] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -69,8 +70,10 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       setChecked(true);
       return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
     }
-    const showSignatureEntry = shouldShowSignatureEntry();
+    const continueSignatureHandoff = consumeSignatureEntryHandoff();
+    const showSignatureEntry = continueSignatureHandoff || shouldShowSignatureEntry();
     setFirstEntry(showSignatureEntry);
+    setEntryHandoff(continueSignatureHandoff);
     setEntryReady(!showSignatureEntry);
     markSignatureEntrySeen();
     setSession(stored);
@@ -93,9 +96,12 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   useEffect(() => {
     if (!checked || !session || !firstEntry || entryReady) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timer = window.setTimeout(() => setEntryReady(true), reducedMotion ? 0 : SIGNATURE_ENTRY_HANDOFF_MS);
+    const timer = window.setTimeout(
+      () => setEntryReady(true),
+      reducedMotion ? 0 : entryHandoff ? 80 : SIGNATURE_ENTRY_HANDOFF_MS,
+    );
     return () => window.clearTimeout(timer);
-  }, [checked, entryReady, firstEntry, session]);
+  }, [checked, entryHandoff, entryReady, firstEntry, session]);
 
   useEffect(() => {
     if (!notice && !profile && !workspaceOpen) return;
@@ -182,5 +188,5 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
       <div className="content" id="workspace-content" tabIndex={-1}>{children}</div>
     </main>
   </div>;
-  return firstEntry ? <AppEntryTransition ready={entryReady} status="Opening your secure workspace" variant="dark">{shell}</AppEntryTransition> : shell;
+  return firstEntry ? <AppEntryTransition completedLogo={entryHandoff} ready={entryReady} status="Opening your secure workspace" variant="dark">{shell}</AppEntryTransition> : shell;
 }
