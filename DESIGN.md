@@ -92,3 +92,15 @@ Correct: retain a loaded inbox thread while a small refresh indicator reports a 
 ## Permanent-pattern rule
 
 New permanent visual or interaction patterns must be added here and implemented as reusable components before they are repeated across feature pages.
+
+## Private Office production mode
+
+Private Office is the approved presentation system for authenticated client roles. It is a role-aware layer inside Torres OS—not a separate application—and therefore retains the same routes, Supabase records, APIs, permission checks, and workflows as the internal command center.
+
+The client shell uses a slimmer midnight-navy navigation rail, restrained brass line work, editorial page titles, and plain-language labels: Home, Setup, Projects, Services, Messages, and Account. Labels may differ from the internal route names, but their destinations and access rules must remain canonical. Do not add search, billing, support, documents, or performance controls until a real permitted workflow exists behind each control.
+
+The client home begins with three pieces in this order: a personalized arrival, a real account-standing statement, and a reusable `PrivateOfficePortfolioPanel` paired with one contextual next action. The portfolio panel represents a service relationship—not a payment card—and may show only real client, account, contact, service, and status values. Missing optional values are omitted or described honestly. Operational content follows as quieter editorial chapters rather than a dashboard wall.
+
+Internal users retain the denser operational shell. Projects and reports may use the same editorial typography and material system, but management controls remain compact and available only where the existing permission model allows them. Mobile client mode uses the same content order and permissions, with a dark branded header and one-column composition; it is not a scaled desktop mockup.
+
+Authentication is the shared entrance for every role. Its editorial Private Office introduction sits beside the existing form at desktop widths and precedes it on smaller screens. It does not change account activation, return-path validation, credential handling, or role-based routing.

@@ -85,10 +85,15 @@ export default function LoginPage() {
 
   return (
     <main className="login-page">
-      <div className="login-brand"><Image src="/brand/torres-co-wordmark.png" alt="Torres & Co. Technology" width={270} height={106} priority className="login-wordmark" /></div>
+      <div className="login-private-office-layout">
+      <section className="login-private-office-intro" aria-label="Torres Private Office">
+        <div className="login-brand"><Image src="/brand/torres-co-wordmark.png" alt="Torres & Co. Technology" width={270} height={106} priority className="login-wordmark" /></div>
+        <div><p className="private-office-kicker">Private Office</p><h2>Your business,<br />composed.</h2><p>One secure entrance to your projects, service record, conversations, account details, and connected performance.</p></div>
+        <footer><span>Private client access</span><span>Protected workspace</span></footer>
+      </section>
       <section className="login-card" aria-labelledby="login-title">
         <div className="login-intro">
-          <p className="eyebrow">Command Center</p>
+          <p className="eyebrow">Private Office access</p>
           <h1 id="login-title">Welcome back.</h1>
           <p>Sign in with your work account. Your permissions automatically open the correct workspace.</p>
         </div>
@@ -110,6 +115,7 @@ export default function LoginPage() {
         {message && <p className="login-notice" role="alert">{message}</p>}
         <p className="login-help">Need an account? <Link href="https://torrescotechnology.com">Ask Torres &amp; Co. for an invitation.</Link></p>
       </section>
+      </div>
       <p className="login-footer">Secure access for Torres &amp; Co. Technology</p>
     </main>
   );

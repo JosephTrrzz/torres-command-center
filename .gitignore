@@ -6,3 +6,4 @@ out
 !.env.example
 .vercel
 .wrangler
+*.tsbuildinfo

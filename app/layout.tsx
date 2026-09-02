@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./ui-enhancements.css";
 import "./design-foundation.css";
+import "./private-office-production.css";
 
 export const metadata: Metadata = {
   title: "Torres & Co. Command Center",
