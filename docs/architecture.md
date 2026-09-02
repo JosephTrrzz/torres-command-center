@@ -29,6 +29,8 @@ An active client member may invite a trusted teammate only into the exact client
 
 Browser requests use the Supabase publishable key plus the signed-in user's access token. Direct reads are constrained by RLS. Privileged writes and third-party calls go through a Cloudflare Function, which validates the token, loads the caller's profile and membership, checks the requested tenant, performs the action with the service role, and writes audit or outbox records.
 
+Personal display-name changes use the protected `/api/profile` self-service boundary. The Function derives the target profile from the verified access token, permits only `full_name`, writes the change to Supabase, and records an audit event. It never accepts a user ID, role, email, organization, or client assignment from the browser. The browser refreshes its cached session only after Supabase confirms the write.
+
 ## Integration framework
 
 Each provider implements a common adapter lifecycle: authorize, verify, discover resources, save mapping, sync, normalize, report freshness, refresh credentials, and disconnect. Raw provider responses are retained only when required and are never used directly by UI components. Normalized data includes source, tenant, external identifier, observed time, synced time, and freshness status.

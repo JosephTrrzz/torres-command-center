@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { APP_NAVIGATION, appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, organizationRoleLabel } from "../lib/access-control";
-import { clearAuthSession, createAuthSessionFromTokens, readStoredSession, storeAuthSession, switchOrganization } from "../lib/supabase-auth";
+import { AUTH_SESSION_EVENT, clearAuthSession, createAuthSessionFromTokens, readStoredSession, storeAuthSession, switchOrganization } from "../lib/supabase-auth";
 import type { AuthSession, ClientSummary, OrganizationAccess } from "../lib/types";
 import { readProfileAvatar } from "./profile-picture-editor";
 import { fetchClients } from "../lib/supabase-data";
@@ -115,18 +115,27 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     const stored = readStoredSession();
     setAvatarImage(readProfileAvatar());
     const onAvatarChanged = () => setAvatarImage(readProfileAvatar());
+    const onSessionChanged = (event: Event) => {
+      const nextSession = (event as CustomEvent<AuthSession>).detail ?? readStoredSession();
+      if (nextSession) setSession(nextSession);
+    };
     window.addEventListener("torres-profile-avatar-changed", onAvatarChanged);
+    window.addEventListener(AUTH_SESSION_EVENT, onSessionChanged);
+    const removeIdentityListeners = () => {
+      window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
+      window.removeEventListener(AUTH_SESSION_EVENT, onSessionChanged);
+    };
     if (!stored) {
       const returnTo = pathname ? `?returnTo=${encodeURIComponent(pathname)}` : "";
       router.replace(`/login/${returnTo}`);
       setChecked(true);
-      return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
+      return removeIdentityListeners;
     }
     const effectiveRole = appRoleForOrganizationRole(stored.organization?.role, stored.profile.role);
     if (!canAccessPath(effectiveRole, pathname || "/")) {
       router.replace(defaultRouteForRole(effectiveRole));
       setChecked(true);
-      return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
+      return removeIdentityListeners;
     }
     const continueSignatureHandoff = consumeSignatureEntryHandoff();
     const showSignatureEntry = continueSignatureHandoff || shouldShowSignatureEntry();
@@ -144,7 +153,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     setNotificationError("");
     void fetchNotifications(stored).then(setWorkspaceNotifications).catch(() => setNotificationError("Notifications couldn’t be loaded."));
     setChecked(true);
-    return () => window.removeEventListener("torres-profile-avatar-changed", onAvatarChanged);
+    return removeIdentityListeners;
   }, [pathname, router]);
 
   useEffect(() => {

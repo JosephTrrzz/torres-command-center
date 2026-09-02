@@ -50,6 +50,8 @@ Both shells require a skip link, labeled navigation, deterministic inline SVG ic
 
 Header popovers are viewport-bounded floating surfaces. They must render above page content, keep their heading and footer visible, and scroll only their internal list when content is long. Opening one shell menu closes the others; Escape dismisses every open shell menu.
 
+Shell identity always represents the signed-in person, never the active organization. The sidebar and account menu use `profiles.full_name`, with a readable email-derived fallback only when that field is empty. Owners and administrators edit this value in Settings; clients edit it from Account. Both surfaces use the same reusable identity editor and protected self-profile API. Portraits are cropped into a fixed, non-shrinking avatar so long names cannot distort them; the current browser-local portrait remains a device preference until a storage-backed media workflow is introduced.
+
 ## Shared patterns
 
 - `PageHeader`: eyebrow, one H1, concise description, optional actions.

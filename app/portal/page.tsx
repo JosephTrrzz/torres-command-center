@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Shell } from "../../components/shell";
 import { LoadingRegion } from "../../components/loading-system";
 import { PrivateOfficeNextAction, PrivateOfficePortfolioPanel } from "../../components/private-office";
+import { AccountIdentityEditor } from "../../components/profile-picture-editor";
 import { fetchClient, fetchClientPeople, fetchCustomerAccount, fetchCustomerAccountByEmail } from "../../lib/supabase-data";
 import { readStoredSession } from "../../lib/supabase-auth";
 import { fetchOnboarding } from "../../lib/onboarding-api";
@@ -140,6 +141,7 @@ export default function PortalPage() {
           <div className="private-office-chapter-heading"><span className="private-office-kicker">Your office</span><h2>Everything connected to your account.</h2><p>Operational details remain available below, organized by the decision or task they support.</p></div>
 
           <div className="portal-grid">
+            {!previewClientId && <AccountIdentityEditor surface="portal" />}
             <section className="portal-card portal-operations-card"><span className="eyebrow">Service &amp; approvals</span><h2>Jobs, estimates, and documents</h2><p>Follow scheduled work, review client-visible updates, approve estimates, and open the latest shared documents in one place.</p><Link className="button button-dark" href={previewClientId ? `/operations/?client=${encodeURIComponent(client.id)}` : "/operations/"}>Open service workspace <span>→︎</span></Link></section>
 
             <section className="portal-card portal-inbox-card"><span className="eyebrow">Messages &amp; updates</span><h2>Your shared inbox</h2><p>Ask questions, respond to project updates, and keep decisions attached to your company record instead of scattered across separate email threads.</p><Link className="button button-dark" href={previewClientId ? `/inbox/?client=${encodeURIComponent(client.id)}` : "/inbox/"}>Open shared inbox <span>→︎</span></Link></section>

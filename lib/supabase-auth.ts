@@ -2,6 +2,7 @@ import { ROLE_PERMISSIONS } from "./organization-access";
 import type { AppRole, AuthSession, AuthUser, OrganizationAccess, OrganizationKind, OrganizationRole, UserProfile } from "./types";
 
 const SESSION_KEY = "torres-auth-session";
+export const AUTH_SESSION_EVENT = "torres-auth-session-changed";
 
 function getConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -177,6 +178,7 @@ export async function switchOrganization(session: AuthSession, organizationId: s
 export function storeAuthSession(session: AuthSession) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    window.dispatchEvent(new CustomEvent<AuthSession>(AUTH_SESSION_EVENT, { detail: session }));
   }
 }
 
