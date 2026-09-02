@@ -1,109 +1,163 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Shell } from "../../components/shell";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrandSelect } from "../../components/brand-select";
-import { fetchClients } from "../../lib/supabase-data";
+import { ButtonLoader, LoadingRegion } from "../../components/loading-system";
+import { Shell } from "../../components/shell";
+import { FeedbackBanner, PageHeader, StatePanel } from "../../components/ui-foundation";
+import { checkIntegration, disconnectIntegration, fetchIntegrations } from "../../lib/integrations-api";
+import { integrationScopeLabel, integrationStatusLabel, type IntegrationProvider, type IntegrationsSnapshot } from "../../lib/integrations";
 import { readStoredSession } from "../../lib/supabase-auth";
-import { ClientDetail } from "../../lib/types";
+import { fetchClients } from "../../lib/supabase-data";
+import type { ClientDetail } from "../../lib/types";
 
-type IntegrationDefinition = { id: string; name: string; category: string; icon: string; description: string; proof: string; unlocks: string[]; requirements: string[] };
-type GoogleProperties = { searchConsole: { properties: Array<{ siteUrl: string; permissionLevel?: string }>; error?: string }; analytics: { properties: Array<{ property: string; displayName?: string; account?: string }>; error?: string }; businessProfile: { properties: Array<{ name: string; title?: string; storeCode?: string; websiteUri?: string }>; error?: string } };
+type GoogleProperties = {
+  searchConsole: { properties: Array<{ siteUrl: string; permissionLevel?: string }>; error?: string };
+  analytics: { properties: Array<{ property: string; displayName?: string; account?: string }>; error?: string };
+  businessProfile: { properties: Array<{ name: string; title?: string; storeCode?: string; websiteUri?: string }>; error?: string };
+};
 
-const integrations: IntegrationDefinition[] = [
-  { id: "gbp", name: "Google Business Profile", category: "Reviews & listings", icon: "G", description: "Prepare reviews, rating, business details, hours, calls, and listing health.", proof: "Reviews, rating, profile completeness", unlocks: ["Review response queue", "Profile actions", "Listing completeness"], requirements: ["Verified Google Business Profile", "Manager access for the client location"] },
-  { id: "search-console", name: "Google Search Console", category: "Search visibility", icon: "S", description: "Track clicks, impressions, queries, indexing, and technical search opportunities.", proof: "Clicks, impressions, query opportunities", unlocks: ["Clicks and impressions", "Search query opportunities", "Indexing checks"], requirements: ["Verified site property", "Owner or delegated access"] },
-  { id: "analytics", name: "Google Analytics", category: "Traffic", icon: "A", description: "Measure sessions, users, engagement, conversions, and the sources producing leads.", proof: "Traffic sources, engagement, conversions", unlocks: ["Traffic source trends", "Engagement and conversions", "Lead source reporting"], requirements: ["GA4 property", "Analyst access"] },
-  { id: "pagespeed", name: "PageSpeed Insights", category: "Website scorecard", icon: "P", description: "Check performance, accessibility, SEO, and Core Web Vitals across mobile and desktop.", proof: "Performance, accessibility, SEO, Core Web Vitals", unlocks: ["Performance scorecard", "Core Web Vitals", "Technical SEO checks"], requirements: ["Public website URL", "Mobile and desktop test targets"] },
-  { id: "cloudflare", name: "Cloudflare", category: "Infrastructure", icon: "C", description: "Monitor uptime, DNS, deployments, SSL, and the security posture of the website.", proof: "Deployment health, DNS, SSL, security", unlocks: ["Deployment health", "DNS and SSL visibility", "Security posture"], requirements: ["Cloudflare zone or Worker", "Read-only account access"] },
-  { id: "reviews", name: "Review sources", category: "Reputation", icon: "R", description: "Create one reputation view for Google and future review providers as the portfolio grows.", proof: "Rating trends, response needs, source coverage", unlocks: ["Rating trends", "Response needs", "Review source coverage"], requirements: ["Review provider access", "Location or profile mapping"] },
-  { id: "square", name: "Square payments", category: "Billing & payments", icon: "$", description: "Prepare customer-linked checkout, invoices, and payment status for Torres & Co. services.", proof: "Payment status, invoices, subscription state", unlocks: ["Customer-linked billing view", "Payment status tracking", "Invoice and subscription readiness"], requirements: ["Square Developer account", "Business owner authorization", "Server-side webhooks for status updates"] },
-];
-
-const readinessKey = "torres-command-center-integration-readiness";
+const providerMarks: Record<IntegrationProvider, string> = { google: "G", resend: "R", website_intake: "W", supabase: "S", cloudflare: "C" };
 
 function formatGoogleNotice(message: string) {
   const normalized = message.toLowerCase();
-  if (normalized.includes("access_denied") || normalized.includes("not verified") || normalized.includes("testing")) {
-    return "Google blocked this account because the app is still in Testing. Choose one of the accounts listed under Google Cloud →︎ OAuth consent screen →︎ Test users, then try again.";
-  }
+  if (normalized.includes("access_denied") || normalized.includes("not verified") || normalized.includes("testing")) return "Google blocked this account because the app is still in Testing. Add the account under Google Cloud →︎ OAuth consent screen →︎ Test users, then try again.";
   return message;
 }
 
+function formatDate(value: string | null) {
+  if (!value) return "Not checked yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not checked yet";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+}
+
 export default function IntegrationsPage() {
-  const [notice, setNotice] = useState("");
+  const [clients, setClients] = useState<ClientDetail[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
-  const [clientList, setClientList] = useState<ClientDetail[]>([]);
-  const [activeIntegration, setActiveIntegration] = useState<IntegrationDefinition | null>(null);
-  const [ready, setReady] = useState<Record<string, boolean>>({});
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState("");
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [snapshot, setSnapshot] = useState<IntegrationsSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [workingProvider, setWorkingProvider] = useState<IntegrationProvider | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "warning" | "error"; title: string; detail: string } | null>(null);
   const [googleProperties, setGoogleProperties] = useState<GoogleProperties | null>(null);
   const [propertiesLoading, setPropertiesLoading] = useState(false);
-  const [propertiesMessage, setPropertiesMessage] = useState("");
   const [propertySelection, setPropertySelection] = useState({ businessProfile: "", searchConsole: "", analytics: "" });
+
+  const selectedClient = useMemo(() => clients.find((client) => client.id === selectedClientId), [clients, selectedClientId]);
+  const googleConnection = snapshot?.connections.find((connection) => connection.provider === "google");
+
+  const loadSnapshot = useCallback(async (clientId: string, quiet = false) => {
+    const session = readStoredSession();
+    if (!session || !clientId) return;
+    if (!quiet) setLoading(true);
+    try {
+      setSnapshot(await fetchIntegrations(session, clientId));
+    } catch (error) {
+      setSnapshot(null);
+      setNotice({ tone: "error", title: "Connections could not load", detail: error instanceof Error ? error.message : "Try refreshing the page." });
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    let clientId = query.get("client") || "";
+    if (!clientId) {
+      try { clientId = window.sessionStorage.getItem("torres-command-center-selected-client") || ""; } catch { /* storage is optional */ }
+    }
+    setSelectedClientId(clientId);
+    if (query.get("connected") === "google") setNotice({ tone: "success", title: "Google connected", detail: "Authorization was saved. Run a connection check, then map this client’s properties." });
+    if (query.get("error")) setNotice({ tone: "error", title: "Google could not connect", detail: formatGoogleNotice(query.get("error") || "Google authorization failed.") });
+    fetchClients().then((list) => {
+      setClients(list);
+      if (!clientId && list[0]) setSelectedClientId(list[0].id);
+    }).catch(() => setNotice({ tone: "error", title: "Clients could not load", detail: "Refresh the page or sign in again." }));
+  }, []);
+
+  useEffect(() => {
+    if (selectedClientId) void loadSnapshot(selectedClientId);
+    else setLoading(false);
+  }, [loadSnapshot, selectedClientId]);
 
   const handleClientChange = (clientId: string) => {
     setSelectedClientId(clientId);
-    setNotice("");
-    try { window.sessionStorage.setItem("torres-command-center-selected-client", clientId); } catch { /* browser storage may be unavailable */ }
+    setSnapshot(null);
+    setGoogleProperties(null);
+    setNotice(null);
+    try { window.sessionStorage.setItem("torres-command-center-selected-client", clientId); } catch { /* storage is optional */ }
     const url = new URL(window.location.href);
     if (clientId) url.searchParams.set("client", clientId);
     else url.searchParams.delete("client");
+    url.searchParams.delete("connected");
     url.searchParams.delete("error");
     window.history.replaceState({}, "", url);
   };
 
-  useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    let clientId = query.get("client") ?? "";
-    if (!clientId) {
-      try { clientId = window.sessionStorage.getItem("torres-command-center-selected-client") ?? ""; } catch { /* browser storage may be unavailable */ }
-    }
-    setSelectedClientId(clientId);
-    if (query.get("connected") === "google") setNotice("Google was connected for this client.");
-    if (query.get("error")) setNotice(formatGoogleNotice(query.get("error") ?? "Unable to connect Google."));
-    try { setReady(JSON.parse(window.localStorage.getItem(readinessKey) ?? "{}")); } catch { setReady({}); }
-    fetchClients().then(setClientList).catch(() => setClientList([]));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedClientId) {
-      setGoogleConnected(false);
-      setGoogleEmail("");
-      return;
-    }
-    let active = true;
-    setGoogleLoading(true);
-    setGoogleProperties(null);
+  const connectGoogle = () => {
+    if (!selectedClientId) return;
     const session = readStoredSession();
-    fetch(`/api/google/status?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store", headers: { Authorization: `Bearer ${session?.access_token ?? ""}` } })
-      .then((response) => response.ok ? response.json() : { connected: false })
-      .then((status: { connected?: boolean; googleEmail?: string }) => {
-        if (!active) return;
-        setGoogleConnected(Boolean(status.connected));
-        setGoogleEmail(status.googleEmail || "");
+    setWorkingProvider("google");
+    void fetch(`/api/google/start?client=${encodeURIComponent(selectedClientId)}`, { headers: { Authorization: `Bearer ${session?.access_token || ""}`, Accept: "application/json" }, credentials: "same-origin" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as { authorizationUrl?: string; error?: string };
+        if (!response.ok || !payload.authorizationUrl) throw new Error(payload.error || "Google authorization could not be started.");
+        window.location.assign(payload.authorizationUrl);
       })
-      .catch(() => { if (active) setGoogleConnected(false); })
-      .finally(() => { if (active) setGoogleLoading(false); });
-    return () => { active = false; };
-  }, [selectedClientId]);
+      .catch((error) => {
+        setWorkingProvider(null);
+        setNotice({ tone: "error", title: "Google could not connect", detail: error instanceof Error ? error.message : "Try again." });
+      });
+  };
+
+  const runHealthCheck = async (provider: IntegrationProvider) => {
+    const session = readStoredSession();
+    if (!session || !selectedClientId) return;
+    setWorkingProvider(provider);
+    setNotice(null);
+    try {
+      const result = await checkIntegration(session, selectedClientId, provider);
+      const providerName = snapshot?.connections.find((item) => item.provider === provider)?.name || "Connection";
+      setNotice({ tone: "success", title: `${providerName} checked`, detail: result.message || "Provider health is current." });
+      await loadSnapshot(selectedClientId, true);
+    } catch (error) {
+      setNotice({ tone: "error", title: "Connection check failed", detail: error instanceof Error ? error.message : "Try again." });
+    } finally {
+      setWorkingProvider(null);
+    }
+  };
+
+  const disconnectGoogle = async () => {
+    if (!window.confirm("Disconnect Google for this client? This removes its authorization and saved property mappings. Reports will stop receiving Google data until it is reconnected.")) return;
+    const session = readStoredSession();
+    if (!session || !selectedClientId) return;
+    setWorkingProvider("google");
+    try {
+      const result = await disconnectIntegration(session, selectedClientId, "google");
+      setGoogleProperties(null);
+      setNotice({ tone: "warning", title: "Google disconnected", detail: result.message || "The connection was removed." });
+      await loadSnapshot(selectedClientId, true);
+    } catch (error) {
+      setNotice({ tone: "error", title: "Google could not disconnect", detail: error instanceof Error ? error.message : "Try again." });
+    } finally {
+      setWorkingProvider(null);
+    }
+  };
 
   const discoverGoogleProperties = async () => {
     if (!selectedClientId) return;
+    const session = readStoredSession();
     setPropertiesLoading(true);
-    setPropertiesMessage("");
+    setNotice(null);
     try {
-      const session = readStoredSession();
-      const response = await fetch(`/api/google/properties?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store", headers: { Authorization: `Bearer ${session?.access_token ?? ""}` } });
+      const response = await fetch(`/api/google/properties?client=${encodeURIComponent(selectedClientId)}`, { cache: "no-store", headers: { Authorization: `Bearer ${session?.access_token || ""}` } });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Google properties could not be loaded.");
       setGoogleProperties(payload);
-      setPropertiesMessage("Google properties loaded. Choose the resources that belong to this client, then save the mapping.");
+      setNotice({ tone: "success", title: "Google resources discovered", detail: "Choose the resources that belong to this client, then save the mapping." });
     } catch (error) {
-      setPropertiesMessage(error instanceof Error ? error.message : "Google properties could not be loaded.");
+      setNotice({ tone: "error", title: "Google resources could not load", detail: error instanceof Error ? error.message : "Try reconnecting Google." });
     } finally {
       setPropertiesLoading(false);
     }
@@ -111,73 +165,38 @@ export default function IntegrationsPage() {
 
   const saveGoogleProperties = async () => {
     if (!selectedClientId) return;
+    const session = readStoredSession();
     setPropertiesLoading(true);
     try {
-      const session = readStoredSession();
-      const response = await fetch("/api/google/properties", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` }, body: JSON.stringify({ clientId: selectedClientId, ...propertySelection }) });
+      const response = await fetch("/api/google/properties", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` }, body: JSON.stringify({ clientId: selectedClientId, ...propertySelection }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Google property selections could not be saved.");
-      setPropertiesMessage("Google property mapping saved. Reports can use these resources after metric sync is enabled.");
+      setNotice({ tone: "success", title: "Property mapping saved", detail: "Reports can now use these Google resources during metric refresh." });
+      await loadSnapshot(selectedClientId, true);
     } catch (error) {
-      setPropertiesMessage(error instanceof Error ? error.message : "Google property selections could not be saved.");
+      setNotice({ tone: "error", title: "Property mapping could not save", detail: error instanceof Error ? error.message : "Try again." });
     } finally {
       setPropertiesLoading(false);
     }
   };
 
-  const selectedClient = useMemo(() => clientList.find((client) => client.id === selectedClientId), [clientList, selectedClientId]);
-  const readyCount = integrations.filter((integration) => ready[`${selectedClientId}:${integration.id}`]).length;
-
-  const markReady = () => {
-    if (!activeIntegration || !selectedClientId) return;
-    const key = `${selectedClientId}:${activeIntegration.id}`;
-    const next = { ...ready, [key]: true };
-    setReady(next);
-    window.localStorage.setItem(readinessKey, JSON.stringify(next));
-    setNotice(`${activeIntegration.name} is marked ready for ${selectedClient?.name ?? "this client"}. Live provider authorization is still required before data appears.`);
-    setActiveIntegration(null);
-  };
-  const connectGoogle = () => {
-    if (!selectedClientId) { setNotice("Choose a client first so Google is connected to the correct account."); return; }
-    const session = readStoredSession();
-    void fetch(`/api/google/start?client=${encodeURIComponent(selectedClientId)}`, { headers: { Authorization: `Bearer ${session?.access_token ?? ""}`, Accept: "application/json" }, credentials: "same-origin" })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => ({})) as { authorizationUrl?: string; error?: string };
-        if (!response.ok || !payload.authorizationUrl) throw new Error(payload.error || "Google authorization could not be started.");
-        window.location.assign(payload.authorizationUrl);
-      })
-      .catch((error) => setNotice(error instanceof Error ? error.message : "Google authorization could not be started."));
-  };
-
   return <Shell active="Integrations">
-      <div className="page-heading integrations-page-heading"><div><p className="eyebrow">Data connections</p><h1>Integrations</h1><p className="lede">Organize the proof behind every client website, campaign, and growth recommendation.</p></div><span className="health-badge watch">{selectedClient ? `${readyCount}/${integrations.length} prepared` : "Choose a client"}</span></div>
-    <section className="integration-banner"><div><p className="eyebrow">Torres & Co. evidence layer</p><h2>One setup hub for every client connection.</h2><p>Prepare the accounts and permissions that turn dashboard estimates into verified business results. Provider authorization is kept separate until each connection is approved.</p></div><div className="integration-logo">TC</div></section>
-    <section className="integration-controls detail-card">
-      <div>
-        <p className="eyebrow">Client scope</p>
-        <h2>Whose connections are you preparing?</h2>
-        <p>Readiness is tracked per client so accounts never get mixed together.</p>
-      </div>
-      <BrandSelect
-        label="Client"
-        onChange={handleClientChange}
-        options={clientList.map((client) => ({
-          value: client.id,
-          label: client.name,
-          description:
-            [client.industry, client.location].filter(Boolean).join(" · ") ||
-            "Client account",
-        }))}
-        placeholder="Choose a client"
-        value={selectedClientId}
-      />
-    </section>
-    <div className="integration-summary"><div><span>Prepared</span><strong>{selectedClient ? readyCount : "—"}</strong><small>connections ready for review</small></div><div><span>Available</span><strong>{integrations.length}</strong><small>connection types</small></div><div><span>Live data</span><strong>{googleLoading ? "Checking" : googleConnected ? "On" : "Off"}</strong><small>{googleConnected ? `Google${googleEmail ? ` · ${googleEmail}` : ""} connected` : "authorization still required"}</small></div></div>
-    {notice && <p className="integration-notice">{notice}</p>}
-    {selectedClient && googleConnected && <section className="google-property-panel detail-card"><div className="section-heading"><div><p className="eyebrow">Google resources</p><h2>Choose the properties for this client</h2><p>Authorization is confirmed for {googleEmail || "this account"}. Select the matching resources before metrics are added to Reports.</p></div><button className="button button-light" type="button" onClick={discoverGoogleProperties} disabled={propertiesLoading}>{propertiesLoading ? "Checking…" : "Discover properties"}</button></div>{propertiesMessage && <p className="integration-notice">{propertiesMessage}</p>}{googleProperties && <div className="google-property-grid"><label>Business Profile<select value={propertySelection.businessProfile} onChange={(event) => setPropertySelection({ ...propertySelection, businessProfile: event.target.value })}><option value="">Choose a location</option>{googleProperties.businessProfile.properties.map((property) => <option key={property.name} value={property.name}>{property.title || property.name}{property.websiteUri ? ` · ${property.websiteUri}` : ""}</option>)}</select>{googleProperties.businessProfile.error && <small>{googleProperties.businessProfile.error}</small>}</label><label>Search Console<select value={propertySelection.searchConsole} onChange={(event) => setPropertySelection({ ...propertySelection, searchConsole: event.target.value })}><option value="">Choose a site</option>{googleProperties.searchConsole.properties.map((property) => <option key={property.siteUrl} value={property.siteUrl}>{property.siteUrl}</option>)}</select>{googleProperties.searchConsole.error && <small>{googleProperties.searchConsole.error}</small>}</label><label>Google Analytics<select value={propertySelection.analytics} onChange={(event) => setPropertySelection({ ...propertySelection, analytics: event.target.value })}><option value="">Choose a property</option>{googleProperties.analytics.properties.map((property) => <option key={property.property} value={property.property}>{property.displayName || property.property}{property.account ? ` · ${property.account}` : ""}</option>)}</select>{googleProperties.analytics.error && <small>{googleProperties.analytics.error}</small>}</label><button className="button button-dark" type="button" onClick={saveGoogleProperties} disabled={propertiesLoading}>Save property mapping <span>→︎</span></button></div>}</section>}
-    <div className="section-heading"><div><p className="eyebrow">Connection catalog</p><h2>Choose what to set up next</h2></div><Link className="button button-light" href="/clients/">View clients <span>→︎</span></Link></div>
-    <div className="integration-grid">{integrations.map((integration) => { const isReady = Boolean(ready[`${selectedClientId}:${integration.id}`]); const isGoogle = ["gbp", "search-console", "analytics"].includes(integration.id); const status = isGoogle && googleConnected ? "Connected" : isReady ? "Prepared" : "Not connected"; return <article className="integration-card" key={integration.id}><div className="integration-card-top"><div><div className="integration-logo">{integration.icon}</div><p className="integration-category">{integration.category}</p></div><span className={`integration-status${status === "Connected" ? " integration-status-connected" : ""}`}>{status}</span></div><h3>{integration.name}</h3><p>{integration.description}</p><div className="integration-proof"><strong>Proof:</strong> {integration.proof}</div><div className="integration-unlocks">{integration.unlocks.map((item) => <span key={item}>{item}</span>)}</div><div className="integration-card-actions"><button className="button button-light" type="button" onClick={() => selectedClientId ? setActiveIntegration(integration) : setNotice("Choose a client first so this connection is scoped correctly.")}>{selectedClientId ? (isReady ? "Review setup" : "Prepare connection") : "Choose client"} <span>→︎</span></button>{isGoogle && <button className="text-button integration-connect" type="button" onClick={googleConnected ? () => setNotice(`Google is connected for ${googleEmail || "this client"}.`) : connectGoogle}>{googleConnected ? "Google connected" : "Connect Google"}</button>}</div></article>; })}</div>
-    <p className="integration-notice">This catalog prepares the workflow and explains what each provider will supply. It does not claim live Google, Cloudflare, or review data until the provider authorization step is completed.</p>
-    {activeIntegration && <div className="modal-backdrop" role="presentation" onClick={() => setActiveIntegration(null)}><section className="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" aria-label="Close" onClick={() => setActiveIntegration(null)}>×</button><p className="eyebrow">Connection setup</p><h2 id="setup-title">{activeIntegration.name}</h2><p>{activeIntegration.description}</p><div className="setup-modal-grid"><div><span>Client</span><strong>{selectedClient?.name}</strong></div><div><span>Status</span><strong>{ready[`${selectedClientId}:${activeIntegration.id}`] ? "Prepared" : "Not connected"}</strong></div></div><h3>What this unlocks</h3><ul>{activeIntegration.unlocks.map((item) => <li key={item}>{item}</li>)}</ul><h3>Before authorization</h3><ul>{activeIntegration.requirements.map((item) => <li key={item}>{item}</li>)}</ul><div className="modal-actions"><button className="button button-light" type="button" onClick={() => setActiveIntegration(null)}>Cancel</button><button className="button button-dark" type="button" onClick={markReady}>Mark ready for authorization <span>→︎</span></button></div></section></div>}
+    <PageHeader eyebrow="Connection control" title="Integrations" description="See what is connected, verify provider health, and keep every client’s data sources properly scoped." actions={<span className="health-badge healthy">Phase 5 foundation</span>} className="integrations-page-heading" />
+    <section className="integration-controls detail-card"><div><p className="eyebrow">Client scope</p><h2>Connection workspace</h2><p>Client-owned resources stay separate while agency and platform services remain clearly labeled.</p></div><BrandSelect label="Client" onChange={handleClientChange} options={clients.map((client) => ({ value: client.id, label: client.name, description: [client.industry, client.location].filter(Boolean).join(" · ") || "Client account" }))} placeholder="Choose a client" value={selectedClientId} /></section>
+    {notice && <FeedbackBanner tone={notice.tone} title={notice.title}><p>{notice.detail}</p></FeedbackBanner>}
+    {loading ? <LoadingRegion active label="Loading integration control center" variant="settings" /> : !selectedClientId ? <StatePanel state="empty" title="Choose a client workspace" description="Connections and provider health are always reviewed within an explicit client scope." /> : !snapshot ? <StatePanel state="error" title="Integration control is unavailable" description="Refresh the page or sign in again." /> : <>
+      {!snapshot.registryReady && <FeedbackBanner tone="warning" title="Provider history needs its Phase 5 migration"><p>Live configuration is shown below, but health checks cannot be saved until <strong>supabase/integration_control.sql</strong> is applied.</p></FeedbackBanner>}
+      <section className="integration-summary" aria-label="Connection summary"><div><span>Connected</span><strong>{snapshot.summary.connected}/{snapshot.connections.length}</strong><small>providers responding</small></div><div><span>Needs attention</span><strong>{snapshot.summary.actionRequired}</strong><small>configuration or access</small></div><div><span>Checked today</span><strong>{snapshot.summary.checkedRecently}</strong><small>durable health checks</small></div></section>
+      <div className="section-heading integration-section-heading"><div><p className="eyebrow">Provider registry</p><h2>Connected systems</h2><p>Health is verified on demand and stored without copying provider secrets into this registry.</p></div><button className="button button-light" type="button" onClick={() => void loadSnapshot(selectedClientId)} disabled={loading}>Refresh view <span aria-hidden="true">→︎</span></button></div>
+      <section className="integration-control-grid">{snapshot.connections.map((connection) => <article className="integration-control-card" key={connection.provider}>
+        <header><span className="integration-provider-mark" aria-hidden="true">{providerMarks[connection.provider]}</span><div><p>{connection.category}</p><h3>{connection.name}</h3></div><span className={`integration-health integration-health-${connection.status}`}><i aria-hidden="true" />{integrationStatusLabel(connection.status)}</span></header>
+        <p className="integration-control-description">{connection.description}</p>
+        <div className="integration-connection-meta"><span><small>Scope</small><strong>{integrationScopeLabel(connection.scope)}</strong></span><span><small>Last verified</small><strong>{formatDate(connection.lastCheckedAt)}</strong></span>{connection.accountLabel && <span><small>Account</small><strong>{connection.accountLabel}</strong></span>}</div>
+        <p className="integration-health-detail">{connection.statusDetail}</p><div className="integration-capabilities">{connection.capabilities.length ? connection.capabilities.map((capability) => <span key={capability}>{capability}</span>) : <span>No resources mapped</span>}</div>
+        <footer>{connection.provider === "google" && connection.status === "disconnected" ? <button className="button button-dark" type="button" onClick={connectGoogle} disabled={!snapshot.canManage || workingProvider === "google"}>{workingProvider === "google" && <ButtonLoader />}Connect Google <span aria-hidden="true">→︎</span></button> : <button className="button button-light" type="button" onClick={() => void runHealthCheck(connection.provider)} disabled={!snapshot.canManage || !snapshot.registryReady || workingProvider !== null}>{workingProvider === connection.provider && <ButtonLoader />}Check connection</button>}{connection.provider === "google" && connection.status !== "disconnected" && <button className="text-button" type="button" onClick={connectGoogle} disabled={!snapshot.canManage}>Reconnect</button>}{connection.canDisconnect && connection.status !== "disconnected" && <button className="text-button danger-link" type="button" onClick={() => void disconnectGoogle()} disabled={!snapshot.canManage || !snapshot.registryReady || workingProvider !== null}>Disconnect</button>}</footer>
+      </article>)}</section>
+      {googleConnection?.status === "connected" && <section className="google-property-panel detail-card"><div className="section-heading"><div><p className="eyebrow">Google resources</p><h2>Map this client’s properties</h2><p>Authorization is confirmed{googleConnection.accountLabel ? ` for ${googleConnection.accountLabel}` : ""}. Only select resources owned by {selectedClient?.name || "this client"}.</p></div><button className="button button-light" type="button" onClick={() => void discoverGoogleProperties()} disabled={propertiesLoading}>{propertiesLoading && <ButtonLoader />}{propertiesLoading ? "Checking" : "Discover properties"}</button></div>{googleProperties && <div className="google-property-grid"><label>Business Profile<select value={propertySelection.businessProfile} onChange={(event) => setPropertySelection({ ...propertySelection, businessProfile: event.target.value })}><option value="">Choose a location</option>{googleProperties.businessProfile.properties.map((property) => <option key={property.name} value={property.name}>{property.title || property.name}{property.websiteUri ? ` · ${property.websiteUri}` : ""}</option>)}</select>{googleProperties.businessProfile.error && <small>{googleProperties.businessProfile.error}</small>}</label><label>Search Console<select value={propertySelection.searchConsole} onChange={(event) => setPropertySelection({ ...propertySelection, searchConsole: event.target.value })}><option value="">Choose a site</option>{googleProperties.searchConsole.properties.map((property) => <option key={property.siteUrl} value={property.siteUrl}>{property.siteUrl}</option>)}</select>{googleProperties.searchConsole.error && <small>{googleProperties.searchConsole.error}</small>}</label><label>Google Analytics<select value={propertySelection.analytics} onChange={(event) => setPropertySelection({ ...propertySelection, analytics: event.target.value })}><option value="">Choose a property</option>{googleProperties.analytics.properties.map((property) => <option key={property.property} value={property.property}>{property.displayName || property.property}{property.account ? ` · ${property.account}` : ""}</option>)}</select>{googleProperties.analytics.error && <small>{googleProperties.analytics.error}</small>}</label><button className="button button-dark" type="button" onClick={() => void saveGoogleProperties()} disabled={propertiesLoading}>Save mapping <span aria-hidden="true">→︎</span></button></div>}</section>}
+      <section className="integration-history detail-card"><div className="section-heading"><div><p className="eyebrow">Activity ledger</p><h2>Recent provider checks</h2></div><Link className="text-link" href="/settings/#admin-console">Workspace settings <span aria-hidden="true">→︎</span></Link></div>{snapshot.runs.length ? <div className="integration-run-list">{snapshot.runs.map((run) => <article key={run.id}><span className={`integration-run-mark ${run.status}`} aria-hidden="true" /><div><strong>{snapshot.connections.find((connection) => connection.provider === run.provider)?.name || run.provider}</strong><p>{run.operation === "health_check" ? "Connection health checked" : "Provider disconnected"}{run.errorMessage ? ` · ${run.errorMessage}` : ""}</p></div><time dateTime={run.startedAt}>{formatDate(run.startedAt)}</time><b>{run.status === "succeeded" ? "Complete" : "Needs attention"}</b></article>)}</div> : <StatePanel state="empty" title="No provider checks recorded" description="Run Check connection on a provider to create the first durable health record." />}</section>
+    </>}
   </Shell>;
 }

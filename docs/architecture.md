@@ -35,6 +35,10 @@ Personal display-name changes use the protected `/api/profile` self-service boun
 
 Each provider implements a common adapter lifecycle: authorize, verify, discover resources, save mapping, sync, normalize, report freshness, refresh credentials, and disconnect. Raw provider responses are retained only when required and are never used directly by UI components. Normalized data includes source, tenant, external identifier, observed time, synced time, and freshness status.
 
+`integration_connections` is the secret-free registry of current provider health, scope, labels, and capabilities. `integration_sync_runs` is its append-only execution ledger. Provider credentials remain in Cloudflare encrypted variables or private provider-specific tables such as `google_connections`; tokens, API keys, and webhook secrets are prohibited from registry metadata.
+
+Integration reads and mutations cross an authenticated Cloudflare Function boundary with organization permission and client-access checks. Browser code cannot write health directly. A confirmed Google disconnect attempts provider revocation, removes local authorization and saved mappings, records the resulting disconnected state, and emits an audit event.
+
 ## Background work
 
 Durable work is represented in an event outbox before execution. Workers claim pending events, record attempts, apply bounded retries, and move exhausted work to a dead-letter state. User-facing state distinguishes queued, running, delayed, failed, and complete.

@@ -62,6 +62,7 @@ Shell identity always represents the signed-in person, never the active organiza
 - Forms: labels remain visible, errors are adjacent and announced, destructive actions are explicit.
 - Tables: real table semantics on wide screens; provide intentional horizontal scrolling or a card transformation on narrow screens.
 - Status: text plus color; color alone never carries meaning.
+- Integration control: provider cards always name their scope (`This client`, `Agency-wide`, or `Platform`), pair status color with text, and place destructive disconnect actions behind explicit confirmation. Health history is durable and server-owned; browser-local readiness is not a valid provider state.
 
 ## Responsive behavior
 

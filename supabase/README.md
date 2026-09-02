@@ -12,6 +12,8 @@ Supabase is the Command Center's database, authentication, and protected data la
 | `profiles` | Application users and access rules. Connects a Supabase Auth user to an owner, employee, or customer role and, for customers, to a client. | Settings/access and onboarding flow |
 | `customer_accounts` | Client portal activation status and billing status. | Client onboarding/settings |
 | `google_connections` | Private Google OAuth connection and the selected Business Profile, Search Console, and GA4 resources. | Integrations |
+| `integration_connections` | Secret-free provider registry with current client-scoped health, scope, capabilities, and last verified time. | Integrations |
+| `integration_sync_runs` | Append-only history of manual and automated provider checks or synchronization runs. | Integrations |
 | `notifications` | User-specific workspace activity, such as a client activation link becoming ready. Read state is stored per user. | Notification bell in the app header |
 | `organizations` | Agency and client tenant boundaries for Torres OS. Existing clients are linked through `legacy_client_id`. | Torres OS organization settings |
 | `organization_memberships` | A user’s role inside a specific agency or client organization. | Team and client access management |
@@ -87,7 +89,8 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 7. Open **Operations** to create real service jobs, schedule work, prepare estimates, and choose which updates the client may see.
 8. Open **Inbox** to start a secure client-visible conversation. Email is saved as a draft first; when the verified provider is configured, staff review and send it from the thread while delivery state updates automatically.
 9. Open **Campaigns** to create a client-scoped draft, review eligible contacts, send a staff test, and type `SEND` only when the recipient list and content are ready.
-10. Before sending SMS, record the client's real E.164 phone number and explicit consent evidence in **Inbox**. A configured provider, granted consent, and no active suppression are all required.
+10. Apply [`integration_control.sql`](./integration_control.sql), then use **Integrations** to verify provider health and review its durable activity ledger.
+11. Before sending SMS, record the client's real E.164 phone number and explicit consent evidence in **Inbox**. A configured provider, granted consent, and no active suppression are all required.
 
 ## Important safety rules
 
@@ -109,10 +112,11 @@ An empty `client_people` table simply means no contacts have been added yet. It 
 - Never infer SMS or voice consent from an email address, client relationship, or saved phone number. Consent must be explicit, purpose-specific, and revocable.
 - Do not remove SMS/voice suppressions to force a message through. `STOP` and equivalent opt-outs must remain authoritative until the recipient explicitly opts back in.
 - Keep Twilio credentials in Cloudflare encrypted secrets. The database stores only provider status and non-secret identifiers.
+- Never store provider secrets in `integration_connections`, `integration_sync_runs`, or their `metadata` columns. Those tables contain operational health only.
 
 ## Phase migration order
 
-Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. Run [`formspree_crm.sql`](./formspree_crm.sql) after [`crm.sql`](./crm.sql) before enabling verified website lead intake. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Existing Phase 4 databases should then run [`inbox_organization.sql`](./inbox_organization.sql) to add durable categories and reversible archive state. Continue with [`transactional_email.sql`](./transactional_email.sql), [`communication_attachments.sql`](./communication_attachments.sql), [`marketing.sql`](./marketing.sql), and [`sms_voice.sql`](./sms_voice.sql). Provider credentials are configured separately in Cloudflare after the schema is installed. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
+Apply migrations in the documented dependency order. Run [`email_persistence.sql`](./email_persistence.sql) after [`access_control.sql`](./access_control.sql) so confirmed Supabase Auth email changes remain synchronized with `profiles.email`. Run [`formspree_crm.sql`](./formspree_crm.sql) after [`crm.sql`](./crm.sql) before enabling verified website lead intake. For Phase 4, run [`communications.sql`](./communications.sql) after the organization/access-control, clients, notifications, CRM, and Operations foundations are present. Existing Phase 4 databases should then run [`inbox_organization.sql`](./inbox_organization.sql) to add durable categories and reversible archive state. Continue with [`transactional_email.sql`](./transactional_email.sql), [`communication_attachments.sql`](./communication_attachments.sql), [`marketing.sql`](./marketing.sql), and [`sms_voice.sql`](./sms_voice.sql). Apply [`integration_control.sql`](./integration_control.sql) after [`torres_os_foundation.sql`](./torres_os_foundation.sql) and the current Google connection migrations. Provider credentials are configured separately in Cloudflare after the schema is installed. These migrations are additive, create no example business records, and preserve the separate meanings of sign-in, business contact, portal, billing, and person-contact emails.
 
 ## Add descriptions inside Supabase
 
