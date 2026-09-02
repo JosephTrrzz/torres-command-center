@@ -23,6 +23,6 @@ export function OnboardingStatusPanel({ clientId }: { clientId: string }) {
       <p>{error || (snapshot ? `${snapshot.completionPercent}% complete · progress is saved after every step.` : "Loading the client’s onboarding progress…")}</p>
     </div>
     {snapshot && <div className="onboarding-status-progress" aria-label={`${snapshot.completionPercent}% onboarding complete`}><span style={{ width: `${snapshot.completionPercent}%` }} /></div>}
-    <Link className="button button-dark" href={`/onboarding/?client=${encodeURIComponent(clientId)}`}>{snapshot?.status === "complete" ? "Review onboarding" : "Open onboarding"} <span>→</span></Link>
+    <Link className="button button-dark" href={`/onboarding/?client=${encodeURIComponent(clientId)}`}>{snapshot?.status === "complete" ? "Review onboarding" : "Open onboarding"} <span>→︎</span></Link>
   </section>;
 }

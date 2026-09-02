@@ -190,7 +190,7 @@ export default function ClientsPage() {
 
       {onboarding && <section className="detail-card onboarding-next" aria-live="polite">
         <div><p className="eyebrow">Next step</p><h2>{onboarding.name} is ready for activation.</h2><p>The client record is saved. Send the client their activation email, then prepare integrations and preview the portal from this workspace.</p></div>
-        <div className="form-actions"><Link className="button button-dark" href={`/clients/detail/?id=${encodeURIComponent(onboarding.id)}`}>Open client account <span>→</span></Link><Link className="button button-light" href={`/integrations/?client=${encodeURIComponent(onboarding.id)}`}>Prepare integrations <span>→</span></Link>{onboarding.website && <a className="button button-outline" href={onboarding.website.startsWith("http") ? onboarding.website : `https://${onboarding.website}`} target="_blank" rel="noreferrer">Open client site ↗</a>}</div>
+        <div className="form-actions"><Link className="button button-dark" href={`/clients/detail/?id=${encodeURIComponent(onboarding.id)}`}>Open client account <span>→︎</span></Link><Link className="button button-light" href={`/integrations/?client=${encodeURIComponent(onboarding.id)}`}>Prepare integrations <span>→︎</span></Link>{onboarding.website && <a className="button button-outline" href={onboarding.website.startsWith("http") ? onboarding.website : `https://${onboarding.website}`} target="_blank" rel="noreferrer">Open client site ↗︎</a>}</div>
       </section>}
 
       {activationLink && <section className="detail-card activation-link-card" aria-live="polite"><div><p className="eyebrow">{activationDelivery?.sent ? "Activation email accepted" : "Activation link ready"}</p><h2>{activationDelivery?.sent ? `Invitation sent to ${activationDelivery.email}` : "Copy and send this secure link"}</h2><p>{activationDelivery?.sent ? "Resend accepted the branded invitation. Keep this private link as a fallback in case the client needs it again." : "The email provider did not accept the invitation. Copy this private link and send it to the client manually."}</p>{!activationDelivery?.sent && activationDelivery?.error && <small className="updated">{activationDelivery.error}</small>}</div><div className="activation-link-row"><input aria-label="Client activation link" readOnly value={activationLink} onFocus={(event) => event.currentTarget.select()} /><button className="button button-dark" type="button" onClick={() => void navigator.clipboard?.writeText(activationLink)}>{activationDelivery?.sent ? "Copy fallback link" : "Copy link"}</button></div></section>}
@@ -201,13 +201,13 @@ export default function ClientsPage() {
             <ClientCard client={client} />
             <div className="client-account-actions">
               <Link className="client-account-primary" href={`/clients/detail/?id=${encodeURIComponent(client.id)}`}>
-                <span><small>Account workspace</small>Manage client</span><b>→</b>
+                <span><small>Account workspace</small>Manage client</span><b>→︎</b>
               </Link>
               <div className="client-account-action-grid">
-                <button className="client-account-action" type="button" onClick={() => openEdit(client)}><span>Edit profile</span><b>→</b></button>
-                <Link className="client-account-action" href={`/onboarding/?client=${encodeURIComponent(client.id)}`}><span>Onboarding</span><b>→</b></Link>
-                <button className="client-account-action" type="button" onClick={() => void sendActivation(client)} disabled={activationBusyId === client.id}><span>{activationBusyId === client.id ? "Preparing…" : activationSent[client.id] ? "Resend activation" : "Send activation"}</span><b>→</b></button>
-                <Link className="client-account-action" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}><span>Preview portal</span><b>→</b></Link>
+                <button className="client-account-action" type="button" onClick={() => openEdit(client)}><span>Edit profile</span><b>→︎</b></button>
+                <Link className="client-account-action" href={`/onboarding/?client=${encodeURIComponent(client.id)}`}><span>Onboarding</span><b>→︎</b></Link>
+                <button className="client-account-action" type="button" onClick={() => void sendActivation(client)} disabled={activationBusyId === client.id}><span>{activationBusyId === client.id ? "Preparing…" : activationSent[client.id] ? "Resend activation" : "Send activation"}</span><b>→︎</b></button>
+                <Link className="client-account-action" href={`/portal/?previewClient=${encodeURIComponent(client.id)}`}><span>Preview portal</span><b>→︎</b></Link>
               </div>
             </div>
           </article>

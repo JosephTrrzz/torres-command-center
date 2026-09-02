@@ -16,6 +16,6 @@ export function ClientCard({ client }: { client: ClientSummary & { website?: str
       <div className="health-track"><span style={{width:`${client.health}%`}} /></div>
       <div className="card-footer"><span>Last updated</span><strong>{client.lastUpdated}</strong></div>
     </Link>
-    {websiteHref ? <a className="client-site-link" href={websiteHref} target="_blank" rel="noreferrer">Open client site <span>↗</span></a> : <span className="client-site-link disabled">Add website to connect site</span>}
+    {websiteHref ? <a className="client-site-link" href={websiteHref} target="_blank" rel="noreferrer">Open client site <span>↗︎</span></a> : <span className="client-site-link disabled">Add website to connect site</span>}
   </div>;
 }
