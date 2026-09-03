@@ -46,7 +46,7 @@ For owner, administrator, operator, employee, member, and viewer roles. It suppo
 
 For the customer/client role. It has a quieter visual treatment and exposes Today, Onboarding, Projects, Operations, Inbox, Reports, and My account through the plain-language labels Home, Setup, Projects, Services, Messages, Performance, and Account. Performance is the tenant-scoped live Reports workflow; it is not a decorative or dead destination. Never add dead links to imply unfinished capabilities.
 
-Both shells require a skip link, labeled navigation, deterministic inline SVG icons, visible current location, keyboard focus, and a mobile navigation scrim that dismisses the drawer.
+Both shells require a skip link, labeled navigation, deterministic inline SVG icons, visible current location, keyboard focus, and a mobile navigation scrim that dismisses the drawer. The scrim may soften the page behind it, but the drawer itself must remain fully opaque, sharp, and above every page or bottom-navigation layer.
 
 Header popovers are viewport-bounded floating surfaces. They must render above page content, keep their heading and footer visible, and scroll only their internal list when content is long. Opening one shell menu closes the others; Escape dismisses every open shell menu.
 
