@@ -66,17 +66,18 @@ export default function ReportsPage() {
 
   async function saveSnapshot() {
     const session = readStoredSession();
-    if (!session || !clients.length) return;
+    const eligibleClients = clients.filter((client) => reportData.find((report) => report.clientId === client.id)?.available);
+    if (!session || !eligibleClients.length) return;
     setSnapshotState("Saving trusted snapshot…");
     try {
-      const responses = await Promise.all(clients.map((client) => fetch("/api/reports", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, reportType: selected.id }) })));
+      const responses = await Promise.all(eligibleClients.map((client) => fetch("/api/reports", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, reportType: selected.id }) })));
       if (responses.some((response) => !response.ok)) throw new Error();
-      setSnapshotState(`${clients.length === 1 ? "Snapshot" : `${clients.length} snapshots`} saved with current calculations.`);
+      setSnapshotState(`${eligibleClients.length === 1 ? "Snapshot" : `${eligibleClients.length} snapshots`} saved with current calculations.`);
     } catch { setSnapshotState("The snapshot could not be saved. Confirm the reporting migration is installed."); }
   }
 
   return <Shell active="Reports">
-    <div className="page-heading"><div><p className="eyebrow">{clientView ? "Private performance" : "Reporting studio"}</p><h1>{clientView ? "Performance" : "Reports"}</h1><p className="lede">{clientView ? "A private, evidence-backed view of your connected website and search performance." : "Review live performance evidence before printing or exporting it for a client or leadership meeting."}</p></div><div className="report-actions"><button className="button button-light" onClick={saveSnapshot} disabled={!clients.length || snapshotState.startsWith("Saving")}>Save snapshot</button><button className="button button-light" onClick={() => window.print()} disabled={!clients.length}>Print / Save PDF</button><button className="button button-dark" onClick={downloadReport} disabled={!clients.length}>Download report <span>↓︎</span></button></div></div>
+    <div className="page-heading"><div><p className="eyebrow">{clientView ? "Private performance" : "Reporting studio"}</p><h1>{clientView ? "Performance" : "Reports"}</h1><p className="lede">{clientView ? "A private, evidence-backed view of your connected website and search performance." : "Review live performance evidence before printing or exporting it for a client or leadership meeting."}</p></div><div className="report-actions"><button className="button button-light" onClick={saveSnapshot} disabled={!totals.connected || snapshotState.startsWith("Saving")}>Save snapshot</button><button className="button button-light" onClick={() => window.print()} disabled={!clients.length}>Print / Save PDF</button><button className="button button-dark" onClick={downloadReport} disabled={!clients.length}>Download report <span>↓︎</span></button></div></div>
     {snapshotState && <p className="integration-notice" role="status">{snapshotState}</p>}
     {error && <p className="integration-notice">{error}</p>}
     <section className="report-grid" aria-label="Report types">{reportDefinitions.map((report, index) => <button className={`report-card ${selectedId === report.id ? "selected" : ""}`} key={report.id} onClick={() => setSelectedId(report.id)}><span className="eyebrow">Report 0{index + 1}</span><h2>{report.label}</h2><p>{report.description}</p><strong>Preview report →︎</strong></button>)}</section>
