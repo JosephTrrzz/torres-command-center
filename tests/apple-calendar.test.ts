@@ -28,10 +28,20 @@ describe("Apple Calendar subscriptions", () => {
     expect(endpoint).toContain('organizationRole !== "client"');
   });
 
+  it("allows only staff to create or revoke subscription URLs", () => {
+    expect(endpoint).toContain('permission: "operations.read", staffOnly: true');
+  });
+
   it("offers explicit Apple handoff, copy, and revocation controls", () => {
     expect(operations).toContain("Connect Apple Calendar");
     expect(operations).toContain("Open in Apple Calendar");
     expect(operations).toContain("Copy private link");
     expect(operations).toContain("Revoke link");
+  });
+
+  it("keeps client calendar exports event-specific", () => {
+    expect(operations).toContain("Your calendar, your choice");
+    expect(operations).toContain("No account connection or full calendar subscription is required.");
+    expect(operations).toContain("<AddToCalendar compact");
   });
 });

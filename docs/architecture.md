@@ -80,6 +80,8 @@ RLS applies both tenant membership and explicit client scope. Customer roles can
 
 Apple Calendar uses a revocable, read-only iCalendar subscription rather than Apple credentials. The authenticated Operations API creates a high-entropy token, stores only its SHA-256 hash, and returns the private `webcal` URL once. Calendar clients later read the feed through the opaque token. Staff feeds include scheduled jobs, CRM appointments, and task deadlines; customer feeds are restricted to service jobs already marked client-visible. Revocation disables the feed immediately. Two-way CalDAV access is intentionally outside this foundation because it would require separately governed Apple credentials and write-conflict handling.
 
+Client users do not receive a calendar subscription URL. From their tenant-scoped Operations schedule, they may export one client-visible appointment at a time to Google Calendar, Outlook Calendar, or a local RFC 5545-compatible `.ics` file. The browser builds that event from data the user is already authorized to view; no calendar credentials, provider token, or new server-side event store is introduced. Staff subscriptions remain available for internal scheduling continuity.
+
 The staff Schedule route is an aggregate projection, not another calendar domain. Its single authenticated, staff-only Function reads service jobs, CRM appointments, and task deadlines for child client organizations of the active agency and preserves the source client on every event. Mutations stay in the corresponding client Operations workspace. Customer roles do not receive the agency aggregate route and continue to use their tenant-scoped Services calendar.
 
 ## Phase 4 communications domain

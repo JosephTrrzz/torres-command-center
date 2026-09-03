@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AddToCalendar } from "../../components/add-to-calendar";
 import { BrandSelect } from "../../components/brand-select";
 import { Shell } from "../../components/shell";
 import { LoadingRegion } from "../../components/loading-system";
@@ -66,6 +67,7 @@ export default function OperationsPage() {
 
   const selectedJob = useMemo(() => snapshot?.jobs.find((job) => job.id === selectedJobId) || snapshot?.jobs[0] || null, [snapshot, selectedJobId]);
   const estimatePreview = useMemo(() => calculateEstimate(estimateItems.map((item) => ({ quantity: Number(item.quantity || 0), unitPrice: Number(item.unitPrice || 0) })), Number(estimateForm.taxRate || 0) / 100), [estimateForm.taxRate, estimateItems]);
+  const isClient = session ? appRoleForOrganizationRole(session.organization?.role, session.profile.role) === "customer" : false;
 
   const loadWorkspace = async (activeSession: AuthSession, clientId?: string) => {
     setLoading(true);
@@ -294,7 +296,9 @@ export default function OperationsPage() {
 
       <section className="operations-panel operations-calendar">
         <div className="operations-section-heading"><div><p className="eyebrow">Shared calendar</p><h2>Upcoming delivery schedule</h2></div><span>{snapshot.calendar.length} scheduled items</span></div>
-        <div className="apple-calendar-panel">
+        {isClient ? <div className="single-event-calendar-panel">
+          <span className="apple-calendar-mark" aria-hidden="true">Cal</span><div><strong>Your calendar, your choice</strong><p>Add only the appointments you want. No account connection or full calendar subscription is required.</p></div>
+        </div> : <div className="apple-calendar-panel">
           <div><span className="apple-calendar-mark" aria-hidden="true">Cal</span><div><strong>Apple Calendar</strong><p>Subscribe to this live schedule. Apple controls refresh timing, and your private link stays active until you revoke it.</p></div></div>
           {!appleCalendarUrl ? <button className="button button-dark" type="button" disabled={busy.startsWith("apple-calendar-")} onClick={() => void updateAppleCalendar("create")}>{busy === "apple-calendar-create" ? "Preparing…" : "Connect Apple Calendar"}</button> : <div className="apple-calendar-actions">
             <a className="button button-dark" href={appleCalendarUrl}>Open in Apple Calendar</a>
@@ -302,8 +306,8 @@ export default function OperationsPage() {
             <button className="text-button danger-link" type="button" disabled={busy === "apple-calendar-revoke"} onClick={() => void updateAppleCalendar("revoke")}>{busy === "apple-calendar-revoke" ? "Revoking…" : "Revoke link"}</button>
           </div>}
           {appleCalendarHttpsUrl && <label className="apple-calendar-link">Private subscription URL<input readOnly value={appleCalendarHttpsUrl} onFocus={(event) => event.currentTarget.select()} /></label>}
-        </div>
-        {snapshot.calendar.length ? <div className="calendar-agenda">{snapshot.calendar.slice(0, 20).map((item) => <article key={`${item.kind}-${item.id}`}><time>{dateTimeLabel(item.starts_at)}</time><span>{labelOperationsValue(item.kind)}</span><strong>{item.title}</strong><small>{labelOperationsValue(item.status)}</small></article>)}</div> : <p className="operations-inline-empty">Nothing is scheduled yet. Add a job date, appointment, or task deadline.</p>}
+        </div>}
+        {snapshot.calendar.length ? <div className="calendar-agenda">{snapshot.calendar.slice(0, 20).map((item) => { const job = item.job_id ? snapshot.jobs.find((candidate) => candidate.id === item.job_id) : null; const location = job?.location_id ? snapshot.locations.find((candidate) => candidate.id === job.location_id) : null; return <article key={`${item.kind}-${item.id}`}><time>{dateTimeLabel(item.starts_at)}</time><span>{labelOperationsValue(item.kind)}</span><strong>{item.title}</strong><small>{labelOperationsValue(item.status)}</small>{item.status !== "canceled" && <AddToCalendar compact event={{ id: `${item.kind}-${item.id}`, title: item.title, startsAt: item.starts_at, endsAt: item.ends_at, description: job?.description || `Scheduled with ${snapshot.client.name}.`, location: location ? addressLabel(location) : "" }} />}</article>; })}</div> : <p className="operations-inline-empty">Nothing is scheduled yet. Add a job date, appointment, or task deadline.</p>}
       </section>
     </>}
   </Shell>;

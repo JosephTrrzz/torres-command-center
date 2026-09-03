@@ -64,7 +64,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const body = await request.json().catch(() => null) as { clientId?: unknown; action?: unknown } | null;
   const clientId = typeof body?.clientId === "string" ? body.clientId : "";
   if (!/^[0-9a-f-]{36}$/i.test(clientId) || (body?.action !== "create" && body?.action !== "revoke")) return authJson({ error: "Choose a valid calendar action." }, 400);
-  const auth = await requireAuth(request, env, { clientId, permission: "operations.read" });
+  const auth = await requireAuth(request, env, { clientId, permission: "operations.read", staffOnly: true });
   if ("response" in auth) return auth.response;
   const url = getSupabaseUrl(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
