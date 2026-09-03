@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchGoogleMetrics, readStoredGoogleMetrics } from "../functions/_shared/google-metrics";
+import { fetchGoogleMetrics, readStoredGoogleComparison, readStoredGoogleMetrics, reportRange } from "../functions/_shared/google-metrics";
 
 const env = {
   SUPABASE_URL: "https://database.example",
@@ -11,6 +11,10 @@ afterEach(() => {
 });
 
 describe("normalized Google metrics", () => {
+  it("builds adjacent complete comparison periods", () => {
+    expect(reportRange(new Date("2026-08-29T12:00:00.000Z"))).toEqual({ startDate: "2026-08-01", endDate: "2026-08-28" });
+    expect(reportRange(new Date("2026-08-29T12:00:00.000Z"), 28, 28)).toEqual({ startDate: "2026-07-04", endDate: "2026-07-31" });
+  });
   it("normalizes daily provider rows and weights multi-day rates", async () => {
     const request = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -60,5 +64,17 @@ describe("normalized Google metrics", () => {
     expect(stored?.freshness).toEqual({ source: "stored", syncedAt: "2026-08-29T12:00:00.000Z" });
     expect(stored?.analytics?.totals.engagementRate).toBe(0.875);
     expect(stored?.searchConsole?.totals).toMatchObject({ clicks: 20, impressions: 400, ctr: 0.05, position: 4 });
+  });
+
+  it("separates current and previous observations without treating missing days as zero", async () => {
+    const rows = [
+      { provider: "google_analytics", resource_id: "properties/123", period_start: "2026-07-31", metric_key: "sessions", value: 5, synced_at: "2026-08-29T12:00:00.000Z" },
+      { provider: "google_analytics", resource_id: "properties/123", period_start: "2026-08-01", metric_key: "sessions", value: 9, synced_at: "2026-08-29T12:00:00.000Z" },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(rows), { status: 200 })));
+    const comparison = await readStoredGoogleComparison(env, "00000000-0000-0000-0000-000000000001", { analytics_property: "properties/123" }, new Date("2026-08-29T12:00:00.000Z"));
+    expect(comparison?.current.analytics?.totals.sessions).toBe(9);
+    expect(comparison?.previous.analytics?.totals.sessions).toBe(5);
+    expect(comparison?.coverage).toEqual({ currentDays: 1, previousDays: 1 });
   });
 });

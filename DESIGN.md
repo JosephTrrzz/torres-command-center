@@ -122,4 +122,6 @@ On screens up to 680px, the client shell adds a fixed five-destination bottom na
 
 Internal users retain the denser operational shell. Projects and reports may use the same editorial typography and material system, but management controls remain compact and available only where the existing permission model allows them. Mobile client mode uses the same content order and permissions, with a dark branded header and one-column composition; it is not a scaled desktop mockup.
 
+Reporting must pair every headline metric with its provider, plain-language definition, complete date window, and previous-period state. Trend language may only appear when stored daily observations exist for the comparison period; otherwise the interface says that the period is still collecting. Never infer missing days as performance decline or present live totals as an immutable snapshot.
+
 Authentication is the shared entrance for every role. Its editorial Private Office introduction sits beside the existing form at desktop widths and precedes it on smaller screens. It does not change account activation, return-path validation, credential handling, or role-based routing.

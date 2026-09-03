@@ -53,11 +53,11 @@ function dateString(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function reportRange(now = new Date()) {
+export function reportRange(now = new Date(), days = 28, offsetDays = 0) {
   const end = new Date(now);
-  end.setUTCDate(end.getUTCDate() - 1);
+  end.setUTCDate(end.getUTCDate() - 1 - offsetDays);
   const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - 27);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
   return { startDate: dateString(start), endDate: dateString(end) };
 }
 
@@ -120,6 +120,7 @@ export async function getGoogleAccessToken(connection: GoogleMetricsConnection, 
 export async function fetchGoogleMetrics(connection: GoogleMetricsConnection, clientId: string, env: GoogleMetricsEnv, now = new Date()) {
   const supabaseUrl = getSupabaseUrl(env);
   const { startDate, endDate } = reportRange(now);
+  const collectionRange = reportRange(now, 56);
   const snapshot: GoogleMetricsSnapshot = {
     clientId,
     googleEmail: connection.google_email || null,
@@ -145,7 +146,7 @@ export async function fetchGoogleMetrics(connection: GoogleMetricsConnection, cl
     const response = await googleRequest<{ rows?: GoogleMetricRow[] }>(`https://analyticsdata.googleapis.com/v1beta/${property}:runReport`, accessToken, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dateRanges: [{ startDate, endDate }], dimensions: [{ name: "date" }], metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "screenPageViews" }, { name: "engagementRate" }, { name: "conversions" }], limit: 31 }),
+      body: JSON.stringify({ dateRanges: [collectionRange], dimensions: [{ name: "date" }], metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "screenPageViews" }, { name: "engagementRate" }, { name: "conversions" }], limit: 62 }),
     });
     if (!response.ok) {
       snapshot.errors.push(response.body.error?.message || "Google Analytics metrics could not be loaded.");
@@ -153,7 +154,8 @@ export async function fetchGoogleMetrics(connection: GoogleMetricsConnection, cl
     }
     const rows = Array.isArray(response.body.rows) ? response.body.rows : [];
     recordsRead += rows.length;
-    const totals = rows.reduce<{ sessions: number; activeUsers: number; pageViews: number; weightedEngagement: number; conversions: number }>((sum, row) => {
+    const currentRows = rows.filter((row) => providerDate(row.dimensionValues?.[0]?.value) >= startDate);
+    const totals = currentRows.reduce<{ sessions: number; activeUsers: number; pageViews: number; weightedEngagement: number; conversions: number }>((sum, row) => {
       const sessions = metricNumber(row, 0);
       return { sessions: sum.sessions + sessions, activeUsers: sum.activeUsers + metricNumber(row, 1), pageViews: sum.pageViews + metricNumber(row, 2), weightedEngagement: sum.weightedEngagement + metricNumber(row, 3) * sessions, conversions: sum.conversions + metricNumber(row, 4) };
     }, { sessions: 0, activeUsers: 0, pageViews: 0, weightedEngagement: 0, conversions: 0 });
@@ -174,7 +176,7 @@ export async function fetchGoogleMetrics(connection: GoogleMetricsConnection, cl
     const response = await googleRequest<{ rows?: SearchMetricRow[] }>(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`, accessToken, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate, endDate, dimensions: ["date"], rowLimit: 31 }),
+      body: JSON.stringify({ ...collectionRange, dimensions: ["date"], rowLimit: 62 }),
     });
     if (!response.ok) {
       snapshot.errors.push(response.body.error?.message || "Search Console metrics could not be loaded.");
@@ -182,7 +184,8 @@ export async function fetchGoogleMetrics(connection: GoogleMetricsConnection, cl
     }
     const rows = Array.isArray(response.body.rows) ? response.body.rows : [];
     recordsRead += rows.length;
-    const totals = rows.reduce<{ clicks: number; impressions: number; weightedPosition: number }>((sum, row) => {
+    const currentRows = rows.filter((row) => (row.keys?.[0] || "") >= startDate);
+    const totals = currentRows.reduce<{ clicks: number; impressions: number; weightedPosition: number }>((sum, row) => {
       const impressions = Number(row.impressions || 0);
       return { clicks: sum.clicks + Number(row.clicks || 0), impressions: sum.impressions + impressions, weightedPosition: sum.weightedPosition + Number(row.position || 0) * impressions };
     }, { clicks: 0, impressions: 0, weightedPosition: 0 });
@@ -243,6 +246,24 @@ export async function persistGoogleMetrics(input: {
 
 type StoredObservation = { provider?: string; resource_id?: string; metric_key?: string; value?: number | string; period_start?: string; synced_at?: string };
 
+function summarizeStoredRows(rows: StoredObservation[], connection: GoogleMetricsConnection) {
+  const analyticsRows = rows.filter((row) => row.provider === "google_analytics" && row.resource_id === connection.analytics_property);
+  const searchRows = rows.filter((row) => row.provider === "google_search_console" && row.resource_id === connection.search_console_site);
+  const sum = (source: StoredObservation[], key: string) => source.filter((row) => row.metric_key === key).reduce((total, row) => total + Number(row.value || 0), 0);
+  const average = (source: StoredObservation[], key: string) => { const values = source.filter((row) => row.metric_key === key).map((row) => Number(row.value || 0)); return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0; };
+  const weightedAverage = (source: StoredObservation[], valueKey: string, weightKey: string) => {
+    const values = new Map(source.filter((row) => row.metric_key === valueKey).map((row) => [row.period_start, Number(row.value || 0)]));
+    const weights = source.filter((row) => row.metric_key === weightKey);
+    const weightTotal = weights.reduce((total, row) => total + Number(row.value || 0), 0);
+    return weightTotal ? weights.reduce((total, row) => total + (values.get(row.period_start) || 0) * Number(row.value || 0), 0) / weightTotal : average(source, valueKey);
+  };
+  const analytics = analyticsRows.length && connection.analytics_property ? { property: connection.analytics_property, totals: { sessions: sum(analyticsRows, "sessions"), activeUsers: sum(analyticsRows, "active_users"), pageViews: sum(analyticsRows, "page_views"), engagementRate: weightedAverage(analyticsRows, "engagement_rate", "sessions"), conversions: sum(analyticsRows, "conversions") } } : null;
+  const impressions = sum(searchRows, "impressions");
+  const clicks = sum(searchRows, "clicks");
+  const searchConsole = searchRows.length && connection.search_console_site ? { site: connection.search_console_site, totals: { clicks, impressions, ctr: impressions ? clicks / impressions : 0, position: weightedAverage(searchRows, "position", "impressions") } } : null;
+  return { analytics, searchConsole, analyticsRows, searchRows };
+}
+
 export async function readStoredGoogleMetrics(env: GoogleMetricsEnv, clientId: string, connection: GoogleMetricsConnection, now = new Date()) {
   const url = getSupabaseUrl(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -251,24 +272,8 @@ export async function readStoredGoogleMetrics(env: GoogleMetricsEnv, clientId: s
   if (!response.ok) return null;
   const rows = await response.json().catch(() => []) as StoredObservation[];
   if (!rows.length) return null;
-  const analyticsRows = rows.filter((row) => row.provider === "google_analytics" && row.resource_id === connection.analytics_property);
-  const searchRows = rows.filter((row) => row.provider === "google_search_console" && row.resource_id === connection.search_console_site);
-  const sum = (source: StoredObservation[], key: string) => source.filter((row) => row.metric_key === key).reduce((total, row) => total + Number(row.value || 0), 0);
-  const average = (source: StoredObservation[], key: string) => {
-    const values = source.filter((row) => row.metric_key === key).map((row) => Number(row.value || 0));
-    return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
-  };
-  const weightedAverage = (source: StoredObservation[], valueKey: string, weightKey: string) => {
-    const values = new Map(source.filter((row) => row.metric_key === valueKey).map((row) => [row.period_start, Number(row.value || 0)]));
-    const weights = source.filter((row) => row.metric_key === weightKey);
-    const weightTotal = weights.reduce((total, row) => total + Number(row.value || 0), 0);
-    return weightTotal ? weights.reduce((total, row) => total + (values.get(row.period_start) || 0) * Number(row.value || 0), 0) / weightTotal : average(source, valueKey);
-  };
+  const { analytics, searchConsole, analyticsRows, searchRows } = summarizeStoredRows(rows, connection);
   const latestFor = (source: StoredObservation[]) => source.reduce<string | null>((latest, row) => !row.synced_at || (latest && row.synced_at <= latest) ? latest : row.synced_at, null);
-  const analytics = analyticsRows.length && connection.analytics_property ? { property: connection.analytics_property, totals: { sessions: sum(analyticsRows, "sessions"), activeUsers: sum(analyticsRows, "active_users"), pageViews: sum(analyticsRows, "page_views"), engagementRate: weightedAverage(analyticsRows, "engagement_rate", "sessions"), conversions: sum(analyticsRows, "conversions") } } : null;
-  const impressions = sum(searchRows, "impressions");
-  const clicks = sum(searchRows, "clicks");
-  const searchConsole = searchRows.length && connection.search_console_site ? { site: connection.search_console_site, totals: { clicks, impressions, ctr: impressions ? clicks / impressions : 0, position: weightedAverage(searchRows, "position", "impressions") } } : null;
   const errors = [connection.analytics_property && !analytics ? "The stored GA4 snapshot has not synchronized yet." : "", connection.search_console_site && !searchConsole ? "The stored Search Console snapshot has not synchronized yet." : ""].filter(Boolean);
   const providerSyncs = [analytics ? latestFor(analyticsRows) : null, searchConsole ? latestFor(searchRows) : null].filter((value): value is string => Boolean(value));
   const latestSync = providerSyncs.length ? providerSyncs.reduce((oldest, value) => value < oldest ? value : oldest) : null;
@@ -282,4 +287,23 @@ export async function readStoredGoogleMetrics(env: GoogleMetricsEnv, clientId: s
     errors,
     freshness: { source: "stored" as const, syncedAt: latestSync },
   } satisfies GoogleMetricsSnapshot;
+}
+
+export async function readStoredGoogleComparison(env: GoogleMetricsEnv, clientId: string, connection: GoogleMetricsConnection, now = new Date()) {
+  const url = getSupabaseUrl(env);
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const current = reportRange(now);
+  const previous = reportRange(now, 28, 28);
+  const response = await fetch(`${url}/rest/v1/provider_metric_observations?client_id=eq.${encodeURIComponent(clientId)}&period_start=gte.${previous.startDate}&period_start=lte.${current.endDate}&select=provider,resource_id,metric_key,value,period_start,synced_at&order=period_start.asc`, { headers: serviceHeaders(serviceKey) });
+  if (!response.ok) return null;
+  const rows = await response.json().catch(() => []) as StoredObservation[];
+  const currentRows = rows.filter((row) => (row.period_start || "") >= current.startDate);
+  const previousRows = rows.filter((row) => (row.period_start || "") >= previous.startDate && (row.period_start || "") <= previous.endDate);
+  const currentSummary = summarizeStoredRows(currentRows, connection);
+  const previousSummary = summarizeStoredRows(previousRows, connection);
+  return {
+    current: { range: current, analytics: currentSummary.analytics, searchConsole: currentSummary.searchConsole },
+    previous: { range: previous, analytics: previousSummary.analytics, searchConsole: previousSummary.searchConsole },
+    coverage: { currentDays: new Set(currentRows.map((row) => row.period_start)).size, previousDays: new Set(previousRows.map((row) => row.period_start)).size },
+  };
 }
