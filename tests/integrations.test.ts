@@ -7,6 +7,8 @@ const api = readFileSync(join(process.cwd(), "functions", "api", "integrations",
 const migration = readFileSync(join(process.cwd(), "supabase", "integration_control.sql"), "utf8");
 const automationMigration = readFileSync(join(process.cwd(), "supabase", "integration_automation.sql"), "utf8");
 const scheduler = readFileSync(join(process.cwd(), "functions", "api", "integrations", "scheduled.ts"), "utf8");
+const metricsMigration = readFileSync(join(process.cwd(), "supabase", "provider_metrics.sql"), "utf8");
+const reportsApi = readFileSync(join(process.cwd(), "functions", "api", "reports", "index.ts"), "utf8");
 
 describe("integration control foundation", () => {
   it("defines the initial normalized provider registry", () => {
@@ -47,5 +49,23 @@ describe("integration control foundation", () => {
     expect(scheduler).toContain("MAX_CHECKS_PER_RUN = 25");
     expect(scheduler).toContain("crypto.subtle.digest");
     expect(scheduler).not.toMatch(/INTEGRATION_CRON_SECRET\s*[:=]\s*["'][^"']{32,}/);
+  });
+
+  it("stores normalized provider observations behind tenant RLS", () => {
+    expect(metricsMigration).toContain("provider_metric_observations");
+    expect(metricsMigration).toContain("can_access_organization(organization_id)");
+    expect(metricsMigration).toContain("unique (client_id, provider, resource_id, metric_key, period_start, period_end)");
+    expect(metricsMigration).toContain("provider_metric_observations_scope_guard");
+    expect(metricsMigration).not.toMatch(/\b(access_token|refresh_token|api_key|webhook_secret)\s+text\b/);
+  });
+
+  it("uses one adapter for manual and scheduled Google sync while reports prefer stored observations", () => {
+    expect(api).toContain("syncGoogleProviderMetrics");
+    expect(api).toContain('body.action === "sync"');
+    expect(api).toContain('authJson({ error: responseMessage }, 502)');
+    expect(scheduler).toContain("syncGoogleProviderMetrics");
+    expect(scheduler).toContain("metricAttempted");
+    expect(reportsApi).toContain("readStoredGoogleMetrics");
+    expect(reportsApi.indexOf("readStoredGoogleMetrics")).toBeLessThan(reportsApi.indexOf("fetchGoogleMetrics(connection"));
   });
 });

@@ -1,6 +1,6 @@
 # Torres OS integrations
 
-Updated 2026-08-25.
+Updated 2026-09-02.
 
 ## Connection lifecycle
 
@@ -18,8 +18,8 @@ Each adapter implements authorization and callback validation, credential verifi
 
 - Supabase: identity, tenant data, portal activation, notifications, and connection metadata.
 - Google OAuth: working for GA4 and Search Console resource discovery and reporting.
-- Google Analytics Data API: live 28-day metrics available for mapped properties.
-- Google Search Console: live clicks and impressions available for mapped sites.
+- Google Analytics Data API: mapped properties synchronize daily observations for sessions, users, page views, engagement, and conversions.
+- Google Search Console: mapped sites synchronize daily clicks, impressions, click-through rate, and position.
 - Google Business Profile: authorization exists, but location discovery is externally blocked while Google API quota/approval remains pending.
 - Cloudflare: Pages hosting, custom admin domain, Functions, production variables, and automatic GitHub deployment.
 
@@ -29,7 +29,7 @@ PageSpeed Insights, Cloudflare telemetry, Google Business Profile reviews, Squar
 
 ## Normalization and sync
 
-Provider data is transformed into internal entities or metric observations. UI code reads normalized contracts and never arbitrary provider response shapes. Connections track last success, last attempt, cursor, next run, error category, and credential expiry. Syncs are idempotent and use external IDs. Rate limits back off without presenting stale data as current.
+Provider data is transformed into internal entities or metric observations. UI code reads normalized contracts and never arbitrary provider response shapes. Google metrics are idempotently upserted into `provider_metric_observations` by client, resource, metric, and day. The protected scheduler refreshes them after successful six-hour Google health checks, while staff can use **Sync report data** for an immediate refresh. Reports display the stored snapshot's last-sync time and use a live fallback only before the normalized store has data. Connections track last success, last attempt, cursor, next run, error category, and credential expiry. Rate limits do not present stale data as newly synchronized.
 
 ## Setup responsibilities
 

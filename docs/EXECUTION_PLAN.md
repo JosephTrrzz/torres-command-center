@@ -58,8 +58,11 @@ Status: in progress.
 
 ## Phase 5 — integrations and normalization
 
+Status: complete for the launch provider-control and Google normalization vertical slice.
+
 - Common adapter framework, durable sync, normalized data, webhook verification, provider health, and disconnect behavior.
-- In progress: the secret-free provider registry, durable health ledger, safe Google disconnect, six-hour automated health checks, consecutive-failure alerting, and recovery notices are implemented.
+- The secret-free provider registry, durable health ledger, safe Google disconnect, six-hour automated health checks and metric synchronization, normalized daily GA4/Search Console observations, visible report freshness, consecutive-failure alerting, and recovery notices are implemented.
+- Signed Resend, Formspree, and Twilio webhook ingestion plus production-testable email, website-intake, Supabase, and Cloudflare adapters cover the major launch categories. Additional third-party adapters remain additive expansion work and do not block Phase 6.
 
 ## Phase 6 — analytics and reports
 

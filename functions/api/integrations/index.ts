@@ -2,6 +2,7 @@ import { authJson, getSupabaseUrl, requireAuth, type FunctionEnv } from "../../_
 import { emailConfigured, type EmailEnv } from "../../_shared/email";
 import { formspreeConfigured, type FormspreeEnv } from "../../_shared/formspree";
 import { websiteIntakeConfigured, type WebsiteIntakeEnv } from "../../_shared/website-intake";
+import { fetchGoogleMetrics, persistGoogleMetrics } from "../../_shared/google-metrics";
 import { INTEGRATION_PROVIDERS, type IntegrationConnection, type IntegrationHealth, type IntegrationProvider, type IntegrationSyncRun, type IntegrationsSnapshot } from "../../../lib/integrations";
 
 export interface Env extends FunctionEnv, EmailEnv, FormspreeEnv, WebsiteIntakeEnv {
@@ -266,6 +267,16 @@ export async function checkProvider(provider: IntegrationProvider, env: Env, url
   }
 }
 
+export async function syncGoogleProviderMetrics(env: Env, client: ClientRow & { organization_id: string }, connectionId: string) {
+  const url = getSupabaseUrl(env);
+  const google = await readGoogle(url, env.SUPABASE_SERVICE_ROLE_KEY || "", client.id);
+  if (!google?.access_token) throw new Error("Connect Google before synchronizing report data.");
+  const result = await fetchGoogleMetrics(google, client.id, env);
+  if (!result.snapshot.available) throw new Error(result.snapshot.errors[0] || "Google did not return any mapped report data.");
+  const recordsWritten = await persistGoogleMetrics({ env, organizationId: client.organization_id, clientId: client.id, connectionId, observations: result.observations });
+  return { ...result, recordsWritten };
+}
+
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
   const clientId = new URL(request.url).searchParams.get("client") || "";
   if (!/^[0-9a-f-]{36}$/i.test(clientId)) return authJson({ error: "Choose a valid client first." }, 400);
@@ -282,7 +293,8 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
   const body = await request.json().catch(() => null) as { action?: unknown; clientId?: unknown; provider?: unknown; confirmation?: unknown } | null;
   const clientId = typeof body?.clientId === "string" ? body.clientId : "";
-  if (!/^[0-9a-f-]{36}$/i.test(clientId) || !isProvider(body?.provider) || (body?.action !== "check" && body?.action !== "disconnect")) return authJson({ error: "Choose a valid integration action." }, 400);
+  if (!/^[0-9a-f-]{36}$/i.test(clientId) || !isProvider(body?.provider) || (body?.action !== "check" && body?.action !== "sync" && body?.action !== "disconnect")) return authJson({ error: "Choose a valid integration action." }, 400);
+  if (body.action === "sync" && body.provider !== "google") return authJson({ error: "Normalized report synchronization is currently available for Google only." }, 400);
   const auth = await requireAuth(request, env, { staffOnly: true, clientId, permission: "integrations.manage" });
   if ("response" in auth) return auth.response;
   const url = getSupabaseUrl(env);
@@ -342,6 +354,44 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   const connectionRows = await connectionResponse.json().catch(() => []) as Array<{ id?: string }>;
   if (!connectionResponse.ok || !connectionRows[0]?.id) return authJson({ error: "Apply supabase/integration_control.sql before saving provider health." }, 503);
 
+  let runSucceeded = succeeded;
+  let recordsRead = 0;
+  let recordsWritten = 0;
+  let runError = succeeded ? "" : result.detail;
+  let responseMessage = result.detail;
+  if (body.action === "sync" && succeeded) {
+    try {
+      const sync = await syncGoogleProviderMetrics(env, client, connectionRows[0].id);
+      recordsRead = sync.recordsRead;
+      recordsWritten = sync.recordsWritten;
+      responseMessage = `${recordsWritten} normalized Google metrics were synchronized for ${sync.snapshot.range.startDate} through ${sync.snapshot.range.endDate}.`;
+      if (sync.snapshot.errors.length) responseMessage += ` ${sync.snapshot.errors.join(" ")}`;
+      await fetch(`${url}/rest/v1/integration_connections?id=eq.${connectionRows[0].id}`, {
+        method: "PATCH",
+        headers: serviceHeaders(serviceKey, "return=minimal"),
+        body: JSON.stringify({
+          status: "connected",
+          last_success_at: new Date().toISOString(),
+          last_error_at: null,
+          last_error_code: null,
+          last_error_message: null,
+          metadata: { health_detail: result.detail, metrics_last_synced_at: new Date().toISOString(), metrics_range: sync.snapshot.range, metrics_partial_errors: sync.snapshot.errors },
+          updated_at: new Date().toISOString(),
+        }),
+      });
+    } catch (error) {
+      runSucceeded = false;
+      runError = error instanceof Error ? error.message : "Google report synchronization failed.";
+      responseMessage = runError;
+      await fetch(`${url}/rest/v1/integration_connections?id=eq.${connectionRows[0].id}`, {
+        method: "PATCH",
+        headers: serviceHeaders(serviceKey, "return=minimal"),
+        body: JSON.stringify({ status: "degraded", last_error_at: new Date().toISOString(), last_error_code: "metrics_sync_failed", last_error_message: runError, updated_at: new Date().toISOString() }),
+      });
+    }
+  }
+
+  const operation = body.action === "disconnect" ? "disconnect" : body.action === "sync" ? "metrics_sync" : "health_check";
   const runResponse = await fetch(`${url}/rest/v1/integration_sync_runs`, {
     method: "POST",
     headers: serviceHeaders(serviceKey, "return=minimal"),
@@ -350,11 +400,13 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
       client_id: clientId,
       connection_id: connectionRows[0].id,
       provider: body.provider,
-      operation: body.action === "disconnect" ? "disconnect" : "health_check",
+      operation,
       trigger: "manual",
-      status: succeeded ? "succeeded" : "failed",
-      error_code: succeeded ? null : "provider_health_failed",
-      error_message: succeeded ? null : result.detail,
+      status: runSucceeded ? "succeeded" : "failed",
+      records_read: recordsRead,
+      records_written: recordsWritten,
+      error_code: runSucceeded ? null : body.action === "sync" ? "metrics_sync_failed" : "provider_health_failed",
+      error_message: runSucceeded ? null : runError,
       metadata: { request_id: requestId },
       initiated_by: auth.context.userId,
       started_at: now,
@@ -366,8 +418,9 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   await fetch(`${url}/rest/v1/audit_events`, {
     method: "POST",
     headers: serviceHeaders(serviceKey, "return=minimal"),
-    body: JSON.stringify({ organization_id: client.organization_id, actor_user_id: auth.context.userId, action: `integration.${body.action}`, entity_type: "integration_connection", entity_id: connectionRows[0].id, request_id: requestId, metadata: { provider: body.provider, client_id: clientId, status: result.status } }),
+    body: JSON.stringify({ organization_id: client.organization_id, actor_user_id: auth.context.userId, action: `integration.${body.action}`, entity_type: "integration_connection", entity_id: connectionRows[0].id, request_id: requestId, metadata: { provider: body.provider, client_id: clientId, status: runSucceeded ? result.status : "degraded", records_read: recordsRead, records_written: recordsWritten } }),
   });
-  console.log(JSON.stringify({ event: "integration_action", requestId, provider: body.provider, action: body.action, status: result.status, clientId }));
-  return authJson({ message: result.detail });
+  console.log(JSON.stringify({ event: "integration_action", requestId, provider: body.provider, action: body.action, status: runSucceeded ? result.status : "degraded", clientId, recordsRead, recordsWritten }));
+  if (!runSucceeded) return authJson({ error: responseMessage }, 502);
+  return authJson({ message: responseMessage });
 };

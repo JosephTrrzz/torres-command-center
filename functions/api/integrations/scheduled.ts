@@ -1,6 +1,6 @@
 import { createNotification } from "../../_shared/notifications";
 import { INTEGRATION_PROVIDERS, integrationAutomationState, type IntegrationHealth, type IntegrationProvider } from "../../../lib/integrations";
-import { checkProvider, PROVIDERS, serviceHeaders, type ClientRow, type Env } from "./index";
+import { checkProvider, PROVIDERS, serviceHeaders, syncGoogleProviderMetrics, type ClientRow, type Env } from "./index";
 
 type ScheduledConnection = {
   id?: string;
@@ -141,7 +141,39 @@ async function persistScheduledCheck(env: Env, url: string, serviceKey: string, 
 
   if (automationState.alertOpened) await writeAlertLifecycle(env, url, serviceKey, { client: input.client, provider: input.provider, connectionId, requestId: input.requestId, opened: true, detail: input.result.detail });
   if (automationState.alertResolved) await writeAlertLifecycle(env, url, serviceKey, { client: input.client, provider: input.provider, connectionId, requestId: input.requestId, opened: false, detail: input.result.detail });
-  return { succeeded, alertOpened: automationState.alertOpened, alertResolved: automationState.alertResolved };
+  return { succeeded, alertOpened: automationState.alertOpened, alertResolved: automationState.alertResolved, connectionId };
+}
+
+async function recordScheduledMetricSync(url: string, serviceKey: string, input: {
+  client: ClientRow & { organization_id: string };
+  connectionId: string;
+  requestId: string;
+  recordsRead: number;
+  recordsWritten: number;
+  errorMessage?: string;
+}) {
+  const now = new Date().toISOString();
+  const response = await fetch(`${url}/rest/v1/integration_sync_runs`, {
+    method: "POST",
+    headers: serviceHeaders(serviceKey, "return=minimal"),
+    body: JSON.stringify({
+      organization_id: input.client.organization_id,
+      client_id: input.client.id,
+      connection_id: input.connectionId,
+      provider: "google",
+      operation: "metrics_sync",
+      trigger: "scheduled",
+      status: input.errorMessage ? "failed" : "succeeded",
+      records_read: input.recordsRead,
+      records_written: input.recordsWritten,
+      error_code: input.errorMessage ? "metrics_sync_failed" : null,
+      error_message: input.errorMessage || null,
+      metadata: { request_id: input.requestId },
+      started_at: now,
+      completed_at: now,
+    }),
+  });
+  if (!response.ok) throw new Error("scheduled metric history could not be saved");
 }
 
 export const onRequestPost = async ({ request, env }: { request: Request; env: Env }) => {
@@ -169,25 +201,47 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   let checked = 0;
   let failed = 0;
+  let metricsSynced = 0;
   let alertsOpened = 0;
   let alertsResolved = 0;
   for (let offset = 0; offset < due.length; offset += 4) {
     const results = await Promise.all(due.slice(offset, offset + 4).map(async ({ client, provider, existing }) => {
       try {
-        const result = await checkProvider(provider, env, url, serviceKey, client.id);
+        let result = await checkProvider(provider, env, url, serviceKey, client.id);
+        let metricResult: Awaited<ReturnType<typeof syncGoogleProviderMetrics>> | null = null;
+        let metricError = "";
+        let metricAttempted = false;
+        if (provider === "google" && result.status === "connected" && existing?.id) {
+          metricAttempted = true;
+          try {
+            metricResult = await syncGoogleProviderMetrics(env, client, existing.id);
+          } catch (error) {
+            metricError = error instanceof Error ? error.message : "Google report synchronization failed.";
+            result = { ...result, status: "degraded", detail: metricError };
+          }
+        }
         const persisted = await persistScheduledCheck(env, url, serviceKey, { client, provider, existing, result, requestId });
-        return persisted;
+        if (metricAttempted) await recordScheduledMetricSync(url, serviceKey, {
+          client,
+          connectionId: persisted.connectionId,
+          requestId,
+          recordsRead: metricResult?.recordsRead || 0,
+          recordsWritten: metricResult?.recordsWritten || 0,
+          errorMessage: metricError || undefined,
+        });
+        return { ...persisted, metricsSynced: metricResult?.recordsWritten || 0 };
       } catch (error) {
         console.error(JSON.stringify({ event: "integration_scheduled_check_failed", requestId, clientId: client.id, provider, error: error instanceof Error ? error.message : "unknown" }));
-        return { succeeded: false, alertOpened: false, alertResolved: false };
+        return { succeeded: false, alertOpened: false, alertResolved: false, metricsSynced: 0 };
       }
     }));
     checked += results.length;
     failed += results.filter((result) => !result.succeeded).length;
     alertsOpened += results.filter((result) => result.alertOpened).length;
     alertsResolved += results.filter((result) => result.alertResolved).length;
+    metricsSynced += results.reduce((total, result) => total + result.metricsSynced, 0);
   }
 
-  console.log(JSON.stringify({ event: "integration_scheduler_complete", requestId, due: due.length, checked, failed, alertsOpened, alertsResolved }));
-  return json({ requestId, due: due.length, checked, failed, alertsOpened, alertsResolved });
+  console.log(JSON.stringify({ event: "integration_scheduler_complete", requestId, due: due.length, checked, failed, alertsOpened, alertsResolved, metricsSynced }));
+  return json({ requestId, due: due.length, checked, failed, alertsOpened, alertsResolved, metricsSynced });
 };

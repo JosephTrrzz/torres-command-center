@@ -31,6 +31,14 @@ export async function checkIntegration(session: AuthSession, clientId: string, p
   }));
 }
 
+export async function syncIntegration(session: AuthSession, clientId: string, provider: IntegrationProvider) {
+  return parse(await fetch("/api/integrations/", {
+    method: "POST",
+    headers: headers(session),
+    body: JSON.stringify({ action: "sync", clientId, provider }),
+  }));
+}
+
 export async function disconnectIntegration(session: AuthSession, clientId: string, provider: IntegrationProvider) {
   return parse(await fetch("/api/integrations/", {
     method: "POST",
@@ -38,4 +46,3 @@ export async function disconnectIntegration(session: AuthSession, clientId: stri
     body: JSON.stringify({ action: "disconnect", clientId, provider, confirmation: "DISCONNECT" }),
   }));
 }
-
