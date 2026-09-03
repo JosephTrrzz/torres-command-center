@@ -12,6 +12,11 @@ export interface Env extends FunctionEnv, EmailEnv, FormspreeEnv, WebsiteIntakeE
 }
 
 export type ClientRow = { id: string; name: string; organization_id?: string | null };
+type ResendHealthPayload = {
+  name?: unknown;
+  code?: unknown;
+  message?: unknown;
+};
 type GoogleRow = {
   google_email?: string;
   access_token?: string;
@@ -75,6 +80,33 @@ function isProvider(value: unknown): value is IntegrationProvider {
 function configured(value: string | undefined) {
   const normalized = value?.trim() || "";
   return Boolean(normalized && !/^(optional|replace-|your-)/i.test(normalized));
+}
+
+export function interpretResendHealth(status: number, ok: boolean, payload: ResendHealthPayload, accountLabel: string) {
+  const errorCode = [payload.name, payload.code].find((value): value is string => typeof value === "string")?.trim().toLowerCase() || "";
+  const capabilities = ["Transactional email", "Delivery webhooks", "CRM replies"];
+  if (ok) {
+    return {
+      status: "connected" as IntegrationHealth,
+      detail: "Resend accepted the provider health request.",
+      accountLabel,
+      capabilities,
+    };
+  }
+  if (status === 401 && errorCode === "restricted_api_key") {
+    return {
+      status: "connected" as IntegrationHealth,
+      detail: "Resend accepted the configured sending-only credential.",
+      accountLabel,
+      capabilities,
+    };
+  }
+  return {
+    status: status === 401 || status === 403 ? "action_required" as IntegrationHealth : "degraded" as IntegrationHealth,
+    detail: `Resend health check returned ${status}.`,
+    accountLabel,
+    capabilities: ["Transactional email"],
+  };
 }
 
 export async function resolveClient(url: string, serviceKey: string, clientId: string) {
@@ -242,9 +274,8 @@ async function checkProviderUnsafe(provider: IntegrationProvider, env: Env, url:
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY!.trim()}` },
       signal: AbortSignal.timeout(10_000),
     });
-    return response.ok
-      ? { status: "connected" as IntegrationHealth, detail: "Resend accepted the provider health request.", accountLabel: env.TRANSACTIONAL_EMAIL_FROM!.trim(), capabilities: ["Transactional email", "Delivery webhooks", "CRM replies"] }
-      : { status: response.status === 401 ? "action_required" as IntegrationHealth : "degraded" as IntegrationHealth, detail: `Resend health check returned ${response.status}.`, accountLabel: env.TRANSACTIONAL_EMAIL_FROM!.trim(), capabilities: ["Transactional email"] };
+    const payload = await response.json().catch(() => ({})) as ResendHealthPayload;
+    return interpretResendHealth(response.status, response.ok, payload, env.TRANSACTIONAL_EMAIL_FROM!.trim());
   }
   if (provider === "website_intake") {
     const ready = websiteIntakeConfigured(env) || formspreeConfigured(env);

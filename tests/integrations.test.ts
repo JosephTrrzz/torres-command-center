@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { interpretResendHealth } from "../functions/api/integrations/index";
 import { INTEGRATION_PROVIDERS, integrationAutomationState, integrationScopeLabel, integrationStatusLabel } from "../lib/integrations";
 
 const api = readFileSync(join(process.cwd(), "functions", "api", "integrations", "index.ts"), "utf8");
@@ -22,6 +23,16 @@ describe("integration control foundation", () => {
     expect(api).toContain('permission: "integrations.manage"');
     expect(api).toContain("staffOnly: true");
     expect(api).toContain("canManage");
+  });
+
+  it("recognizes a least-privilege Resend sending key without hiding invalid credentials", () => {
+    expect(interpretResendHealth(401, false, { name: "restricted_api_key" }, "Team <notifications@example.com>")).toMatchObject({
+      status: "connected",
+      detail: "Resend accepted the configured sending-only credential.",
+    });
+    expect(interpretResendHealth(401, false, { name: "missing_api_key" }, "Team <notifications@example.com>").status).toBe("action_required");
+    expect(interpretResendHealth(403, false, { name: "invalid_api_key" }, "Team <notifications@example.com>").status).toBe("action_required");
+    expect(interpretResendHealth(500, false, {}, "Team <notifications@example.com>").status).toBe("degraded");
   });
 
   it("keeps credentials out of the normalized registry", () => {
