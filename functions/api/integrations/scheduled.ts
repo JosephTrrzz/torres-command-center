@@ -1,6 +1,7 @@
 import { createNotification } from "../../_shared/notifications";
 import { INTEGRATION_PROVIDERS, integrationAutomationState, type IntegrationHealth, type IntegrationProvider } from "../../../lib/integrations";
 import { checkProvider, PROVIDERS, serviceHeaders, syncGoogleProviderMetrics, type ClientRow, type Env } from "./index";
+import { processDueReportSchedules } from "../../_shared/report-delivery";
 
 type ScheduledConnection = {
   id?: string;
@@ -242,6 +243,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     metricsSynced += results.reduce((total, result) => total + result.metricsSynced, 0);
   }
 
-  console.log(JSON.stringify({ event: "integration_scheduler_complete", requestId, due: due.length, checked, failed, alertsOpened, alertsResolved, metricsSynced }));
-  return json({ requestId, due: due.length, checked, failed, alertsOpened, alertsResolved, metricsSynced });
+  const reportDeliveries = await processDueReportSchedules(env, url, serviceKey);
+  console.log(JSON.stringify({ event: "integration_scheduler_complete", requestId, due: due.length, checked, failed, alertsOpened, alertsResolved, metricsSynced, reportDeliveries }));
+  return json({ requestId, due: due.length, checked, failed, alertsOpened, alertsResolved, metricsSynced, reportDeliveries });
 };

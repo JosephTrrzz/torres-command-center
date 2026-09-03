@@ -124,4 +124,6 @@ Internal users retain the denser operational shell. Projects and reports may use
 
 Reporting must pair every headline metric with its provider, plain-language definition, complete date window, and previous-period state. Trend language may only appear when stored daily observations exist for the comparison period; otherwise the interface says that the period is still collecting. Never infer missing days as performance decline or present live totals as an immutable snapshot.
 
+Scheduled report delivery is a staff-only chapter inside Reports. A schedule names one client, report, recipient, cadence, and exact first delivery time. Creation always produces a disabled record; enabling requires a separate explicit confirmation. Every run regenerates trusted calculations, stores an immutable snapshot, uses tracked transactional email, and preserves delivery history. Disabling and archiving stop future sends without erasing evidence.
+
 Authentication is the shared entrance for every role. Its editorial Private Office introduction sits beside the existing form at desktop widths and precedes it on smaller screens. It does not change account activation, return-path validation, credential handling, or role-based routing.

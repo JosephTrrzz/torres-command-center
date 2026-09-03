@@ -53,7 +53,8 @@ Use this checklist before calling a backend or provider production-ready.
 - [x] Current and previous 28-day calculations use normalized daily provider observations.
 - [x] Metric definitions and source provenance are visible in reports.
 - [x] Apply `supabase/reporting.sql` and verify immutable report snapshot storage is available in production.
-- [ ] Configure and verify scheduled report delivery.
+- [x] Apply the scheduled-delivery additions in `supabase/reporting.sql`.
+- [ ] Create a disabled schedule, verify explicit enable/disable, and observe one tracked scheduler run in production.
 
 ## Cloudflare
 
