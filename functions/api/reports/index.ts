@@ -53,7 +53,11 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     headers: serviceHeaders(serviceKey, "return=representation"),
     body: JSON.stringify({ organization_id: clients[0].organization_id, client_id: clientId, report_type: reportType, period_start: comparison.current.range.startDate, period_end: comparison.current.range.endDate, comparison_start: comparison.previous.range.startDate, comparison_end: comparison.previous.range.endDate, payload: { version: 1, current, comparison, generated_at: new Date().toISOString() }, created_by: auth.context.userId }),
   });
-  if (!snapshotResponse.ok) return json({ error: "Apply supabase/reporting.sql before saving report snapshots." }, 502);
+  if (!snapshotResponse.ok) {
+    const failure = await snapshotResponse.json().catch(() => null) as { code?: string; message?: string } | null;
+    console.error(JSON.stringify({ event: "report_snapshot_failed", status: snapshotResponse.status, code: failure?.code || "unknown", message: failure?.message || "unknown" }));
+    return json({ error: failure?.message || "The report snapshot storage rejected this request.", code: failure?.code || "snapshot_failed" }, 502);
+  }
   const rows = await snapshotResponse.json().catch(() => []) as Array<{ id?: string; created_at?: string }>;
   return json({ snapshot: rows[0] || null }, 201);
 };

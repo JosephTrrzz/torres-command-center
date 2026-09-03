@@ -71,9 +71,10 @@ export default function ReportsPage() {
     setSnapshotState("Saving trusted snapshot…");
     try {
       const responses = await Promise.all(eligibleClients.map((client) => fetch("/api/reports", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, reportType: selected.id }) })));
-      if (responses.some((response) => !response.ok)) throw new Error();
+      const failed = responses.find((response) => !response.ok);
+      if (failed) { const body = await failed.json().catch(() => null) as { error?: string } | null; throw new Error(body?.error || "The snapshot could not be saved."); }
       setSnapshotState(`${eligibleClients.length === 1 ? "Snapshot" : `${eligibleClients.length} snapshots`} saved with current calculations.`);
-    } catch { setSnapshotState("The snapshot could not be saved. Confirm the reporting migration is installed."); }
+    } catch (reason) { setSnapshotState(reason instanceof Error ? reason.message : "The snapshot could not be saved."); }
   }
 
   return <Shell active="Reports">
