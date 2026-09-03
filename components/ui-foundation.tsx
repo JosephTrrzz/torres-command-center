@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export type AppIconName = "today" | "overview" | "clients" | "crm" | "projects" | "operations" | "inbox" | "campaigns" | "onboarding" | "portal" | "integrations" | "reports" | "settings" | "chevron";
+export type AppIconName = "today" | "overview" | "clients" | "crm" | "projects" | "operations" | "schedule" | "inbox" | "campaigns" | "onboarding" | "portal" | "integrations" | "reports" | "settings" | "chevron";
 
 const paths: Record<AppIconName, React.ReactNode> = {
   today: <><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
@@ -9,6 +9,7 @@ const paths: Record<AppIconName, React.ReactNode> = {
   crm: <><circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m18 4 .8 1.5 1.7.3-1.2 1.2.3 1.7L18 8l-1.6.7.3-1.7-1.2-1.2 1.7-.3Z"/></>,
   projects: <><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></>,
   operations: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+  schedule: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M7 14h3M14 14h3M7 18h3"/></>,
   inbox: <><path d="M3 6.5h18v12H3Z"/><path d="m3 7 9 7 9-7"/></>,
   campaigns: <><path d="m4 13 13-6v10L4 11Z"/><path d="M7 13v5.5a2 2 0 0 0 2 2h1M20 9v6"/></>,
   onboarding: <><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></>,

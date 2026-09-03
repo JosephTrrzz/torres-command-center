@@ -12,7 +12,7 @@ import { fetchNotifications, markNotificationsRead, type WorkspaceNotification }
 import { AppIcon, type AppIconName } from "./ui-foundation";
 import { AppEntryTransition, BrandedAppLoader, consumeSignatureEntryHandoff, markSignatureEntrySeen, shouldShowSignatureEntry } from "./loading-system";
 
-const NAV_ICONS: Record<string, AppIconName> = { Today: "today", Overview: "overview", Clients: "clients", CRM: "crm", Projects: "projects", Operations: "operations", Inbox: "inbox", Campaigns: "campaigns", Onboarding: "onboarding", Portal: "portal", "My account": "portal", Integrations: "integrations", Reports: "reports", Settings: "settings" };
+const NAV_ICONS: Record<string, AppIconName> = { Today: "today", Overview: "overview", Clients: "clients", CRM: "crm", Projects: "projects", Operations: "operations", Schedule: "schedule", Inbox: "inbox", Campaigns: "campaigns", Onboarding: "onboarding", Portal: "portal", "My account": "portal", Integrations: "integrations", Reports: "reports", Settings: "settings" };
 const SIGNATURE_ENTRY_HANDOFF_MS = 1420;
 const CLIENT_NAV_LABELS: Record<string, string> = { Today: "Home", Onboarding: "Setup", Projects: "Projects", Operations: "Services", Inbox: "Messages", Reports: "Performance", "My account": "Account" };
 

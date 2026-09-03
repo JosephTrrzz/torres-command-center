@@ -40,7 +40,7 @@ Use the spacing tokens (`--space-1` through `--space-6`) and a base rhythm of 4p
 
 ### Internal shell
 
-For owner, administrator, operator, employee, member, and viewer roles. It supports workspace switching, operational navigation, notifications, profile controls, and broad information density. The canonical order is Today, Overview, Clients, CRM, Projects, Operations, Inbox, Campaigns, Integrations, Reports, then Settings when permitted.
+For owner, administrator, operator, employee, member, and viewer roles. It supports workspace switching, operational navigation, notifications, profile controls, and broad information density. The canonical order is Today, Overview, Clients, CRM, Projects, Operations, Schedule, Inbox, Campaigns, Integrations, Reports, then Settings when permitted.
 
 ### Client shell
 
@@ -99,6 +99,10 @@ New permanent visual or interaction patterns must be added here and implemented 
 ### Private calendar connection
 
 Calendar subscriptions are presented as compact connection panels beside the real schedule they export. The panel must name the provider, explain refresh behavior, distinguish the private subscription URL from ordinary navigation, and provide an explicit revoke action. A raw subscription URL is shown only after creation in the current browser session; it is not persisted in browser storage. Client feeds contain only client-visible service work, while staff feeds may include internal CRM appointments and task deadlines.
+
+### Agency Schedule
+
+Schedule is the staff-facing, cross-client reading surface for the existing Operations calendar. It aggregates authorized service jobs, CRM appointments, and task deadlines without creating a second event store. Month, week, and agenda views share one restrained toolbar with Today, period navigation, search, client, category, and local-time-zone context. View, date, and filters persist in the URL. Selecting an event opens a viewport-bounded detail drawer and routes edits back to the owning client’s Operations workspace. On mobile, agenda is the default and dense calendar layouts collapse into a readable chronological list. Client users continue to see only their own client-visible schedule inside Services.
 
 ## Private Office production mode
 
