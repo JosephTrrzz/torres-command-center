@@ -43,7 +43,7 @@ Use this checklist before calling a backend or provider production-ready.
 - [x] Search Console site discovery and metrics working.
 - [x] Apply `supabase/provider_metrics.sql` and verify tenant-scoped normalized observation storage.
 - [x] Manual and six-hour scheduled GA4/Search Console synchronization share the protected adapter.
-- [ ] Verify normalized sync and visible report freshness in production after migration/deployment.
+- [x] Verify normalized sync and visible report freshness in production after migration/deployment.
 - [ ] Google Business Profile API access approved and quota greater than 0 QPM.
 - [ ] Business Profile location mapping verified after approval.
 - [ ] Disconnect and reauthorization flow tested.
