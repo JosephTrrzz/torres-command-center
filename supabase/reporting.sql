@@ -74,10 +74,12 @@ begin
   if not exists (select 1 from public.clients where id = new.client_id and organization_id = new.organization_id) then
     raise exception 'Report delivery client and organization scope do not match';
   end if;
-  if tg_table_name = 'report_schedule_runs' and not exists (
-    select 1 from public.report_schedules where id = new.schedule_id and client_id = new.client_id and organization_id = new.organization_id
-  ) then
-    raise exception 'Report delivery run and schedule scope do not match';
+  if tg_table_name = 'report_schedule_runs' then
+    if not exists (
+      select 1 from public.report_schedules where id = new.schedule_id and client_id = new.client_id and organization_id = new.organization_id
+    ) then
+      raise exception 'Report delivery run and schedule scope do not match';
+    end if;
   end if;
   return new;
 end;

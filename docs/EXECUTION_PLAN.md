@@ -66,8 +66,10 @@ Status: complete for the launch provider-control and Google normalization vertic
 
 ## Phase 6 — analytics and reports
 
+Status: complete for the launch analytics, evidence, and scheduled-delivery vertical slice.
+
 - Metric definitions, snapshots, comparison periods, transparent calculations, client/agency reports, and scheduled delivery.
-- Current/previous period calculations, visible metric provenance, immutable snapshots, and staff-controlled disabled-by-default scheduled delivery are implemented. The production migration is applied; a controlled scheduled worker delivery remains before Phase 6 can be marked complete.
+- Current/previous period calculations, visible metric provenance, immutable snapshots, and staff-controlled disabled-by-default scheduled delivery are implemented. The production migration is applied, and a controlled production worker run generated one immutable snapshot, one tracked email delivery, and then returned the test schedule to disabled state.
 
 ## Phase 7 — Torres AI
 

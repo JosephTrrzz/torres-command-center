@@ -53,6 +53,12 @@ Scheduled integration checks are a bounded exception to the general outbox-consu
 
 Torres AI receives an explicit organization and user context. Retrieval is tenant-scoped before content reaches a model. Responses identify evidence, freshness, and uncertainty. Any external write, message, publication, financial action, or destructive change requires a separate approval step and an audit record.
 
+## Phase 6 reporting domain
+
+Reports calculate current and comparison periods from normalized provider observations and preserve each exported or scheduled result as an immutable, tenant-scoped snapshot. Recurring schedules are staff-managed, created disabled, and require an explicit enable action. The protected hourly scheduler claims only due active schedules, uses a schedule-and-time idempotency key, links every attempt to its snapshot and tracked email delivery, and advances the next run only after successful provider acceptance. Disabling or archiving a schedule prevents future delivery without removing its execution history.
+
+The report scope trigger validates client and organization ownership for every reporting record. Run-specific schedule validation is isolated to the `report_schedule_runs` trigger branch so schedule inserts never reference fields that exist only on run records.
+
 ## Delivery topology
 
 - Production admin: `https://admin.torrescotechnology.com`
