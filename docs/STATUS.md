@@ -42,7 +42,7 @@ Updated 2026-09-07.
 
 ## Verified baseline
 
-The current verified baseline is 152 application/security tests plus both TypeScript checks, the Torres AI Worker checks and dry-run bundle, dependency audits, and the Next.js production build. The Torres AI and security migrations are additive and create no customer records.
+The current verified baseline is 153 application/security tests plus both TypeScript checks, the Torres AI Worker checks and dry-run bundle, dependency audits, and the Next.js production build. The Torres AI and security migrations are additive and create no customer records.
 
 ## Known limitations
 

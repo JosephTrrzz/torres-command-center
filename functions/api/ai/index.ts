@@ -159,7 +159,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   if (!organizationId) return authJson({ error: "Choose a workspace before using Torres AI." }, 409);
   const url = getSupabaseUrl(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || "";
-  const body = await request.json().catch(() => null) as { action?: unknown; threadId?: unknown; prompt?: unknown; kind?: unknown } | null;
+  const body = await request.json().catch(() => null) as { action?: unknown; threadId?: unknown; createNew?: unknown; prompt?: unknown; kind?: unknown } | null;
   const action = body?.action;
 
   if (action === "archive") {
@@ -183,6 +183,9 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   try {
     let thread = typeof body?.threadId === "string" ? await ownedThread(url, serviceKey, organizationId, auth.context.userId, body.threadId) : null;
     if (body?.threadId && (!thread || thread.status !== "active")) return authJson({ error: "That private conversation is not available." }, 404);
+    if (!thread && body?.createNew !== true) {
+      thread = (await loadThreads(url, serviceKey, organizationId, auth.context.userId))[0] || null;
+    }
     if (!thread) {
       const response = await fetch(`${url}/rest/v1/ai_threads`, { method: "POST", headers: headers(serviceKey, "return=representation"), body: JSON.stringify({ organization_id: organizationId, owner_user_id: auth.context.userId, title: titleFromPrompt(prompt) }) });
       const rows = await response.json().catch(() => []) as ThreadRow[];

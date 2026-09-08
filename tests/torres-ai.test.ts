@@ -7,6 +7,7 @@ import { isDisallowedAiPrompt, structuredAiResponse, validEvidenceHref, verified
 const root = process.cwd();
 const migration = readFileSync(join(root, "supabase", "torres_ai.sql"), "utf8");
 const api = readFileSync(join(root, "functions", "api", "ai", "index.ts"), "utf8");
+const page = readFileSync(join(root, "app", "assistant", "page.tsx"), "utf8");
 const worker = readFileSync(join(root, "workers", "torres-ai", "src", "index.ts"), "utf8");
 
 const evidence: TorresAiEvidence[] = [{ id: "project:one", sourceType: "project", sourceId: "one", label: "Project one", fact: "Status is active.", href: "/projects/", observedAt: null }];
@@ -43,6 +44,15 @@ describe("Torres AI security boundary", () => {
     expect(migration).toContain("pg_advisory_xact_lock");
     expect(migration).toContain("persist_ai_answer");
     expect(migration).toContain("owner_user_id = auth.uid()");
+    expect(migration).toContain("if tg_table_name = 'ai_approvals' then");
+    expect(migration).not.toContain("tg_table_name = 'ai_approvals' and thread_owner <> new.requested_by");
+  });
+
+  it("reuses the active conversation unless the user explicitly starts a new one", () => {
+    expect(api).toContain("body?.createNew !== true");
+    expect(api).toContain("await loadThreads(url, serviceKey, organizationId, auth.context.userId)");
+    expect(page).toContain("createNewThreadRef.current = true");
+    expect(page).toContain("createNewThreadRef.current = false");
   });
 
   it("derives scope from verified auth and calls only the private service binding", () => {

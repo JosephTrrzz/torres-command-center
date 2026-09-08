@@ -54,7 +54,7 @@ export function fetchTorresAi(session: AuthSession, threadId?: string) {
   return requestAi(session, threadId ? { headers: { "X-Torres-AI-Thread": threadId } } : undefined);
 }
 
-export function askTorresAi(session: AuthSession, input: { threadId?: string; prompt: string; kind?: TorresAiKind }) {
+export function askTorresAi(session: AuthSession, input: { threadId?: string; createNew?: boolean; prompt: string; kind?: TorresAiKind }) {
   return requestAi(session, { method: "POST", body: JSON.stringify({ action: "ask", ...input }) });
 }
 

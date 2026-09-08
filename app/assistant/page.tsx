@@ -27,6 +27,7 @@ export default function TorresAiPage() {
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const createNewThreadRef = useRef(false);
 
   useEffect(() => {
     const stored = readStoredSession();
@@ -37,6 +38,7 @@ export default function TorresAiPage() {
 
   const loadThread = async (threadId: string) => {
     if (!session || busy) return;
+    createNewThreadRef.current = false;
     setBusy(true);
     setError("");
     try { setSnapshot(await fetchTorresAi(session, threadId)); }
@@ -49,10 +51,12 @@ export default function TorresAiPage() {
     if (!session || busy) return;
     const question = (preset?.prompt ?? prompt).trim();
     if (!question) return;
+    const createNew = createNewThreadRef.current;
+    createNewThreadRef.current = false;
     setBusy(true);
     setError("");
     try {
-      const next = await askTorresAi(session, { threadId: snapshot?.selectedThreadId || undefined, prompt: question, kind: preset?.kind });
+      const next = await askTorresAi(session, { threadId: snapshot?.selectedThreadId || undefined, createNew, prompt: question, kind: preset?.kind });
       setSnapshot(next);
       setPrompt("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Torres AI could not answer safely."); }
@@ -61,6 +65,7 @@ export default function TorresAiPage() {
 
   const newConversation = () => {
     if (!snapshot) return;
+    createNewThreadRef.current = true;
     setSnapshot({ ...snapshot, selectedThreadId: null, messages: [] });
     setPrompt("");
     setError("");
