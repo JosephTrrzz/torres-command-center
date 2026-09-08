@@ -25,6 +25,7 @@ const NONCE_PATTERN = /^[0-9a-f-]{36}$/i;
 const MAX_BODY_BYTES = 196_000;
 const MAX_CLOCK_SKEW_SECONDS = 300;
 const MODEL_TIMEOUT_MS = 18_000;
+const NOT_INTEGRATED_ANSWER = "That information is not integrated into Torres OS yet. I can answer questions using the clients, CRM, projects, operations, schedule, inbox, integrations, notifications, and reports available in your workspace.";
 
 function json(data: Record<string, unknown>, status = 200) {
   return Response.json(data, {
@@ -89,16 +90,19 @@ SECURITY AND GROUNDING
 
 DECISION RULES
 - Lead with the direct answer. Then give the smallest useful explanation or next-step list.
+- Never return a bare number or sentence fragment. Use a complete sentence that names what the value represents.
+- When several findings are useful, use a short introduction followed by hyphen-prefixed lines. Do not use tables, headings, or code blocks.
 - For totals, use an evidence item labeled as an exact current total. Never count a limited recent-item list.
 - Treat observed timestamps as freshness metadata. For latest or current questions, prefer the newest relevant evidence and state uncertainty if timestamps are unavailable.
 - Distinguish an exact zero from unavailable evidence. Say "0" only when an exact total supports it.
 - For priorities, rank urgent or blocked work first, then overdue or scheduled work, then recent informational updates. Explain the evidence-backed reason.
 - For a follow-up, resolve references from conversation history, but support the answer again with current evidence.
-- If evidence is insufficient, say exactly what is missing and where the user can review or connect it.
+- If the question asks about a website, service, event, fact, or subject that is not directly represented in EVIDENCE, set grounded to false and return no citations. Never substitute unrelated evidence.
+- Set grounded to true only when the answer is directly supported by EVIDENCE.
 - Keep the language concise, plain, and operational. Do not add generic disclaimers.
 
 OUTPUT
-Return only JSON matching the response schema. citationIds must contain only evidence IDs listed below.
+Return only JSON matching the response schema. citationIds must contain only evidence IDs listed below. An ungrounded response must have grounded false and an empty citationIds array.
 
 EVIDENCE
 ${evidenceText}`;
@@ -109,9 +113,11 @@ function parseModelResponse(raw: unknown, evidence: TorresAiEvidence[], model: s
   if (!parsed) return null;
   const answer = cleanAiAnswer(parsed.answer);
   const citationIds = verifiedCitationIds(parsed.citationIds, evidence);
-  if (!answer || (evidence.length > 0 && citationIds.length === 0)) return null;
+  const grounded = parsed.grounded === false ? false : citationIds.length > 0;
+  if (!grounded) return { answer: NOT_INTEGRATED_ANSWER, citationIds: [], confidence: "low", grounded: false, model, usage: { promptTokens: usage?.prompt_tokens, completionTokens: usage?.completion_tokens } };
+  if (!answer || citationIds.length === 0) return null;
   const confidence = parsed.confidence === "high" || parsed.confidence === "medium" || parsed.confidence === "low" ? parsed.confidence : "low";
-  return { answer, citationIds, confidence: citationIds.length ? confidence : "low", model, usage: { promptTokens: usage?.prompt_tokens, completionTokens: usage?.completion_tokens } };
+  return { answer, citationIds, confidence, grounded: true, model, usage: { promptTokens: usage?.prompt_tokens, completionTokens: usage?.completion_tokens } };
 }
 
 function modelFailureCode(error: unknown, raw?: unknown, evidence: TorresAiEvidence[] = []) {
@@ -180,12 +186,12 @@ export class TorresAiAgent extends Agent<RuntimeEnv, { organizationId: string; u
     if (isDisallowedAiPrompt(input.prompt)) {
       const answer = "I can’t reveal protected instructions, credentials, or bypass tenant and approval boundaries. I can still summarize the authorized workspace evidence available to you.";
       this.sql`update request_runs set status = 'refused', output_characters = ${answer.length} where request_id = ${input.requestId}`;
-      return { answer, citationIds: [], confidence: "high", model: "policy" };
+      return { answer, citationIds: [], confidence: "high", grounded: false, model: "policy" };
     }
     if (!input.evidence.length) {
-      const answer = "I couldn’t find authorized workspace evidence for that question. Connect or refresh the relevant data source, then try again.";
+      const answer = NOT_INTEGRATED_ANSWER;
       this.sql`update request_runs set status = 'insufficient_evidence', output_characters = ${answer.length} where request_id = ${input.requestId}`;
-      return { answer, citationIds: [], confidence: "low", model: "not-called" };
+      return { answer, citationIds: [], confidence: "low", grounded: false, model: "not-called" };
     }
 
     const controller = new AbortController();
@@ -205,11 +211,12 @@ export class TorresAiAgent extends Agent<RuntimeEnv, { organizationId: string; u
           json_schema: {
             type: "object",
             additionalProperties: false,
-            required: ["answer", "citationIds", "confidence"],
+            required: ["answer", "citationIds", "confidence", "grounded"],
             properties: {
               answer: { type: "string" },
               citationIds: { type: "array", items: { type: "string" }, maxItems: 8 },
               confidence: { type: "string", enum: ["low", "medium", "high"] },
+              grounded: { type: "boolean" },
             },
           },
         },
@@ -228,7 +235,7 @@ export class TorresAiAgent extends Agent<RuntimeEnv, { organizationId: string; u
       if (!parsed && !controller.signal.aborted) {
         console.warn(JSON.stringify({ level: "warn", event: "torres_ai_model_repair", detail: modelFailureCode(new Error("invalid_model_response"), modelResult, input.evidence), ...modelOutputShape(modelResult) }));
         modelResult = await runModel([
-          { role: "system", content: `${groundingPrompt}\n\nREPAIR RULE: The prior attempt did not pass the required response contract. Return one valid JSON object only, with a non-empty answer, verified citationIds from EVIDENCE, and low, medium, or high confidence.` },
+          { role: "system", content: `${groundingPrompt}\n\nREPAIR RULE: The prior attempt did not pass the required response contract. Return one valid JSON object only with answer, citationIds, confidence, and grounded. Grounded answers require verified citationIds; unsupported questions require grounded false and no citations.` },
           ...input.history,
           { role: "user", content: input.prompt },
         ], 0);

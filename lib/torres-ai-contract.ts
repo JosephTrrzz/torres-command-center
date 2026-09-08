@@ -36,6 +36,7 @@ export interface TorresAiAgentResponse {
   answer: string;
   citationIds: string[];
   confidence: "low" | "medium" | "high";
+  grounded: boolean;
   model: string;
   usage?: { promptTokens?: number; completionTokens?: number };
 }

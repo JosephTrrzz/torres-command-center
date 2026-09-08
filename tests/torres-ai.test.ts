@@ -73,4 +73,15 @@ describe("Torres AI security boundary", () => {
     expect(api).toContain("workspace-client-directory");
     expect(api).toContain("count=exact");
   });
+
+  it("supports broader workspace questions without inventing answers", () => {
+    expect(api).toContain("workspace-upcoming-appointments");
+    expect(api).toContain("workspace-open-tasks");
+    expect(api).toContain("workspace-open-conversations");
+    expect(api).toContain("workspace-integrations-needing-attention");
+    expect(worker).toContain("That information is not integrated into Torres OS yet.");
+    expect(worker).toContain('required: ["answer", "citationIds", "confidence", "grounded"]');
+    expect(page).toContain('className="ai-answer"');
+    expect(page).toContain('block.type === "ordered"');
+  });
 });

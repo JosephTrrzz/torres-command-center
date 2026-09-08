@@ -55,7 +55,7 @@ Scheduled integration checks are a bounded exception to the general outbox-consu
 
 ## AI boundary
 
-Torres AI receives an explicit organization and user context. Retrieval is tenant-scoped before content reaches a model. Responses identify evidence, freshness, and uncertainty. Any external write, message, publication, financial action, or destructive change requires a separate approval step and an audit record.
+Torres AI receives an explicit organization and user context. Retrieval is tenant-scoped before content reaches a model and may include authorized client, CRM, schedule, inbox, project, operations, integration-health, notification, and reporting evidence. Responses identify evidence, freshness, and uncertainty. The Agent returns an explicit grounded state: supported answers require server-verified citations, while unsupported questions are saved as an uncited “not integrated” response instead of being paired with unrelated records. Any external write, message, publication, financial action, or destructive change requires a separate approval step and an audit record.
 
 Phase 7 uses an authenticated Pages Function as the only browser-facing AI boundary. That Function derives the active organization and user from the verified Supabase session, retrieves a bounded and privacy-minimized evidence set, and calls a private Cloudflare Worker through a service binding. The Worker uses one durable Agent instance per organization and conversation, with an HMAC timestamp and one-time nonce as defense in depth. Its local durable state contains only replay protection and request counts; prompts and responses remain in Supabase under owner-only RLS.
 

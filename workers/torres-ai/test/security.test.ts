@@ -33,4 +33,9 @@ describe("private agent contract", () => {
     expect(structuredAiResponse({ response: '{answer: "The client is active.", citationIds: ["report:one"], confidence: "high"}' })).toEqual({ ...answer, answer: "The client is active." });
     expect(structuredAiResponse({ response: "not json" })).toBeNull();
   });
+
+  it("preserves the explicit grounded state", () => {
+    const unsupported = { answer: "Unavailable.", citationIds: [], confidence: "low", grounded: false };
+    expect(structuredAiResponse({ response: unsupported })).toEqual(unsupported);
+  });
 });

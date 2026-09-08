@@ -24,7 +24,7 @@ Updated 2026-09-07.
 | SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
 | Campaigns and review requests | Phase 4B ready to migrate | Client-scoped drafts, consent basis, recipient review, durable suppression, staff test sends, explicit production confirmation, unsubscribe handling, and provider delivery truth. |
 | Integration control | Phase 5 complete | Common provider registry, durable run history, manual verification, safe Google disconnect, scheduled health checks, normalized GA4/Search Console sync, signed webhook ingestion, two-failure administrator alerts, and recovery notices are implemented. |
-| Torres AI | Phase 7 live foundation | Read-only tenant retrieval, exact server-calculated workspace totals, private user-owned conversations, current-evidence follow-ups, verified citations, one-pass structured-output recovery, atomic persistence, database-serialized rate limits, replay protection, privacy-minimized telemetry, and the private `torres-ai` Cloudflare Agent are deployed. A signed-in production prompt completes, persists, survives reload, and displays a verified source; a separate two-user/two-organization isolation smoke test remains. |
+| Torres AI | Phase 7 live foundation | Read-only tenant retrieval now covers authorized clients, CRM follow-ups, schedules, inbox workload, projects, operations, integration health, notifications, and reports. Answers use complete sentences and semantic lists, unsupported questions return an explicit uncited “not integrated” state, and grounded answers retain verified citations. Private user-owned conversations, atomic persistence, database-serialized rate limits, replay protection, privacy-minimized telemetry, and the private `torres-ai` Cloudflare Agent are deployed. A signed-in production prompt completes, persists, survives reload, and displays a verified source; a separate two-user/two-organization isolation smoke test remains. |
 | Security hardening | Live foundation | Static and Function security headers, bounded edge requests, legacy customer-account RLS repair, atomic receptionist throttling, session-scoped default auth storage, and Supabase-validated Cloudflare Turnstile are active in production. Targeted WAF tuning and recurring monitoring remain operational follow-up work. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |
 
@@ -42,7 +42,7 @@ Updated 2026-09-07.
 
 ## Verified baseline
 
-The current verified baseline is 153 application/security tests plus both TypeScript checks, the Torres AI Worker checks and dry-run bundle, dependency audits, and the Next.js production build. The Torres AI and security migrations are additive and create no customer records.
+The current verified baseline is 157 application/security tests plus both TypeScript checks, the Torres AI Worker checks and dry-run bundle, dependency audits, and the Next.js production build. The Torres AI and security migrations are additive and create no customer records.
 
 ## Known limitations
 
