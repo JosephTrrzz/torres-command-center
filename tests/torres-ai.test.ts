@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { canAccessPath } from "../lib/access-control";
-import { isDisallowedAiPrompt, validEvidenceHref, verifiedCitationIds, type TorresAiEvidence } from "../lib/torres-ai-contract";
+import { isDisallowedAiPrompt, structuredAiResponse, validEvidenceHref, verifiedCitationIds, type TorresAiEvidence } from "../lib/torres-ai-contract";
 
 const root = process.cwd();
 const migration = readFileSync(join(root, "supabase", "torres_ai.sql"), "utf8");
@@ -23,6 +23,12 @@ describe("Torres AI security boundary", () => {
     expect(validEvidenceHref("//attacker.example")).toBe(false);
     expect(validEvidenceHref("https://attacker.example")).toBe(false);
     expect(verifiedCitationIds(["project:one", "project:invented", "project:one"], evidence)).toEqual(["project:one"]);
+  });
+
+  it("accepts structured JSON responses without relaxing citation checks", () => {
+    const response = structuredAiResponse({ response: { answer: "Project one is active.", citationIds: ["project:one"], confidence: "high" } });
+    expect(response?.answer).toBe("Project one is active.");
+    expect(verifiedCitationIds(response?.citationIds, evidence)).toEqual(["project:one"]);
   });
 
   it("blocks prompt and credential extraction attempts", () => {

@@ -40,6 +40,17 @@ function titleFromPrompt(prompt: string) {
   return prompt.replace(/\s+/g, " ").trim().slice(0, 80) || "New conversation";
 }
 
+function persistenceFailureCode(value: unknown) {
+  const code = value && typeof value === "object" && "code" in value && typeof value.code === "string" ? value.code : "";
+  if (code === "PGRST202" || code === "42883") return "rpc_missing";
+  if (code === "42501") return "rpc_permission_denied";
+  if (code === "23503") return "rpc_foreign_key_rejected";
+  if (code === "23505") return "rpc_duplicate_rejected";
+  if (code === "23514") return "rpc_constraint_rejected";
+  if (code === "P0001") return "rpc_validation_rejected";
+  return code ? "rpc_database_rejected" : "rpc_transport_failed";
+}
+
 function iso(value: unknown) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : null;
 }
@@ -206,7 +217,11 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
     const selectedEvidence = evidence.filter((item) => citationIds.includes(item.id));
     const persistence = await fetch(`${url}/rest/v1/rpc/persist_ai_answer`, { method: "POST", headers: headers(serviceKey), body: JSON.stringify({ target_organization_id: organizationId, target_user_id: auth.context.userId, target_thread_id: thread.id, target_kind: kind, target_prompt: prompt, target_answer: answer, target_confidence: agentResult.confidence, target_citations: selectedEvidence.map((item) => ({ source_type: item.sourceType, source_id: item.sourceId, label: item.label, href: item.href, observed_at: item.observedAt })) }) });
-    if (!persistence.ok) throw new Error("answer_persistence_failed");
+    if (!persistence.ok) {
+      const persistenceError = await persistence.json().catch(() => null) as unknown;
+      console.error(JSON.stringify({ level: "error", event: "torres_ai_persistence", status: persistence.status, code: persistenceFailureCode(persistenceError) }));
+      throw new Error("answer_persistence_failed");
+    }
     await Promise.all([
       fetch(`${url}/rest/v1/ai_usage_events?request_id=eq.${requestId}`, { method: "PATCH", headers: headers(serviceKey, "return=minimal"), body: JSON.stringify({ status: agentResult.model === "policy" ? "refused" : "succeeded", model: clean(agentResult.model, 160), output_characters: answer.length, prompt_tokens: agentResult.usage?.promptTokens ?? null, completion_tokens: agentResult.usage?.completionTokens ?? null, duration_ms: Date.now() - started }) }),
       fetch(`${url}/rest/v1/audit_events`, { method: "POST", headers: headers(serviceKey, "return=minimal"), body: JSON.stringify({ organization_id: organizationId, actor_user_id: auth.context.userId, action: "ai.answer.generated", entity_type: "ai_thread", entity_id: thread.id, request_id: requestId, metadata: { kind, evidence_count: evidence.length, citation_count: citationIds.length, confidence: agentResult.confidence, read_only: true } }) }),

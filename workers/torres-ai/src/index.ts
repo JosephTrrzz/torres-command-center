@@ -6,6 +6,7 @@ import {
   TORRES_AI_SOURCE_TYPES,
   cleanAiAnswer,
   isDisallowedAiPrompt,
+  structuredAiResponse,
   validEvidenceHref,
   verifiedCitationIds,
   type TorresAiAgentRequest,
@@ -82,18 +83,56 @@ function systemPrompt(evidence: TorresAiEvidence[]) {
 }
 
 function parseModelResponse(raw: unknown, evidence: TorresAiEvidence[], model: string, usage?: { prompt_tokens?: number; completion_tokens?: number }): TorresAiAgentResponse | null {
-  const responseText = typeof raw === "string" ? raw : raw && typeof raw === "object" && "response" in raw && typeof raw.response === "string" ? raw.response : "";
-  if (!responseText) return null;
-  try {
-    const parsed = JSON.parse(responseText.replace(/^```json\s*/i, "").replace(/```\s*$/, "")) as { answer?: unknown; citationIds?: unknown; confidence?: unknown };
-    const answer = cleanAiAnswer(parsed.answer);
-    const citationIds = verifiedCitationIds(parsed.citationIds, evidence);
-    if (!answer || (evidence.length > 0 && citationIds.length === 0)) return null;
-    const confidence = parsed.confidence === "high" || parsed.confidence === "medium" || parsed.confidence === "low" ? parsed.confidence : "low";
-    return { answer, citationIds, confidence: citationIds.length ? confidence : "low", model, usage: { promptTokens: usage?.prompt_tokens, completionTokens: usage?.completion_tokens } };
-  } catch {
-    return null;
-  }
+  const parsed = structuredAiResponse(raw);
+  if (!parsed) return null;
+  const answer = cleanAiAnswer(parsed.answer);
+  const citationIds = verifiedCitationIds(parsed.citationIds, evidence);
+  if (!answer || (evidence.length > 0 && citationIds.length === 0)) return null;
+  const confidence = parsed.confidence === "high" || parsed.confidence === "medium" || parsed.confidence === "low" ? parsed.confidence : "low";
+  return { answer, citationIds, confidence: citationIds.length ? confidence : "low", model, usage: { promptTokens: usage?.prompt_tokens, completionTokens: usage?.completion_tokens } };
+}
+
+function modelFailureCode(error: unknown, raw?: unknown, evidence: TorresAiEvidence[] = []) {
+  if (error instanceof Error && error.name === "AbortError") return "model_timeout";
+  if (error instanceof Error && /JSON Mode couldn't be met/i.test(error.message)) return "json_mode_unmet";
+  if (error instanceof Error && error.message !== "invalid_model_response") return "model_request_failed";
+  const parsed = structuredAiResponse(raw);
+  if (!parsed) return "model_output_unparseable";
+  if (!cleanAiAnswer(parsed.answer)) return "model_answer_missing";
+  if (evidence.length > 0 && verifiedCitationIds(parsed.citationIds, evidence).length === 0) return "model_citations_unverified";
+  return "model_response_invalid";
+}
+
+function modelOutputShape(raw: unknown) {
+  const rawRecord = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+  const response = rawRecord && "response" in rawRecord ? rawRecord.response : undefined;
+  const firstChoice = rawRecord && Array.isArray(rawRecord.choices) ? rawRecord.choices[0] : null;
+  const choiceRecord = firstChoice && typeof firstChoice === "object" && !Array.isArray(firstChoice) ? firstChoice as Record<string, unknown> : null;
+  const message = choiceRecord?.message;
+  const messageRecord = message && typeof message === "object" && !Array.isArray(message) ? message as Record<string, unknown> : null;
+  const content = messageRecord?.content;
+  const responseText = typeof response === "string" ? response.trim() : "";
+  return {
+    rawType: Array.isArray(raw) ? "array" : typeof raw,
+    rawKeys: rawRecord ? Object.keys(rawRecord).slice(0, 12) : [],
+    responseType: Array.isArray(response) ? "array" : typeof response,
+    responseLength: typeof response === "string" ? response.length : null,
+    responseFirstCode: responseText ? responseText.codePointAt(0) : null,
+    responseLastCode: responseText ? responseText.codePointAt(responseText.length - 1) : null,
+    responseHasAnswerKey: responseText.includes("answer"),
+    responseHasCitationKey: responseText.includes("citationIds"),
+    responseHasFence: responseText.includes("```"),
+    responseOpenBraces: (responseText.match(/\{/g) || []).length,
+    responseCloseBraces: (responseText.match(/\}/g) || []).length,
+    responseDoubleQuotes: (responseText.match(/"/g) || []).length,
+    responseSingleQuotes: (responseText.match(/'/g) || []).length,
+    responseKeys: response && typeof response === "object" && !Array.isArray(response) ? Object.keys(response as Record<string, unknown>).slice(0, 12) : [],
+    choiceKeys: choiceRecord ? Object.keys(choiceRecord).slice(0, 12) : [],
+    messageType: Array.isArray(message) ? "array" : typeof message,
+    messageKeys: messageRecord ? Object.keys(messageRecord).slice(0, 12) : [],
+    contentType: Array.isArray(content) ? "array" : typeof content,
+    contentLength: typeof content === "string" ? content.length : null,
+  };
 }
 
 export class TorresAiAgent extends Agent<RuntimeEnv, { organizationId: string; userId: string; threadId: string; lastActiveAt: string }> {
@@ -129,8 +168,9 @@ export class TorresAiAgent extends Agent<RuntimeEnv, { organizationId: string; u
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+    let modelResult: unknown;
     try {
-      const result = await this.env.AI.run(this.env.AI_MODEL, {
+      modelResult = await this.env.AI.run(this.env.AI_MODEL, {
         messages: [
           { role: "system", content: systemPrompt(input.evidence) },
           ...input.history,
@@ -156,14 +196,18 @@ export class TorresAiAgent extends Agent<RuntimeEnv, { organizationId: string; u
         tags: ["torres-ai", input.kind],
         gateway: this.env.AI_GATEWAY_ID ? { id: this.env.AI_GATEWAY_ID, collectLog: false, requestTimeoutMs: MODEL_TIMEOUT_MS, retries: { maxAttempts: 2, backoff: "exponential" } } : undefined,
       });
-      const usage = result && typeof result === "object" && "usage" in result ? result.usage : undefined;
-      const parsed = parseModelResponse(result, input.evidence, this.env.AI_MODEL, usage);
+      const usage = modelResult && typeof modelResult === "object" && "usage" in modelResult && modelResult.usage && typeof modelResult.usage === "object"
+        ? modelResult.usage as { prompt_tokens?: number; completion_tokens?: number }
+        : undefined;
+      const parsed = parseModelResponse(modelResult, input.evidence, this.env.AI_MODEL, usage);
       if (!parsed) throw new Error("invalid_model_response");
       this.sql`update request_runs set status = 'succeeded', output_characters = ${parsed.answer.length} where request_id = ${input.requestId}`;
       return parsed;
     } catch (error) {
       this.sql`update request_runs set status = 'failed' where request_id = ${input.requestId}`;
-      throw error;
+      const detail = modelFailureCode(error, modelResult, input.evidence);
+      console.error(JSON.stringify({ level: "error", event: "torres_ai_model_failure", detail, ...modelOutputShape(modelResult) }));
+      throw new Error(detail);
     } finally {
       clearTimeout(timeout);
     }
@@ -198,8 +242,9 @@ export default {
       console.log(JSON.stringify({ level: "info", event: "torres_ai_request", requestId, agentRequestId: input.requestId, organizationId: input.organizationId, userId: input.userId, status: "succeeded", evidenceCount: input.evidence.length, inputCharacters: input.prompt.length, outputCharacters: response.answer.length }));
       return json(response as unknown as Record<string, unknown>);
     } catch (error) {
-      const code = error instanceof Error && error.message === "duplicate_request" ? "duplicate_request" : "agent_unavailable";
-      console.error(JSON.stringify({ level: "error", event: "torres_ai_request", requestId, agentRequestId: input.requestId, organizationId: input.organizationId, userId: input.userId, status: "failed", code }));
+      const detail = error instanceof Error ? error.message : "agent_unavailable";
+      const code = detail === "duplicate_request" ? "duplicate_request" : "agent_unavailable";
+      console.error(JSON.stringify({ level: "error", event: "torres_ai_request", requestId, agentRequestId: input.requestId, organizationId: input.organizationId, userId: input.userId, status: "failed", code, detail }));
       return json({ error: code === "duplicate_request" ? "This request was already processed." : "Torres AI is temporarily unavailable.", code }, code === "duplicate_request" ? 409 : 503);
     }
   },
