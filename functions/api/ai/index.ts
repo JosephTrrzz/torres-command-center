@@ -5,6 +5,7 @@ import {
   TORRES_AI_MAX_PROMPT_CHARACTERS,
   cleanAiAnswer,
   isDisallowedAiPrompt,
+  postgrestExactCount,
   validEvidenceHref,
   verifiedCitationIds,
   type TorresAiAgentRequest,
@@ -74,6 +75,16 @@ async function rest<T>(url: string, serviceKey: string, path: string): Promise<T
   return response.json().catch(() => []) as Promise<T[]>;
 }
 
+async function restCount(url: string, serviceKey: string, path: string) {
+  const response = await fetch(`${url}/rest/v1/${path}`, {
+    method: "HEAD",
+    headers: { ...headers(serviceKey), Prefer: "count=exact", Range: "0-0" },
+  });
+  const count = postgrestExactCount(response.headers.get("Content-Range"));
+  if (!response.ok || count === null) throw new Error("storage_count_failed");
+  return count;
+}
+
 async function scopeFor(context: AuthContext, url: string, serviceKey: string) {
   const organizationId = context.organizationId || "";
   const active = context.memberships.find((membership) => membership.organizationId === organizationId);
@@ -97,20 +108,40 @@ function evidenceItem(sourceType: TorresAiEvidence["sourceType"], sourceId: stri
 
 async function authorizedEvidence(context: AuthContext, url: string, serviceKey: string) {
   const scope = await scopeFor(context, url, serviceKey);
-  if (!scope.organizationIds.length || !scope.clientIds.length) return [];
+  const observedAt = new Date().toISOString();
+  const clientCount = scope.organizationIds.length
+    ? await restCount(url, serviceKey, `clients?organization_id=in.(${scope.organizationIds.join(",")})&select=id`).catch(() => null)
+    : 0;
+  const clientSummary = clientCount === null ? null : evidenceItem(
+    "client",
+    "workspace-client-directory",
+    "Client directory",
+    `Exact current total: ${clientCount} client account${clientCount === 1 ? "" : "s"} ${clientCount === 1 ? "is" : "are"} visible to this signed-in workspace.`,
+    scope.clientUser ? "/portal/" : "/clients/",
+    observedAt,
+  );
+  const summaries: TorresAiEvidence[] = clientSummary ? [clientSummary] : [];
+  if (!scope.organizationIds.length) return summaries;
   const organizationFilter = scope.organizationIds.join(",");
   const clientFilter = scope.clientIds.join(",");
+  const serviceVisibility = scope.clientUser ? "&client_visible=eq.true" : "";
   const requests: Array<Promise<TorresAiEvidence[]>> = [
-    rest<{ id: string; name: string; industry: string; location: string }>(url, serviceKey, `clients?id=in.(${clientFilter})&select=id,name,industry,location&order=name.asc&limit=8`).then((rows) => rows.flatMap((row) => evidenceItem("client", row.id, row.name, `${row.name} is a ${clean(row.industry, 100) || "client"} account${row.location ? ` in ${clean(row.location, 180)}` : ""}.`, scope.clientUser ? "/portal/" : `/clients/?client=${row.id}`, null) || [])),
-    rest<{ id: string; name: string; status: string; progress_percent: number; target_date: string | null; updated_at: string }>(url, serviceKey, `client_projects?organization_id=in.(${organizationFilter})&select=id,name,status,progress_percent,target_date,updated_at&order=updated_at.desc&limit=8`).then((rows) => rows.flatMap((row) => evidenceItem("project", row.id, row.name, `Project status: ${row.status}; progress: ${row.progress_percent}%; target: ${row.target_date || "not set"}.`, `/projects/`, row.updated_at) || [])),
-    rest<{ id: string; title: string; status: string; priority: string; scheduled_start: string | null; updated_at: string }>(url, serviceKey, `service_jobs?organization_id=in.(${organizationFilter})${scope.clientUser ? "&client_visible=eq.true" : ""}&select=id,title,status,priority,scheduled_start,updated_at&order=updated_at.desc&limit=8`).then((rows) => rows.flatMap((row) => evidenceItem("service_job", row.id, row.title, `Service status: ${row.status}; priority: ${row.priority}; scheduled: ${row.scheduled_start || "not scheduled"}.`, `/operations/`, row.updated_at) || [])),
-    rest<{ id: string; report_type: string; period_start: string; period_end: string; created_at: string }>(url, serviceKey, `report_snapshots?organization_id=in.(${organizationFilter})&select=id,report_type,period_start,period_end,created_at&order=created_at.desc&limit=6`).then((rows) => rows.flatMap((row) => evidenceItem("report_snapshot", row.id, `${row.report_type} report`, `Verified report snapshot covers ${row.period_start} through ${row.period_end}.`, `/reports/`, row.created_at) || [])),
-    rest<{ id: string; title: string; body: string; href: string | null; created_at: string }>(url, serviceKey, `notifications?user_id=eq.${encodeURIComponent(context.userId)}&select=id,title,body,href,created_at&order=created_at.desc&limit=6`).then((rows) => rows.flatMap((row) => evidenceItem("notification", row.id, row.title, row.body, notificationHref(row.href, scope.clientUser), row.created_at) || [])),
+    restCount(url, serviceKey, `client_projects?organization_id=in.(${organizationFilter})&status=in.(planned,active,blocked)&select=id`).then((count) => evidenceItem("project", "workspace-open-projects", "Open project total", `Exact current total: ${count} project${count === 1 ? "" : "s"} ${count === 1 ? "is" : "are"} planned, active, or blocked.`, "/projects/", observedAt)).then((item) => item ? [item] : []),
+    restCount(url, serviceKey, `service_jobs?organization_id=in.(${organizationFilter})${serviceVisibility}&status=in.(requested,scheduled,in_progress,waiting)&select=id`).then((count) => evidenceItem("service_job", "workspace-open-service-jobs", "Open service-work total", `Exact current total: ${count} service job${count === 1 ? "" : "s"} ${count === 1 ? "is" : "are"} requested, scheduled, in progress, or waiting.`, "/operations/", observedAt)).then((item) => item ? [item] : []),
+    restCount(url, serviceKey, `report_snapshots?organization_id=in.(${organizationFilter})&select=id`).then((count) => evidenceItem("report_snapshot", "workspace-report-snapshots", "Verified report total", `Exact current total: ${count} verified report snapshot${count === 1 ? "" : "s"} ${count === 1 ? "is" : "are"} stored for the authorized workspace.`, "/reports/", observedAt)).then((item) => item ? [item] : []),
+    ...(scope.clientIds.length ? [rest<{ id: string; name: string; industry: string; location: string }>(url, serviceKey, `clients?id=in.(${clientFilter})&select=id,name,industry,location&order=name.asc&limit=8`).then((rows) => rows.flatMap((row) => evidenceItem("client", row.id, row.name, `${row.name} is a ${clean(row.industry, 100) || "client"} account${row.location ? ` in ${clean(row.location, 180)}` : ""}.`, scope.clientUser ? "/portal/" : `/clients/?client=${row.id}`, null) || []))] : []),
+    rest<{ id: string; name: string; status: string; progress_percent: number; target_date: string | null; updated_at: string }>(url, serviceKey, `client_projects?organization_id=in.(${organizationFilter})&select=id,name,status,progress_percent,target_date,updated_at&order=updated_at.desc&limit=7`).then((rows) => rows.flatMap((row) => evidenceItem("project", row.id, row.name, `Project status: ${row.status}; progress: ${row.progress_percent}%; target: ${row.target_date || "not set"}.`, `/projects/`, row.updated_at) || [])),
+    rest<{ id: string; title: string; status: string; priority: string; scheduled_start: string | null; updated_at: string }>(url, serviceKey, `service_jobs?organization_id=in.(${organizationFilter})${serviceVisibility}&select=id,title,status,priority,scheduled_start,updated_at&order=updated_at.desc&limit=7`).then((rows) => rows.flatMap((row) => evidenceItem("service_job", row.id, row.title, `Service status: ${row.status}; priority: ${row.priority}; scheduled: ${row.scheduled_start || "not scheduled"}.`, `/operations/`, row.updated_at) || [])),
+    rest<{ id: string; report_type: string; period_start: string; period_end: string; created_at: string }>(url, serviceKey, `report_snapshots?organization_id=in.(${organizationFilter})&select=id,report_type,period_start,period_end,created_at&order=created_at.desc&limit=5`).then((rows) => rows.flatMap((row) => evidenceItem("report_snapshot", row.id, `${row.report_type} report`, `Verified report snapshot covers ${row.period_start} through ${row.period_end}.`, `/reports/`, row.created_at) || [])),
+    rest<{ id: string; title: string; body: string; href: string | null; created_at: string }>(url, serviceKey, `notifications?user_id=eq.${encodeURIComponent(context.userId)}&select=id,title,body,href,created_at&order=created_at.desc&limit=4`).then((rows) => rows.flatMap((row) => evidenceItem("notification", row.id, row.title, row.body, notificationHref(row.href, scope.clientUser), row.created_at) || [])),
   ];
-  if (!scope.clientUser) {
-    requests.push(rest<{ id: string; full_name: string; company: string; service_interest: string; status: string; source: string; updated_at: string }>(url, serviceKey, `crm_leads?client_id=in.(${clientFilter})&select=id,full_name,company,service_interest,status,source,updated_at&order=updated_at.desc&limit=8`).then((rows) => rows.flatMap((row) => evidenceItem("crm_lead", row.id, row.full_name, `Lead${row.company ? ` from ${clean(row.company, 120)}` : ""}; interest: ${clean(row.service_interest, 120) || "not specified"}; status: ${row.status}; source: ${row.source}.`, `/crm/`, row.updated_at) || [])));
+  if (!scope.clientUser && scope.clientIds.length) {
+    requests.push(
+      restCount(url, serviceKey, `crm_leads?client_id=in.(${clientFilter})&status=in.(new,qualified,contacted,appointment_scheduled)&select=id`).then((count) => evidenceItem("crm_lead", "workspace-active-leads", "Active lead total", `Exact current total: ${count} lead${count === 1 ? "" : "s"} ${count === 1 ? "is" : "are"} new, qualified, contacted, or appointment scheduled.`, "/crm/", observedAt)).then((item) => item ? [item] : []),
+      rest<{ id: string; full_name: string; company: string; service_interest: string; status: string; source: string; updated_at: string }>(url, serviceKey, `crm_leads?client_id=in.(${clientFilter})&select=id,full_name,company,service_interest,status,source,updated_at&order=updated_at.desc&limit=4`).then((rows) => rows.flatMap((row) => evidenceItem("crm_lead", row.id, row.full_name, `Lead${row.company ? ` from ${clean(row.company, 120)}` : ""}; interest: ${clean(row.service_interest, 120) || "not specified"}; status: ${row.status}; source: ${row.source}.`, `/crm/`, row.updated_at) || [])),
+    );
   }
-  return (await Promise.all(requests.map((source) => source.catch(() => [])))).flat().slice(0, TORRES_AI_MAX_EVIDENCE_ITEMS);
+  return [...summaries, ...(await Promise.all(requests.map((source) => source.catch(() => [])))).flat()].slice(0, TORRES_AI_MAX_EVIDENCE_ITEMS);
 }
 
 async function loadThreads(url: string, serviceKey: string, organizationId: string, userId: string) {

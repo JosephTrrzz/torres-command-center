@@ -44,6 +44,13 @@ export function validEvidenceHref(value: string) {
   return /^\/[a-z0-9/_?=&%.-]*$/i.test(value) && !value.startsWith("//");
 }
 
+export function postgrestExactCount(contentRange: string | null) {
+  const match = contentRange?.match(/\/(\d+)$/);
+  if (!match) return null;
+  const count = Number(match[1]);
+  return Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+
 export function verifiedCitationIds(ids: unknown, evidence: TorresAiEvidence[]) {
   const allowed = new Set(evidence.map((item) => item.id));
   if (!Array.isArray(ids)) return [];

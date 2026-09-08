@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDisallowedAiPrompt, structuredAiResponse, validEvidenceHref, verifiedCitationIds, type TorresAiEvidence } from "../../../lib/torres-ai-contract";
+import { isDisallowedAiPrompt, postgrestExactCount, structuredAiResponse, validEvidenceHref, verifiedCitationIds, type TorresAiEvidence } from "../../../lib/torres-ai-contract";
 
 const evidence: TorresAiEvidence[] = [{ id: "report:one", sourceType: "report_snapshot", sourceId: "one", label: "Report", fact: "A verified report exists.", href: "/reports/", observedAt: null }];
 
@@ -13,6 +13,12 @@ describe("private agent contract", () => {
     expect(verifiedCitationIds(["report:one", "invented"], evidence)).toEqual(["report:one"]);
     expect(validEvidenceHref("/reports/")).toBe(true);
     expect(validEvidenceHref("https://outside.example")).toBe(false);
+  });
+
+  it("uses only exact PostgREST totals", () => {
+    expect(postgrestExactCount("0-0/7")).toBe(7);
+    expect(postgrestExactCount("*/0")).toBe(0);
+    expect(postgrestExactCount("0-0/*")).toBeNull();
   });
 
   it("normalizes both Cloudflare JSON mode objects and legacy JSON strings", () => {
