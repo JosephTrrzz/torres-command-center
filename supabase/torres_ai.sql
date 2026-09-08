@@ -229,8 +229,10 @@ begin
   if thread_organization is null or thread_organization <> new.organization_id then
     raise exception 'AI record and thread organization scope do not match';
   end if;
-  if tg_table_name = 'ai_approvals' and thread_owner <> new.requested_by then
-    raise exception 'AI approval requester must own the thread';
+  if tg_table_name = 'ai_approvals' then
+    if thread_owner <> new.requested_by then
+      raise exception 'AI approval requester must own the thread';
+    end if;
   end if;
   return new;
 end;
