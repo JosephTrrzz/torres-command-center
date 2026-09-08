@@ -51,9 +51,11 @@ export default function TorresAiPage() {
   const [snapshot, setSnapshot] = useState<TorresAiSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState("");
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const ledgerEndRef = useRef<HTMLDivElement>(null);
   const createNewThreadRef = useRef(false);
 
   useEffect(() => {
@@ -62,6 +64,10 @@ export default function TorresAiPage() {
     if (!stored) return setLoading(false);
     void fetchTorresAi(stored).then(setSnapshot).catch((cause) => setError(cause instanceof Error ? cause.message : "Torres AI could not be loaded.")).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    ledgerEndRef.current?.scrollIntoView({ block: "end" });
+  }, [busy, pendingPrompt, snapshot?.messages.length]);
 
   const loadThread = async (threadId: string) => {
     if (!session || busy) return;
@@ -81,13 +87,14 @@ export default function TorresAiPage() {
     const createNew = createNewThreadRef.current;
     createNewThreadRef.current = false;
     setBusy(true);
+    setPendingPrompt(question);
     setError("");
     try {
       const next = await askTorresAi(session, { threadId: snapshot?.selectedThreadId || undefined, createNew, prompt: question, kind: preset?.kind });
       setSnapshot(next);
       setPrompt("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Torres AI could not answer safely."); }
-    finally { setBusy(false); }
+    finally { setPendingPrompt(""); setBusy(false); }
   };
 
   const newConversation = () => {
@@ -120,13 +127,15 @@ export default function TorresAiPage() {
       </aside>
       <section className="ai-conversation" aria-label="Torres AI conversation">
         <header className="ai-conversation-header"><div><p className="eyebrow">Evidence desk</p><h2>{snapshot.selectedThreadId ? "Workspace conversation" : "How can I help?"}</h2></div>{snapshot.selectedThreadId && <button type="button" onClick={() => void archive()} disabled={busy}>Archive</button>}</header>
-        <div className="ai-message-ledger" aria-live="polite">
-          {!snapshot.messages.length ? <div className="ai-welcome"><span className="ai-mark" aria-hidden="true">T</span><h3>Begin with a private operating question.</h3><p>I will use only the current workspace records you can access and link every factual answer back to its source.</p><div className="ai-starters">{starters.map((starter) => <button type="button" onClick={() => void submit(undefined, starter)} disabled={busy} key={starter.label}>{starter.label}<span aria-hidden="true">→︎</span></button>)}</div></div> : snapshot.messages.map((message) => <article className={`ai-message ai-message-${message.role}`} key={message.id}>
+        <div className="ai-message-ledger" aria-live="polite" aria-busy={busy}>
+          {!snapshot.messages.length && !pendingPrompt ? <div className="ai-welcome"><span className="ai-mark" aria-hidden="true">T</span><h3>Begin with a private operating question.</h3><p>I will use only the current workspace records you can access and link every factual answer back to its source.</p><div className="ai-starters">{starters.map((starter) => <button type="button" onClick={() => void submit(undefined, starter)} disabled={busy} key={starter.label}>{starter.label}<span aria-hidden="true">→︎</span></button>)}</div></div> : snapshot.messages.map((message) => <article className={`ai-message ai-message-${message.role}`} key={message.id}>
             <div className="ai-message-meta"><strong>{message.role === "assistant" ? "Torres AI" : "You"}</strong><time dateTime={message.createdAt}>{timeLabel(message.createdAt)}</time>{message.confidence && <span>{message.confidence} confidence</span>}</div>
             <AnswerContent content={message.content} />
             {message.citations.length > 0 && <div className="ai-citations"><strong>Sources</strong>{message.citations.map((citation) => <Link href={citation.href} key={citation.id}>{citation.label}<span aria-hidden="true">→︎</span></Link>)}</div>}
           </article>)}
-          {busy && <div className="ai-thinking" role="status"><span aria-hidden="true" /> Reviewing authorized evidence…</div>}
+          {pendingPrompt && <article className="ai-message ai-message-user ai-message-pending" aria-label="Your submitted question"><div className="ai-message-meta"><strong>You</strong><span>Sending</span></div><AnswerContent content={pendingPrompt} /></article>}
+          {busy && pendingPrompt && <div className="ai-thinking" role="status"><span className="ai-thinking-mark" aria-hidden="true">T</span><span className="ai-thinking-copy"><strong>Torres AI is reviewing your workspace</strong><small>Checking permitted records and verified sources</small></span><span className="ai-thinking-dots" aria-hidden="true"><i /><i /><i /></span></div>}
+          <div ref={ledgerEndRef} />
         </div>
         <form className="ai-composer" onSubmit={(event) => void submit(event)}>
           <label htmlFor="torres-ai-question">Ask Torres AI</label>

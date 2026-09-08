@@ -62,6 +62,13 @@ describe("Torres AI security boundary", () => {
     expect(page).toContain("createNewThreadRef.current = false");
   });
 
+  it("shows an immediate, accessible response transition", () => {
+    expect(page).toContain("setPendingPrompt(question)");
+    expect(page).toContain('aria-busy={busy}');
+    expect(page).toContain("Torres AI is reviewing your workspace");
+    expect(page).toContain('className="ai-message ai-message-user ai-message-pending"');
+  });
+
   it("derives scope from verified auth and calls only the private service binding", () => {
     expect(api).toContain('requireAuth(request, env, { permission: "ai.use" })');
     expect(api).toContain('env.TORRES_AI.fetch("https://torres-ai.internal/v1/respond"');
