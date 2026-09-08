@@ -9,6 +9,9 @@
   "ai": {
     "binding": "AI"
   },
+  "secrets": {
+    "required": ["TORRES_AI_INTERNAL_SECRET"]
+  },
   "durable_objects": {
     "bindings": [
       {
