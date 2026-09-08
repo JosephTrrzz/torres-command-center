@@ -40,11 +40,11 @@ Use the spacing tokens (`--space-1` through `--space-6`) and a base rhythm of 4p
 
 ### Internal shell
 
-For owner, administrator, operator, employee, member, and viewer roles. It supports workspace switching, operational navigation, notifications, profile controls, and broad information density. The canonical order is Today, Overview, Clients, CRM, Projects, Operations, Schedule, Inbox, Campaigns, Integrations, Reports, then Settings when permitted.
+For owner, administrator, operator, employee, member, and viewer roles. It supports workspace switching, operational navigation, notifications, profile controls, and broad information density. The canonical order is Today, Torres AI, Overview, Clients, CRM, Projects, Operations, Schedule, Inbox, Campaigns, Integrations, Reports, then Settings when permitted.
 
 ### Client shell
 
-For the customer/client role. It has a quieter visual treatment and exposes Today, Onboarding, Projects, Operations, Inbox, Reports, and My account through the plain-language labels Home, Setup, Projects, Services, Messages, Performance, and Account. Performance is the tenant-scoped live Reports workflow; it is not a decorative or dead destination. Never add dead links to imply unfinished capabilities.
+For the customer/client role. It has a quieter visual treatment and exposes Today, Torres AI, Onboarding, Projects, Operations, Inbox, Reports, and My account through the plain-language labels Home, Concierge, Setup, Projects, Services, Messages, Performance, and Account. Performance is the tenant-scoped live Reports workflow; it is not a decorative or dead destination. Never add dead links to imply unfinished capabilities.
 
 Both shells require a skip link, labeled navigation, deterministic inline SVG icons, visible current location, keyboard focus, and a mobile navigation scrim that dismisses the drawer. The scrim may soften the page behind it, but the drawer itself must remain fully opaque, sharp, and above every page or bottom-navigation layer.
 
@@ -58,6 +58,10 @@ Shell identity always represents the signed-in person, never the active organiza
 - `Breadcrumbs`: shell-level orientation; no duplicate page-title breadcrumb.
 - `FeedbackBanner`: persistent, accessible success/info/warning/error feedback.
 - `StatePanel`: reusable loading, empty, and error presentation with an optional recovery action.
+
+### Torres AI evidence desk
+
+Torres AI uses a two-part evidence desk: a private conversation rail and a restrained answer ledger. Every factual assistant answer must show server-verified source links and a confidence label; model-created links are never rendered. The trust bar always states that the surface is private, tenant-isolated, and read-only. Prompts render as plain text, answers render as plain text, and workspace records are treated as untrusted evidence rather than instructions. On narrow screens the thread rail becomes a horizontal list, the composer stacks, and no content may overflow the viewport.
 - Buttons: action verbs, stable labels during loading where possible, minimum 44px mobile target.
 - Forms: labels remain visible, errors are adjacent and announced, destructive actions are explicit.
 - Tables: real table semantics on wide screens; provide intentional horizontal scrolling or a card transformation on narrow screens.
@@ -127,3 +131,5 @@ Reporting must pair every headline metric with its provider, plain-language defi
 Scheduled report delivery is a staff-only chapter inside Reports. A schedule names one client, report, recipient, cadence, and exact first delivery time. Creation always produces a disabled record; enabling requires a separate explicit confirmation. Every run regenerates trusted calculations, stores an immutable snapshot, uses tracked transactional email, and preserves delivery history. Disabling and archiving stop future sends without erasing evidence.
 
 Authentication is the shared entrance for every role. Its editorial Private Office introduction sits beside the existing form at desktop widths and precedes it on smaller screens. It does not change account activation, return-path validation, credential handling, or role-based routing.
+
+When bot protection is configured, the login form includes a quiet Cloudflare Turnstile challenge between the credentials and session controls. The challenge uses interaction-only presentation so legitimate users are interrupted only when Cloudflare needs more evidence. Sign-in and password reset remain disabled until a valid token exists, failures reset the one-time challenge, and the control must remain keyboard accessible without competing with the page hierarchy. “Keep me signed in” is explicit: unchecked sessions end with the browser session, while checked sessions may persist on that trusted device.

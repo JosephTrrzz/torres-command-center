@@ -12,19 +12,6 @@ import { fetchOnboarding } from "../../lib/onboarding-api";
 import type { OnboardingSnapshot } from "../../lib/onboarding";
 import { ClientDetail, ClientPerson, CustomerAccount } from "../../lib/types";
 
-type PortalSession = { user?: { email?: string | null }; email?: string | null };
-
-function readPortalEmail() {
-  try {
-    const raw = window.localStorage.getItem("torres-auth-session");
-    if (!raw) return "";
-    const session = JSON.parse(raw) as PortalSession;
-    return session.user?.email ?? session.email ?? "";
-  } catch {
-    return "";
-  }
-}
-
 function formatStatus(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -74,7 +61,7 @@ export default function PortalPage() {
         }
         return;
       }
-      const email = readPortalEmail();
+      const email = session?.user.email ?? "";
       if (!email) {
         if (!cancelled) {
           setMessage("Please sign in with the email assigned to your customer portal.");

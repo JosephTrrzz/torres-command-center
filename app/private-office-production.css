@@ -21,6 +21,7 @@
 .login-private-office-layout .login-intro h1{font-size:clamp(44px,4vw,62px);font-weight:400}
 .login-private-office-layout .login-role-copy{margin:34px 0;padding:18px 0 18px 20px;border-radius:0;background:transparent}
 .login-private-office-layout .button-login{min-height:50px;margin-top:6px;border-radius:4px}
+.login-turnstile{display:flex;min-height:36px;margin-top:10px;align-items:center;justify-content:flex-start;overflow:hidden}
 
 /* Client mode is intentionally quieter and distinct from the internal command center. */
 .app-shell[data-shell-variant=client]{position:relative;isolation:isolate;background:#f8f5ee}

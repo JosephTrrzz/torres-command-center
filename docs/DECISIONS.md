@@ -73,3 +73,15 @@ Reason: durable categories make triage consistent across devices, while reversib
 Decision: website inquiries and qualified receptionist conversations remain organization-wide CRM leads until they are intentionally linked to a client. Staff can reply through the provider-tracked CRM workflow, pin important leads, and reversibly archive website-chat transcripts. New email leads receive one idempotent acknowledgment when the organization setting is enabled.
 
 Reason: prospects are not clients yet. Keeping acquisition communication in CRM avoids inventing tenant relationships, while the shared delivery ledger, reversible archive state, and configurable acknowledgment preserve operational truth and communication history.
+
+## D-013 — private, cited, read-only AI first
+
+Decision: Torres AI begins as a private Cloudflare Agent behind an authenticated Pages Function and private service binding. It retrieves a bounded tenant-scoped evidence set before model execution, verifies every citation server-side, disables provider payload logging, and exposes no action tools.
+
+Reason: a useful operating assistant must not become a second source of truth or a path around tenant authorization. Read-only answers, owner-scoped conversation RLS, atomic persistence, serialized rate limits, privacy-minimized telemetry, replay protection, and explicit future approval records establish the security foundation before any consequential automation is considered.
+
+## D-014 — layered edge and identity abuse protection
+
+Decision: protect static assets, Pages Functions, public intake, and direct Supabase authentication with separate controls. Repository middleware owns bounded requests and response policy; Supabase owns CAPTCHA verification for password flows; Cloudflare zone rules own managed attack detection, distributed rate limiting, and bot mitigation.
+
+Reason: no single layer sees every request. In particular, the static login page sends password authentication directly to Supabase, while signed webhooks and server-to-server intake must not be challenged like browsers. Layered, path-aware controls reduce bypass risk without breaking legitimate providers.

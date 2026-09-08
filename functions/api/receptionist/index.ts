@@ -204,25 +204,13 @@ async function applyRateLimit(url: string, serviceKey: string, request: Request,
   const date = new Date();
   date.setUTCSeconds(0, 0);
   const windowStart = date.toISOString();
-  const query = `${url}/rest/v1/receptionist_rate_limits?bucket_hash=eq.${bucketHash}&window_start=eq.${encodeURIComponent(windowStart)}&select=request_count&limit=1`;
-  const response = await fetch(query, { headers: serviceHeaders(serviceKey) });
-  const rows = response.ok ? await response.json().catch(() => []) as Array<{ request_count?: number }> : [];
-  const count = Number(rows[0]?.request_count || 0);
-  if (count >= requestsPerMinute) return false;
-  if (count) {
-    await fetch(`${url}/rest/v1/receptionist_rate_limits?bucket_hash=eq.${bucketHash}&window_start=eq.${encodeURIComponent(windowStart)}`, {
-      method: "PATCH",
-      headers: serviceHeaders(serviceKey, "return=minimal"),
-      body: JSON.stringify({ request_count: count + 1, updated_at: new Date().toISOString() }),
-    });
-  } else {
-    await fetch(`${url}/rest/v1/receptionist_rate_limits`, {
-      method: "POST",
-      headers: serviceHeaders(serviceKey, "return=minimal"),
-      body: JSON.stringify({ bucket_hash: bucketHash, window_start: windowStart, request_count: 1 }),
-    });
-  }
-  return true;
+  const response = await fetch(`${url}/rest/v1/rpc/claim_receptionist_rate_limit`, {
+    method: "POST",
+    headers: serviceHeaders(serviceKey),
+    body: JSON.stringify({ p_bucket_hash: bucketHash, p_window_start: windowStart, p_limit: requestsPerMinute }),
+  });
+  if (!response.ok) return false;
+  return await response.json().catch(() => false) === true;
 }
 
 async function lifecycle(url: string, serviceKey: string, session: SessionRow, action: string, entityType: string, entityId: string, metadata: Record<string, unknown>) {

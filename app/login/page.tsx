@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, isSafeReturnTo } from "../../lib/access-control";
 import { createAuthSession, createAuthSessionFromTokens, requestPasswordReset, storeAuthSession } from "../../lib/supabase-auth";
 import { BrandedAppLoader, prepareSignatureEntryHandoff } from "../../components/loading-system";
+import { TurnstileChallenge } from "../../components/turnstile";
 
 export default function LoginPage() {
   const [notice, setNotice] = useState(false);
@@ -14,8 +15,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [challengeKey, setChallengeKey] = useState(0);
   const [inviteSession, setInviteSession] = useState<{ access_token: string; refresh_token?: string; expires_at?: number; user: { id: string; email?: string } } | null>(null);
   const router = useRouter();
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
 
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -56,7 +61,7 @@ export default function LoginPage() {
       const acceptanceBody = await acceptanceResponse.json().catch(() => ({})) as { error?: string };
       if (!acceptanceResponse.ok) throw new Error(acceptanceBody.error || "Your organization invitation could not be activated.");
       const session = await createAuthSessionFromTokens(inviteSession.access_token, inviteSession.refresh_token, inviteSession.expires_at, inviteSession.user);
-      storeAuthSession(session);
+      storeAuthSession(session, "session");
       await fetch("/api/customer-activate", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` } });
       prepareSignatureEntryHandoff();
       router.replace(defaultRouteForRole(appRoleForOrganizationRole(session.organization?.role, session.profile.role)));
@@ -68,8 +73,9 @@ export default function LoginPage() {
     setBusy(true);
     setMessage("");
     try {
-      const session = await createAuthSession(email, password);
-      storeAuthSession(session);
+      if (turnstileSiteKey && !captchaToken) throw new Error("Complete the security check before signing in.");
+      const session = await createAuthSession(email, password, captchaToken || undefined);
+      storeAuthSession(session, remember ? "local" : "session");
       const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
       const requestedPath = new URLSearchParams(window.location.search).get("returnTo");
       const destination = requestedPath && isSafeReturnTo(requestedPath) && canAccessPath(effectiveRole, requestedPath) ? requestedPath : defaultRouteForRole(effectiveRole);
@@ -77,6 +83,8 @@ export default function LoginPage() {
       router.replace(destination);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to sign in.");
+      setCaptchaToken("");
+      setChallengeKey((value) => value + 1);
       setBusy(false);
     }
   }
@@ -108,8 +116,9 @@ export default function LoginPage() {
           <input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           <label htmlFor="password">Password</label>
           <input id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-          <div className="login-options"><label className="remember"><input type="checkbox" /> <span>Remember me</span></label><button type="button" className="forgot" onClick={async () => { setMessage(""); try { await requestPasswordReset(email); setNotice(true); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to request a password reset."); } }}>Forgot password?</button></div>
-          <button className="button button-login" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in securely"}<span>→︎</span></button>
+          {turnstileSiteKey && <TurnstileChallenge key={challengeKey} siteKey={turnstileSiteKey} onToken={setCaptchaToken} />}
+          <div className="login-options"><label className="remember"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> <span>Keep me signed in on this device</span></label><button type="button" className="forgot" onClick={async () => { setMessage(""); try { if (turnstileSiteKey && !captchaToken) throw new Error("Complete the security check before requesting a reset."); await requestPasswordReset(email, captchaToken || undefined); setNotice(true); setCaptchaToken(""); setChallengeKey((value) => value + 1); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to request a password reset."); } }}>Forgot password?</button></div>
+          <button className="button button-login" type="submit" disabled={busy || Boolean(turnstileSiteKey && !captchaToken)}>{busy ? "Signing in…" : "Sign in securely"}<span>→︎</span></button>
         </form>}
         {notice && <p className="login-notice" role="status">If that email exists, a password-reset link has been sent.</p>}
         {message && <p className="login-notice" role="alert">{message}</p>}

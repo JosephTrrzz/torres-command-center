@@ -8,6 +8,7 @@ export interface NavigationItem {
 export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
   owner: [
     { href: "/today/", label: "Today" },
+    { href: "/assistant/", label: "Torres AI" },
     { href: "/", label: "Overview" },
     { href: "/clients/", label: "Clients" },
     { href: "/crm/", label: "CRM" },
@@ -23,6 +24,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
   ],
   employee: [
     { href: "/today/", label: "Today" },
+    { href: "/assistant/", label: "Torres AI" },
     { href: "/", label: "Overview" },
     { href: "/clients/", label: "Clients" },
     { href: "/crm/", label: "CRM" },
@@ -36,6 +38,7 @@ export const APP_NAVIGATION: Record<AppRole, NavigationItem[]> = {
   ],
   customer: [
     { href: "/today/", label: "Today" },
+    { href: "/assistant/", label: "Torres AI" },
     { href: "/onboarding/", label: "Onboarding" },
     { href: "/projects/", label: "Projects" },
     { href: "/operations/", label: "Operations" },
@@ -81,8 +84,8 @@ function matchesRoute(pathname: string, route: string) {
 export function canAccessPath(role: AppRole, pathname: string) {
   if (matchesRoute(pathname, "/login")) return true;
   if (role === "owner") return true;
-  if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects") || matchesRoute(pathname, "/operations") || matchesRoute(pathname, "/inbox") || matchesRoute(pathname, "/reports");
+  if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/assistant") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects") || matchesRoute(pathname, "/operations") || matchesRoute(pathname, "/inbox") || matchesRoute(pathname, "/reports");
 
-  const employeeRoots = ["/today", "/clients", "/crm", "/projects", "/operations", "/schedule", "/inbox", "/campaigns", "/integrations", "/reports", "/portal"];
+  const employeeRoots = ["/today", "/assistant", "/clients", "/crm", "/projects", "/operations", "/schedule", "/inbox", "/campaigns", "/integrations", "/reports", "/portal"];
   return pathname === "/" || employeeRoots.some((root) => matchesRoute(pathname, root));
 }

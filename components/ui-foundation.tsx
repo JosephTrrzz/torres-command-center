@@ -1,9 +1,10 @@
 import Link from "next/link";
 
-export type AppIconName = "today" | "overview" | "clients" | "crm" | "projects" | "operations" | "schedule" | "inbox" | "campaigns" | "onboarding" | "portal" | "integrations" | "reports" | "settings" | "chevron";
+export type AppIconName = "today" | "ai" | "overview" | "clients" | "crm" | "projects" | "operations" | "schedule" | "inbox" | "campaigns" | "onboarding" | "portal" | "integrations" | "reports" | "settings" | "chevron";
 
 const paths: Record<AppIconName, React.ReactNode> = {
   today: <><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
+  ai: <><path d="M12 2.5c.8 5.7 3.8 8.7 9.5 9.5-5.7.8-8.7 3.8-9.5 9.5-.8-5.7-3.8-8.7-9.5-9.5 5.7-.8 8.7-3.8 9.5-9.5Z"/><path d="M19 2v4M17 4h4"/></>,
   overview: <><path d="M12 3 21 12 12 21 3 12Z"/><path d="m12 7 5 5-5 5-5-5Z"/></>,
   clients: <><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3.5 20v-2.3A4.7 4.7 0 0 1 8.2 13h1.6a4.7 4.7 0 0 1 4.7 4.7V20M14.5 15a4 4 0 0 1 6 3.5V20"/></>,
   crm: <><circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="m18 4 .8 1.5 1.7.3-1.2 1.2.3 1.7L18 8l-1.6.7.3-1.7-1.2-1.2 1.7-.3Z"/></>,

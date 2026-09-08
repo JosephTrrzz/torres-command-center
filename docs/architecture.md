@@ -29,6 +29,10 @@ An active client member may invite a trusted teammate only into the exact client
 
 Browser requests use the Supabase publishable key plus the signed-in user's access token. Direct reads are constrained by RLS. Privileged writes and third-party calls go through a Cloudflare Function, which validates the token, loads the caller's profile and membership, checks the requested tenant, performs the action with the service role, and writes audit or outbox records.
 
+Every Pages Function request crosses a common edge middleware boundary that rejects legacy tunneling methods, caps request bodies before domain logic, refuses compressed mutation bodies, and attaches non-cacheable browser-isolation headers. Static Pages responses use an explicit CSP, anti-framing, HSTS, MIME-sniffing, referrer, and browser-permission policy. Public website chat remains the only cross-origin API surface and allows only exact configured production origins.
+
+Password sign-in and recovery support Cloudflare Turnstile through Supabase Auth. The browser receives only the public site key; Supabase stores the Turnstile secret and performs authoritative token validation. By default authenticated state is session-scoped. Persistent browser storage is used only after the user explicitly selects “Keep me signed in.”
+
 Personal display-name changes use the protected `/api/profile` self-service boundary. The Function derives the target profile from the verified access token, permits only `full_name`, writes the change to Supabase, and records an audit event. It never accepts a user ID, role, email, organization, or client assignment from the browser. The browser refreshes its cached session only after Supabase confirms the write.
 
 ## Integration framework
@@ -52,6 +56,12 @@ Scheduled integration checks are a bounded exception to the general outbox-consu
 ## AI boundary
 
 Torres AI receives an explicit organization and user context. Retrieval is tenant-scoped before content reaches a model. Responses identify evidence, freshness, and uncertainty. Any external write, message, publication, financial action, or destructive change requires a separate approval step and an audit record.
+
+Phase 7 uses an authenticated Pages Function as the only browser-facing AI boundary. That Function derives the active organization and user from the verified Supabase session, retrieves a bounded and privacy-minimized evidence set, and calls a private Cloudflare Worker through a service binding. The Worker uses one durable Agent instance per organization and conversation, with an HMAC timestamp and one-time nonce as defense in depth. Its local durable state contains only replay protection and request counts; prompts and responses remain in Supabase under owner-only RLS.
+
+The model is read-only. It receives no provider credentials, raw access tokens, private contact addresses, arbitrary database access, or action tools. Evidence is explicitly labeled untrusted, output is schema-constrained, and citation identifiers are checked against the server-created evidence allowlist before an answer is atomically persisted. Requests are limited per user by a database-serialized claim, and AI telemetry records counts, duration, status, and model only—not prompt or answer text. AI Gateway payload logging is disabled. Future external actions must use the separate `ai_approvals` lifecycle and are outside the initial release.
+
+The private Worker authenticates requests with timestamped HMAC signatures, Web Crypto timing-safe comparison, one-time durable nonces, and a private service binding. It has no public preview or workers.dev route.
 
 ## Phase 6 reporting domain
 

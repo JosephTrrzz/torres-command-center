@@ -91,6 +91,7 @@ function selectedOrganization(organizations: OrganizationAccess[], defaultOrgani
 export async function createAuthSession(
   email: string,
   password: string,
+  captchaToken?: string,
 ): Promise<AuthSession> {
   const { url, key } = getConfig();
   const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
@@ -99,7 +100,11 @@ export async function createAuthSession(
       apikey: key,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+      ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
+    }),
   });
 
   if (!response.ok) throw new Error(await parseError(response));
@@ -175,9 +180,13 @@ export async function switchOrganization(session: AuthSession, organizationId: s
   };
 }
 
-export function storeAuthSession(session: AuthSession) {
+export function storeAuthSession(session: AuthSession, persistence?: "local" | "session") {
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    const target = persistence ?? (window.localStorage.getItem(SESSION_KEY) ? "local" : "session");
+    const selectedStorage = target === "local" ? window.localStorage : window.sessionStorage;
+    const otherStorage = target === "local" ? window.sessionStorage : window.localStorage;
+    selectedStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    otherStorage.removeItem(SESSION_KEY);
     window.dispatchEvent(new CustomEvent<AuthSession>(AUTH_SESSION_EVENT, { detail: session }));
   }
 }
@@ -185,7 +194,8 @@ export function storeAuthSession(session: AuthSession) {
 export function readStoredSession(): AuthSession | null {
   if (typeof window === "undefined") return null;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(SESSION_KEY) || "null");
+    const serialized = window.sessionStorage.getItem(SESSION_KEY) || window.localStorage.getItem(SESSION_KEY);
+    const parsed = JSON.parse(serialized || "null");
     if (
       !parsed ||
       typeof parsed.access_token !== "string" ||
@@ -208,18 +218,23 @@ export function readStoredSession(): AuthSession | null {
 export function clearAuthSession() {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(SESSION_KEY);
+    window.sessionStorage.removeItem(SESSION_KEY);
     window.localStorage.removeItem("torres-demo-session");
   }
 }
 
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(email: string, captchaToken?: string) {
   const { url, key } = getConfig();
   const redirectTo =
     typeof window === "undefined" ? undefined : `${window.location.origin}/login/`;
   const response = await fetch(`${url}/auth/v1/recover`, {
     method: "POST",
     headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, redirect_to: redirectTo }),
+    body: JSON.stringify({
+      email,
+      redirect_to: redirectTo,
+      ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
+    }),
   });
   if (!response.ok) throw new Error(await parseError(response));
 }

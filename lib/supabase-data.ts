@@ -1,5 +1,6 @@
 import { BillingStatus, ClientDetail, ClientPerson, CustomerAccount, PortalStatus } from "./types";
 import { isValidEmail, normalizeEmail } from "./email";
+import { readStoredSession } from "./supabase-auth";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -115,9 +116,7 @@ export async function deleteClientPerson(id: string) {
 }
 
 function getSession(): { access_token?: string } | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem("torres-auth-session");
-  return raw ? JSON.parse(raw) : null;
+  return readStoredSession();
 }
 
 function headersForRead() {

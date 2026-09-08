@@ -14,8 +14,13 @@ create table if not exists public.customer_accounts (
 
 alter table public.customer_accounts enable row level security;
 drop policy if exists "Authenticated users can view customer accounts" on public.customer_accounts;
-create policy "Authenticated users can view customer accounts" on public.customer_accounts for select to authenticated using (true);
 drop policy if exists "Authenticated users can create customer accounts" on public.customer_accounts;
-create policy "Authenticated users can create customer accounts" on public.customer_accounts for insert to authenticated with check (true);
 drop policy if exists "Authenticated users can update customer accounts" on public.customer_accounts;
-create policy "Authenticated users can update customer accounts" on public.customer_accounts for update to authenticated using (true) with check (true);
+drop policy if exists "accounts_staff_manage" on public.customer_accounts;
+drop policy if exists "accounts_customer_read" on public.customer_accounts;
+create policy "accounts_staff_manage" on public.customer_accounts for all to authenticated
+using (public.is_staff()) with check (public.is_staff());
+create policy "accounts_customer_read" on public.customer_accounts for select to authenticated
+using (client_id = public.current_client_id());
+revoke all on public.customer_accounts from anon, authenticated;
+grant select, insert, update, delete on public.customer_accounts to authenticated;

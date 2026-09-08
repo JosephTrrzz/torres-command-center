@@ -31,7 +31,7 @@ describe("Private Office production integration", () => {
 
   it("uses one existing authentication flow and responsive presentation", () => {
     expect(login).toContain("login-private-office-layout");
-    expect(login).toContain("createAuthSession(email, password)");
+    expect(login).toContain("createAuthSession(email, password, captchaToken || undefined)");
     expect(styles).toContain("@media(max-width:680px)");
     expect(styles).toContain("@media(prefers-reduced-motion:reduce)");
   });

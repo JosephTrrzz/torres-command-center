@@ -12,9 +12,9 @@ import { fetchNotifications, markNotificationsRead, type WorkspaceNotification }
 import { AppIcon, type AppIconName } from "./ui-foundation";
 import { AppEntryTransition, BrandedAppLoader, consumeSignatureEntryHandoff, markSignatureEntrySeen, shouldShowSignatureEntry } from "./loading-system";
 
-const NAV_ICONS: Record<string, AppIconName> = { Today: "today", Overview: "overview", Clients: "clients", CRM: "crm", Projects: "projects", Operations: "operations", Schedule: "schedule", Inbox: "inbox", Campaigns: "campaigns", Onboarding: "onboarding", Portal: "portal", "My account": "portal", Integrations: "integrations", Reports: "reports", Settings: "settings" };
+const NAV_ICONS: Record<string, AppIconName> = { Today: "today", "Torres AI": "ai", Overview: "overview", Clients: "clients", CRM: "crm", Projects: "projects", Operations: "operations", Schedule: "schedule", Inbox: "inbox", Campaigns: "campaigns", Onboarding: "onboarding", Portal: "portal", "My account": "portal", Integrations: "integrations", Reports: "reports", Settings: "settings" };
 const SIGNATURE_ENTRY_HANDOFF_MS = 1420;
-const CLIENT_NAV_LABELS: Record<string, string> = { Today: "Home", Onboarding: "Setup", Projects: "Projects", Operations: "Services", Inbox: "Messages", Reports: "Performance", "My account": "Account" };
+const CLIENT_NAV_LABELS: Record<string, string> = { Today: "Home", "Torres AI": "Concierge", Onboarding: "Setup", Projects: "Projects", Operations: "Services", Inbox: "Messages", Reports: "Performance", "My account": "Account" };
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "TC";
@@ -228,7 +228,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   }
   if (!session) return <BrandedAppLoader />;
   const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
-  const nav = APP_NAVIGATION[effectiveRole];
+  const nav = APP_NAVIGATION[effectiveRole].filter((item) => item.label !== "Torres AI" || !session.organization || session.organization.permissions.includes("ai.use"));
   const activeNavigationLabel = effectiveRole === "customer" && active === "Portal" ? "My account" : active;
   const displayName = displayNameFor(session.profile);
   const avatar = initials(displayName);

@@ -73,7 +73,10 @@ Status: complete for the launch analytics, evidence, and scheduled-delivery vert
 
 ## Phase 7 — Torres AI
 
+Status: secure local foundation implemented; production activation and smoke verification remain.
+
 - Tenant-scoped retrieval, cited answers, daily briefing, weekly summary, approvals, audit, and evaluation harness.
+- The first slice is deliberately read-only: owner-scoped private threads, bounded server-side retrieval, source-verified answers, serialized rate limits, HMAC/replay protection, privacy-minimized telemetry, and a private Cloudflare Agent are implemented. Approval records exist for later consequential actions, but no action tools are exposed.
 
 ## Phase 8 — opportunity engine
 

@@ -1,6 +1,6 @@
 # Torres OS status
 
-Updated 2026-09-02.
+Updated 2026-09-07.
 
 ## Production foundation
 
@@ -24,6 +24,8 @@ Updated 2026-09-02.
 | SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
 | Campaigns and review requests | Phase 4B ready to migrate | Client-scoped drafts, consent basis, recipient review, durable suppression, staff test sends, explicit production confirmation, unsubscribe handling, and provider delivery truth. |
 | Integration control | Phase 5 complete | Common provider registry, durable run history, manual verification, safe Google disconnect, scheduled health checks, normalized GA4/Search Console sync, signed webhook ingestion, two-failure administrator alerts, and recovery notices are implemented. |
+| Torres AI | Phase 7 local foundation | Read-only tenant retrieval, private user-owned conversations, verified citations, atomic persistence, database-serialized rate limits, replay protection, privacy-minimized telemetry, and a private Cloudflare Agent worker are implemented locally. Migration, encrypted secrets, service binding, deployment, and production smoke verification remain explicit activation steps. |
+| Security hardening | Local implementation ready | Static and Function security headers, bounded edge requests, legacy customer-account RLS repair, atomic receptionist throttling, session-scoped default auth storage, optional Supabase-validated Turnstile, and a production WAF/bot/monitoring runbook are implemented locally. Migration and external Cloudflare/Supabase activation remain explicit production steps. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |
 
 ## Phase status
@@ -34,11 +36,13 @@ Updated 2026-09-02.
 - Phase 3 CRM and operations: implementation complete; the lead-to-appointment workflow now continues into customer 360, jobs, scheduling, estimates, documents, tasks, activity, and client-visible approvals.
 - Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded transactional emails, private draft attachments, automatic legal footer, automatic lead acknowledgments, CRM replies, controlled campaigns/newsletters/review requests, consent-safe SMS/voice foundation, AI receptionist-to-CRM handoff, and the website chat availability control are implemented. Live Twilio provider configuration remains.
 - Phase 5 integrations and normalization: complete for the launch provider-control and Google normalization vertical slice. Optional provider expansion remains additive future work.
-- Phases 6–11: planned, not production-complete.
+- Phase 6 reporting delivery: implementation complete.
+- Phase 7 Torres AI: secure local foundation implemented; external activation and production verification remain.
+- Phases 8–11: planned, not production-complete.
 
 ## Verified baseline
 
-On 2026-09-02: 123 unit tests, application TypeScript, Cloudflare Function TypeScript, and the Next.js production build passed. The provider metrics, integration automation, and Apple Calendar migrations are additive and create no client, provider, metric, or calendar-subscription records.
+The current verified baseline is 150 application/security tests plus both TypeScript checks, the Torres AI Worker checks and dry-run bundle, dependency audits, and the Next.js production build. The Torres AI and security migrations are additive and create no customer, conversation, or message records.
 
 ## Known limitations
 
@@ -49,6 +53,6 @@ On 2026-09-02: 123 unit tests, application TypeScript, Cloudflare Function TypeS
 - Operational documents currently use validated HTTPS resource links; managed file uploads and storage lifecycle controls remain a later enhancement.
 - Apple Calendar is a read-only subscription and Apple controls its refresh interval. Two-way Apple event import and editing are not enabled.
 - Secure in-app communications, branded transactional email, controlled campaign/review-request delivery, the AI receptionist, and the consent-safe SMS/voice data and webhook foundation are implemented. Qualified website chats are retained as private CRM transcripts and staff replies pause the AI for that conversation. Live SMS/voice delivery requires Twilio credentials and a verified sender.
-- AI, opportunities, automations, billing, and support are roadmap capabilities, not live features.
+- Torres AI is implemented locally but is not live until its migration, private Worker, encrypted shared secret, Pages service binding, and production smoke test are completed. Opportunities, automations, billing, and support remain roadmap capabilities.
 - Reports now use persisted daily Google observations with visible freshness. Comparison periods, scheduled delivery, and broader end-to-end production tests remain.
 - Website lead storage is implemented. Production website delivery uses a first-party Cloudflare Function because outbound Formspree webhooks require a paid plan; both Pages projects require the shared server-only intake variables.
