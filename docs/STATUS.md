@@ -37,7 +37,7 @@ Updated 2026-09-18.
 - Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded transactional emails, private draft attachments, automatic legal footer, automatic lead acknowledgments, CRM replies, controlled campaigns/newsletters/review requests, consent-safe SMS/voice foundation, AI receptionist-to-CRM handoff, and the website chat availability control are implemented. Live Twilio provider configuration remains.
 - Phase 5 integrations and normalization: complete for the launch provider-control and Google normalization vertical slice. Optional provider expansion remains additive future work.
 - Phase 6 reporting delivery: implementation complete.
-- Phase 7 Torres AI: retired from the product. Production cleanup removes the Pages service binding, runtime secret, and private Worker after the non-AI application deployment is active.
+- Phase 7 Torres AI: retired from the product. Production cleanup is complete: the Pages service binding and runtime secret are removed, the private Worker is deleted, and the Supabase retirement migration has revoked application access while retaining historical records.
 - Phases 8–11: planned, not production-complete.
 
 ## Verified baseline
