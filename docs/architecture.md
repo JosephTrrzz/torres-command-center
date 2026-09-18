@@ -53,15 +53,9 @@ Durable work is represented in an event outbox before execution. Workers claim p
 
 Scheduled integration checks are a bounded exception to the general outbox-consumer flow: the protected scheduler performs the due health request directly and writes every alert transition to both the audit ledger and event outbox. A failed check remains due again at its next interval, while alert delivery is idempotent across an open incident.
 
-## AI boundary
+## Retired AI boundary
 
-Torres AI receives an explicit organization and user context. Retrieval is tenant-scoped before content reaches a model and may include authorized client, CRM, schedule, inbox, project, operations, integration-health, notification, and reporting evidence. Responses identify evidence, freshness, and uncertainty. The Agent returns an explicit grounded state: supported answers require server-verified citations, while unsupported questions are saved as an uncited “not integrated” response instead of being paired with unrelated records. Any external write, message, publication, financial action, or destructive change requires a separate approval step and an audit record.
-
-Phase 7 uses an authenticated Pages Function as the only browser-facing AI boundary. That Function derives the active organization and user from the verified Supabase session, retrieves a bounded and privacy-minimized evidence set, and calls a private Cloudflare Worker through a service binding. The Worker uses one durable Agent instance per organization and conversation, with an HMAC timestamp and one-time nonce as defense in depth. Its local durable state contains only replay protection and request counts; prompts and responses remain in Supabase under owner-only RLS.
-
-The model is read-only. It receives no provider credentials, raw access tokens, private contact addresses, arbitrary database access, or action tools. Evidence is explicitly labeled untrusted, output is schema-constrained, and citation identifiers are checked against the server-created evidence allowlist before an answer is atomically persisted. Requests are limited per user by a database-serialized claim, and AI telemetry records counts, duration, status, and model only—not prompt or answer text. AI Gateway payload logging is disabled. Future external actions must use the separate `ai_approvals` lifecycle and are outside the initial release.
-
-The private Worker authenticates requests with timestamped HMAC signatures, Web Crypto timing-safe comparison, one-time durable nonces, and a private service binding. It has no public preview or workers.dev route.
+The Torres AI product surface, browser API, private Worker, service binding, and permission are retired. Existing AI conversation and telemetry rows are preserved for controlled operator disposition rather than silently deleted, but application roles have no table privileges or RLS read policies for those records. The public website receptionist remains a separate, bounded lead-intake workflow and does not expose the retired operating-assistant surface.
 
 ## Phase 6 reporting domain
 

@@ -157,8 +157,7 @@ insert into public.permissions (key, name, description) values
   ('reports.read', 'Read reports', 'View organization reports and metric provenance.'),
   ('reports.export', 'Export reports', 'Generate or download organization reports.'),
   ('audit.read', 'Read audit history', 'View organization audit events.'),
-  ('automation.manage', 'Manage automations', 'Create and approve organization automations.'),
-  ('ai.use', 'Use Torres AI', 'Ask tenant-scoped questions and create drafts.')
+  ('automation.manage', 'Manage automations', 'Create and approve organization automations.')
 on conflict (key) do update
 set name = excluded.name, description = excluded.description;
 
@@ -167,17 +166,16 @@ select role_name, permission_key
 from (values
   ('owner', 'organization.manage'), ('owner', 'clients.read'), ('owner', 'clients.manage'),
   ('owner', 'integrations.read'), ('owner', 'integrations.manage'), ('owner', 'reports.read'),
-  ('owner', 'reports.export'), ('owner', 'audit.read'), ('owner', 'automation.manage'), ('owner', 'ai.use'),
+  ('owner', 'reports.export'), ('owner', 'audit.read'), ('owner', 'automation.manage'),
   ('admin', 'organization.manage'), ('admin', 'clients.read'), ('admin', 'clients.manage'),
   ('admin', 'integrations.read'), ('admin', 'integrations.manage'), ('admin', 'reports.read'),
-  ('admin', 'reports.export'), ('admin', 'audit.read'), ('admin', 'automation.manage'), ('admin', 'ai.use'),
+  ('admin', 'reports.export'), ('admin', 'audit.read'), ('admin', 'automation.manage'),
   ('operator', 'clients.read'), ('operator', 'clients.manage'), ('operator', 'integrations.read'),
   ('operator', 'integrations.manage'), ('operator', 'reports.read'), ('operator', 'reports.export'),
-  ('operator', 'ai.use'),
   ('member', 'clients.read'), ('member', 'integrations.read'), ('member', 'reports.read'),
-  ('member', 'reports.export'), ('member', 'ai.use'),
+  ('member', 'reports.export'),
   ('viewer', 'clients.read'), ('viewer', 'integrations.read'), ('viewer', 'reports.read'),
-  ('client', 'integrations.read'), ('client', 'reports.read'), ('client', 'reports.export'), ('client', 'ai.use')
+  ('client', 'integrations.read'), ('client', 'reports.read'), ('client', 'reports.export')
 ) as role_map(role_name, permission_key)
 on conflict do nothing;
 

@@ -71,12 +71,9 @@ Status: complete for the launch analytics, evidence, and scheduled-delivery vert
 - Metric definitions, snapshots, comparison periods, transparent calculations, client/agency reports, and scheduled delivery.
 - Current/previous period calculations, visible metric provenance, immutable snapshots, and staff-controlled disabled-by-default scheduled delivery are implemented. The production migration is applied, and a controlled production worker run generated one immutable snapshot, one tracked email delivery, and then returned the test schedule to disabled state.
 
-## Phase 7 — Torres AI
+## Phase 7 — retired
 
-Status: secure local foundation implemented; production activation and smoke verification remain.
-
-- Tenant-scoped retrieval, cited answers, daily briefing, weekly summary, approvals, audit, and evaluation harness.
-- The first slice is deliberately read-only: owner-scoped private threads, bounded server-side retrieval, source-verified answers, serialized rate limits, HMAC/replay protection, privacy-minimized telemetry, and a private Cloudflare Agent are implemented. Approval records exist for later consequential actions, but no action tools are exposed.
+Torres AI was removed from the product. Its application route, API, Worker, service binding, role permission, and runtime secret are not part of the active system. Existing private database history is retained without application access pending a separate retention decision.
 
 ## Phase 8 — opportunity engine
 

@@ -17,7 +17,7 @@ Torres OS is an intelligence and operations layer for local businesses. It gives
 ## Product modes
 
 - Agency mode: portfolio overview, clients, onboarding, projects, tasks, integrations, reports, billing, support, and platform administration.
-- Client mode: Today, customers and CRM, jobs, calendar, estimates, finance, marketing, communications, documents, analytics, AI, and automations.
+- Client mode: Today, customers and CRM, jobs, calendar, estimates, finance, marketing, communications, documents, analytics, and automations.
 - Preview mode: an authorized agency user can inspect the exact client experience without changing tenant identity or weakening RLS.
 
 ## First complete vertical slice
@@ -30,9 +30,8 @@ The first end-to-end slice is:
 4. A website lead enters the client workspace and is assigned.
 5. An appointment appears on the calendar and creates an actionable task.
 6. The Today view summarizes priorities and verified signals.
-7. The user can ask Torres AI a scoped question with cited workspace evidence.
-8. Project progress and a weekly report are visible to authorized users.
-9. Important actions appear in an immutable audit history.
+7. Project progress and a weekly report are visible to authorized users.
+8. Important actions appear in an immutable audit history.
 
 ## Core capabilities
 
@@ -42,7 +41,6 @@ The first end-to-end slice is:
 - Connected communications, marketing, review, website, payment, and analytics providers.
 - Provider-normalized metrics with freshness and provenance.
 - Transparent reports that can be previewed before print or export.
-- Torres AI with tenant-scoped retrieval, citations, approval gates, and audit logs.
 - Opportunity scoring, recommended actions, and reversible automations.
 - Billing, support, import/export, observability, and platform administration.
 

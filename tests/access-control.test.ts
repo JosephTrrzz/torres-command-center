@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APP_NAVIGATION,
   canAccessPath,
   defaultRouteForRole,
   isSafeReturnTo,
@@ -8,10 +9,14 @@ import { canAccessClient, canSwitchOrganization } from "../functions/_shared/aut
 import { buildNotificationInsert } from "../functions/_shared/notifications";
 
 describe("role access control", () => {
+  it("does not expose the retired assistant in any role navigation", () => {
+    expect(Object.values(APP_NAVIGATION).flat().some((item) => item.href.startsWith("/assistant"))).toBe(false);
+  });
+
   it("keeps customers inside their portal", () => {
     expect(canAccessPath("customer", "/portal/")).toBe(true);
     expect(canAccessPath("customer", "/today/")).toBe(true);
-    expect(canAccessPath("customer", "/assistant/")).toBe(true);
+    expect(canAccessPath("customer", "/assistant/")).toBe(false);
     expect(canAccessPath("customer", "/onboarding/")).toBe(true);
     expect(canAccessPath("customer", "/projects/")).toBe(true);
     expect(canAccessPath("customer", "/operations/")).toBe(true);
@@ -26,7 +31,7 @@ describe("role access control", () => {
 
   it("allows employees to operate client workflows but not owner settings", () => {
     expect(canAccessPath("employee", "/today/")).toBe(true);
-    expect(canAccessPath("employee", "/assistant/")).toBe(true);
+    expect(canAccessPath("employee", "/assistant/")).toBe(false);
     expect(canAccessPath("employee", "/clients/detail/")).toBe(true);
     expect(canAccessPath("employee", "/integrations/")).toBe(true);
     expect(canAccessPath("employee", "/projects/")).toBe(true);

@@ -68,7 +68,7 @@ The protected `/api/communications` Function is the only mutation boundary. Staf
 
 ### Strategy and intelligence
 
-`goals`, `goal_progress`, `opportunities`, `opportunity_evidence`, `recommendations`, `daily_briefings`, `weekly_reports`, `ai_threads`, `ai_messages`, `ai_citations`, and `ai_approvals`.
+`goals`, `goal_progress`, `opportunities`, `opportunity_evidence`, `recommendations`, `daily_briefings`, and `weekly_reports`. Historical `ai_threads`, `ai_messages`, `ai_citations`, and `ai_approvals` may remain in upgraded databases but are retired and unavailable to application roles.
 
 ### Communications and marketing expansion
 

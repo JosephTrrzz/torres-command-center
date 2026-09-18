@@ -12,7 +12,7 @@ No public application can be guaranteed attack-proof. This baseline uses indepen
 - Sign-in sessions default to browser-session storage. Persistent storage requires an explicit “Keep me signed in on this device” choice.
 - `supabase/security_hardening.sql` removes legacy open customer-account and client-contact policies and replaces the website-chat read/update counter with one atomic, service-role-only claim.
 - Public Formspree, Resend, Twilio, website-intake, calendar, unsubscribe, and receptionist routes retain their existing signature, opaque-token, exact-origin, expiry, idempotency, and scope checks.
-- Torres AI remains behind a private service binding and uses HMAC, clock-skew checks, one-time durable nonces, timing-safe signature comparison, tenant-scoped retrieval, verified citations, and no action tools.
+- The retired Torres AI route, API, Worker, binding, secret, and role permission remain absent. Preserved historical rows have no application-role access.
 
 ## Required production activation
 
@@ -36,7 +36,7 @@ Complete these controls for both `torrescotechnology.com` and `admin.torrescotec
    - In Supabase, open **Authentication → Bot and Abuse Protection**, enable CAPTCHA, select Cloudflare Turnstile, and save the matching secret key.
    - Require MFA for owners and administrators, enable leaked-password protection when available, set sensible password rules, and review active sessions after any credential incident.
 5. Secrets and providers
-   - Keep service-role, Resend, Twilio, Google, webhook, scheduler, website-intake, and Torres AI credentials in encrypted production secrets only.
+   - Keep service-role, Resend, Twilio, Google, webhook, scheduler, and website-intake credentials in encrypted production secrets only.
    - Rotate credentials after suspected exposure and at a documented interval. Grant each provider only the scopes used by the application.
    - Never expose the Supabase service-role key, Turnstile secret, or internal HMAC credentials through `NEXT_PUBLIC_*` variables.
 6. Monitoring and recovery

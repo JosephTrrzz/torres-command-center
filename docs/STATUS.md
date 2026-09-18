@@ -1,6 +1,6 @@
 # Torres OS status
 
-Updated 2026-09-07.
+Updated 2026-09-18.
 
 ## Production foundation
 
@@ -24,7 +24,7 @@ Updated 2026-09-07.
 | SMS and voice | Foundation ready to migrate | Explicit consent, suppression, SMS lifecycle events, signed Twilio webhook handling, provider readiness, and call-history schema are implemented. Live sending remains disabled until Twilio credentials and a sender are configured. |
 | Campaigns and review requests | Phase 4B ready to migrate | Client-scoped drafts, consent basis, recipient review, durable suppression, staff test sends, explicit production confirmation, unsubscribe handling, and provider delivery truth. |
 | Integration control | Phase 5 complete | Common provider registry, durable run history, manual verification, safe Google disconnect, scheduled health checks, normalized GA4/Search Console sync, signed webhook ingestion, two-failure administrator alerts, and recovery notices are implemented. |
-| Torres AI | Phase 7 live foundation | Read-only tenant retrieval now covers authorized clients, CRM follow-ups, schedules, inbox workload, projects, operations, integration health, notifications, and reports. Answers use complete sentences and semantic lists, unsupported questions return an explicit uncited “not integrated” state, and grounded answers retain verified citations. Private user-owned conversations, atomic persistence, database-serialized rate limits, replay protection, privacy-minimized telemetry, and the private `torres-ai` Cloudflare Agent are deployed. A signed-in production prompt completes, persists, survives reload, and displays a verified source; a separate two-user/two-organization isolation smoke test remains. |
+| Torres AI | Retired | Navigation, route, API, Worker source, role permission, and runtime configuration are removed. Existing private database history is preserved without application access pending a separate retention decision. |
 | Security hardening | Live foundation | Static and Function security headers, bounded edge requests, legacy customer-account RLS repair, atomic receptionist throttling, session-scoped default auth storage, and Supabase-validated Cloudflare Turnstile are active in production. Targeted WAF tuning and recurring monitoring remain operational follow-up work. |
 | Cloudflare deployment | Live | GitHub-connected production deployment and custom domain. |
 
@@ -37,12 +37,12 @@ Updated 2026-09-07.
 - Phase 4 communications and marketing: in progress; the secure shared Inbox, verified Resend provider, signed delivery webhook, branded transactional emails, private draft attachments, automatic legal footer, automatic lead acknowledgments, CRM replies, controlled campaigns/newsletters/review requests, consent-safe SMS/voice foundation, AI receptionist-to-CRM handoff, and the website chat availability control are implemented. Live Twilio provider configuration remains.
 - Phase 5 integrations and normalization: complete for the launch provider-control and Google normalization vertical slice. Optional provider expansion remains additive future work.
 - Phase 6 reporting delivery: implementation complete.
-- Phase 7 Torres AI: private Worker and Command Center service binding are live; signed-in single-workspace production generation and persistence are verified. The two-user/two-organization isolation smoke test remains.
+- Phase 7 Torres AI: retired from the product. Production cleanup removes the Pages service binding, runtime secret, and private Worker after the non-AI application deployment is active.
 - Phases 8–11: planned, not production-complete.
 
 ## Verified baseline
 
-The current verified baseline is 158 application/security tests plus both TypeScript checks, the Torres AI Worker checks and dry-run bundle, dependency audits, and the Next.js production build. The Torres AI and security migrations are additive and create no customer records.
+The current baseline is re-verified after the Torres AI removal with application/security tests, both TypeScript checks, dependency audit, and the Next.js production build. The retirement migration preserves historical AI records while revoking application access.
 
 ## Known limitations
 
@@ -53,6 +53,6 @@ The current verified baseline is 158 application/security tests plus both TypeSc
 - Operational documents currently use validated HTTPS resource links; managed file uploads and storage lifecycle controls remain a later enhancement.
 - Apple Calendar is a read-only subscription and Apple controls its refresh interval. Two-way Apple event import and editing are not enabled.
 - Secure in-app communications, branded transactional email, controlled campaign/review-request delivery, the AI receptionist, and the consent-safe SMS/voice data and webhook foundation are implemented. Qualified website chats are retained as private CRM transcripts and staff replies pause the AI for that conversation. Live SMS/voice delivery requires Twilio credentials and a verified sender.
-- Torres AI is live behind the authenticated Pages Function and private Worker service binding. Its signed-in production generation, verified citation, atomic persistence, and reload behavior are confirmed. A two-user/two-organization isolation smoke test remains before the Phase 7 foundation is considered complete. Opportunities, automations, billing, and support remain roadmap capabilities.
+- Existing Torres AI database history is retained but unavailable to application roles. A separate retention decision is required before those historical rows are deleted. Opportunities, automations, billing, and support remain roadmap capabilities.
 - Reports now use persisted daily Google observations with visible freshness. Comparison periods, scheduled delivery, and broader end-to-end production tests remain.
 - Website lead storage is implemented. Production website delivery uses a first-party Cloudflare Function because outbound Formspree webhooks require a paid plan; both Pages projects require the shared server-only intake variables.

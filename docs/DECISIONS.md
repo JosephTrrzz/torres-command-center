@@ -76,12 +76,18 @@ Reason: prospects are not clients yet. Keeping acquisition communication in CRM 
 
 ## D-013 — private, cited, read-only AI first
 
-Decision: Torres AI begins as a private Cloudflare Agent behind an authenticated Pages Function and private service binding. It retrieves a bounded tenant-scoped evidence set before model execution, verifies every citation server-side, disables provider payload logging, and exposes no action tools.
+Historical decision: Torres AI began as a private Cloudflare Agent behind an authenticated Pages Function and private service binding. It retrieved a bounded tenant-scoped evidence set before model execution, verified every citation server-side, disabled provider payload logging, and exposed no action tools.
 
-Reason: a useful operating assistant must not become a second source of truth or a path around tenant authorization. Read-only answers, owner-scoped conversation RLS, atomic persistence, serialized rate limits, privacy-minimized telemetry, replay protection, and explicit future approval records establish the security foundation before any consequential automation is considered.
+Superseded by D-015.
 
 ## D-014 — layered edge and identity abuse protection
 
 Decision: protect static assets, Pages Functions, public intake, and direct Supabase authentication with separate controls. Repository middleware owns bounded requests and response policy; Supabase owns CAPTCHA verification for password flows; Cloudflare zone rules own managed attack detection, distributed rate limiting, and bot mitigation.
 
 Reason: no single layer sees every request. In particular, the static login page sends password authentication directly to Supabase, while signed webhooks and server-to-server intake must not be challenged like browsers. Layered, path-aware controls reduce bypass risk without breaking legitimate providers.
+
+## D-015 — retire the operating assistant
+
+Decision: remove Torres AI from the product, including its navigation, route, browser API, private Cloudflare Worker, service binding, shared secret, and role permission. Preserve existing private AI records under revoked application access until a separate retention or deletion decision is approved.
+
+Reason: retiring the complete execution path avoids a hidden or partially active AI surface while preserving data-governance control over existing records. The public website receptionist remains a separate lead-intake workflow.
