@@ -75,6 +75,8 @@ Status: complete for the launch analytics, evidence, and scheduled-delivery vert
 
 Torres AI was removed from the product. Its application route, API, Worker, service binding, role permission, and runtime secret are not part of the active system. Existing private database history is retained without application access pending a separate retention decision.
 
+The public website receptionist is the only approved AI feature. The remaining phases use explicit calculations, evidence, and rules; they do not reintroduce a general-purpose assistant or other generative AI capabilities.
+
 ## Phase 8 — opportunity engine
 
 - Evidence-backed opportunity detection, scoring, prioritization, status, ownership, and outcome tracking.

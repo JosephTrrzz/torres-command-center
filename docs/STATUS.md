@@ -1,6 +1,6 @@
 # Torres OS status
 
-Updated 2026-09-18.
+Updated 2026-09-21.
 
 ## Production foundation
 
@@ -39,6 +39,8 @@ Updated 2026-09-18.
 - Phase 6 reporting delivery: implementation complete.
 - Phase 7 Torres AI: retired from the product. Production cleanup is complete: the Pages service binding and runtime secret are removed, the private Worker is deleted, and the Supabase retirement migration has revoked application access while retaining historical records.
 - Phases 8–11: planned, not production-complete.
+
+The website receptionist is the only approved AI feature. Its public chat, CRM lead handoff, staff replies, and availability settings remain supported. Settings role descriptions no longer advertise retired AI access, and future phases must not reintroduce other AI features without a new owner decision.
 
 ## Verified baseline
 

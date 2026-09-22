@@ -69,7 +69,7 @@ Use this checklist before calling a backend or provider production-ready.
 
 ## Planned providers
 
-PageSpeed, Cloudflare telemetry, Square, email, SMS/voice, storage, and AI remain unchecked until their adapters, secrets, server routes, mapping, sync, errors, disconnect flow, tests, and production smoke checks are complete.
+PageSpeed, Cloudflare telemetry, Square, email, SMS/voice, and storage require verified adapters, secrets, server routes, mapping, sync, errors, disconnect flow, tests, and production smoke checks before their remaining checklist items can be marked complete. General-purpose AI is excluded; the existing public website receptionist is the only approved AI feature.
 
 ## Apple Calendar
 

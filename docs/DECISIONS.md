@@ -22,7 +22,7 @@ Reason: a flag-day authorization rewrite would risk locking out current admins a
 
 ## D-004 — server boundary for privileged work
 
-Decision: provider calls, service-role writes, invitation generation, membership changes, exports, AI actions, and background-job control run in Cloudflare Functions.
+Decision: provider calls, service-role writes, invitation generation, membership changes, exports, website receptionist requests, and background-job control run in Cloudflare Functions.
 
 Reason: browser bundles cannot protect credentials or enforce privileged authorization reliably.
 
@@ -40,7 +40,7 @@ Reason: it provides transactional handoff, retries, observability, and a future 
 
 ## D-007 — approval-gated AI
 
-Decision: AI may read, summarize, recommend, and draft; consequential external actions require a separate approval record.
+Historical decision: AI could read, summarize, recommend, and draft; consequential external actions required a separate approval record. Superseded by D-015 and D-016.
 
 Reason: this makes automation useful without obscuring responsibility or creating unsafe side effects.
 
@@ -91,3 +91,9 @@ Reason: no single layer sees every request. In particular, the static login page
 Decision: remove Torres AI from the product, including its navigation, route, browser API, private Cloudflare Worker, service binding, shared secret, and role permission. Preserve existing private AI records under revoked application access until a separate retention or deletion decision is approved.
 
 Reason: retiring the complete execution path avoids a hidden or partially active AI surface while preserving data-governance control over existing records. The public website receptionist remains a separate lead-intake workflow.
+
+## D-016 — website receptionist is the only AI exception
+
+Decision (2026-09-21): retain the public website receptionist and its CRM transcript, lead capture, staff handoff, and availability controls. All other AI product features are excluded from the Command Center. Reporting, opportunity scoring, and future automations use explicit calculations and rules rather than generative AI unless the owner approves a new scope.
+
+Reason: the owner explicitly retained online reception while confirming removal of every other AI feature. Historical migration and retirement records remain for auditability; they do not restore application access.
