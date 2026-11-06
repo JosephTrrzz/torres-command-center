@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { TORRES_SITE_CLIENT } from "../lib/website-editor";
 import { APP_NAVIGATION, appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, organizationRoleLabel } from "../lib/access-control";
 import { AUTH_SESSION_EVENT, clearAuthSession, createAuthSessionFromTokens, readStoredSession, storeAuthSession, switchOrganization } from "../lib/supabase-auth";
 import type { AuthSession, ClientSummary, OrganizationAccess } from "../lib/types";
@@ -228,7 +229,8 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   }
   if (!session) return <BrandedAppLoader />;
   const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
-  const nav = APP_NAVIGATION[effectiveRole];
+  const showWebsite = effectiveRole === "owner" || (effectiveRole === "customer" && session.profile.client_id === TORRES_SITE_CLIENT);
+  const nav = showWebsite ? [...APP_NAVIGATION[effectiveRole], { href: "/website/", label: "Website" }] : APP_NAVIGATION[effectiveRole];
   const activeNavigationLabel = effectiveRole === "customer" && active === "Portal" ? "My account" : active;
   const displayName = displayNameFor(session.profile);
   const avatar = initials(displayName);

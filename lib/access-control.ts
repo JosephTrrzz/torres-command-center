@@ -81,7 +81,7 @@ function matchesRoute(pathname: string, route: string) {
 export function canAccessPath(role: AppRole, pathname: string) {
   if (matchesRoute(pathname, "/login")) return true;
   if (role === "owner") return true;
-  if (role === "customer") return matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects") || matchesRoute(pathname, "/operations") || matchesRoute(pathname, "/inbox") || matchesRoute(pathname, "/reports");
+  if (role === "customer") return matchesRoute(pathname, "/website") || matchesRoute(pathname, "/portal") || matchesRoute(pathname, "/today") || matchesRoute(pathname, "/onboarding") || matchesRoute(pathname, "/projects") || matchesRoute(pathname, "/operations") || matchesRoute(pathname, "/inbox") || matchesRoute(pathname, "/reports");
 
   const employeeRoots = ["/today", "/clients", "/crm", "/projects", "/operations", "/schedule", "/inbox", "/campaigns", "/integrations", "/reports", "/portal"];
   return pathname === "/" || employeeRoots.some((root) => matchesRoute(pathname, root));
