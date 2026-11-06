@@ -1,0 +1,9 @@
+.site-editor { display:grid; grid-template-columns:minmax(17rem, 2fr) minmax(0, 3fr); gap:24px; align-items:start; }
+.site-editor fieldset { display:grid; gap:16px; min-width:0; padding:24px; }
+.site-editor label { display:grid; gap:6px; }
+.site-editor input, .site-editor textarea { width:100%; min-width:0; }
+.site-editor-actions { display:flex; gap:12px; flex-wrap:wrap; }
+.site-editor-preview { background:#132238; color:#fff; border-radius:18px; padding:clamp(24px,5vw,64px); overflow-wrap:anywhere; }
+.site-editor-preview h2 { color:inherit; font:400 clamp(32px,4vw,56px)/1.08 Georgia,serif; }
+.site-editor-preview img { width:100%; height:auto; margin-top:16px; }
+@media(max-width:1000px) { .site-editor { grid-template-columns:minmax(0,1fr); } }
