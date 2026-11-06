@@ -1,0 +1,87 @@
+/* Shared material for sign-in, workspace navigation, and content panels. */
+@media screen {
+  :is(.app-shell, .login-page) {
+    --glass-solid: #faf9f5;
+    --glass-fill: var(--glass-solid);
+    --glass-filter: none;
+    --glass-radius: 18px;
+    --glass-edge: rgb(255 255 255 / .94);
+    --glass-rim: inset 0 1px 1px var(--glass-edge), inset 0 -1px 1px rgb(57 74 91 / .13);
+    --glass-shadow: 0 12px 38px -20px rgb(15 29 49 / .32);
+    --glass-light: linear-gradient(145deg, rgb(255 255 255 / .6), transparent 45%, rgb(200 219 228 / .18));
+    --glass-canvas: radial-gradient(ellipse at 96% 0%, #cadde4, transparent 48rem),
+      radial-gradient(ellipse at 14% 8%, #e9ddc7, transparent 40rem), var(--color-brand-ivory);
+  }
+  .app-shell[data-shell-variant], .login-private-office-layout { background: var(--glass-canvas); }
+  .app-shell[data-shell-variant] .topbar,
+  .app-shell .menu-popover,
+  .login-page .login-private-office-layout > .login-card {
+    background: var(--glass-light), var(--glass-fill);
+    box-shadow: var(--glass-rim), var(--glass-shadow);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+  }
+  .login-page .login-private-office-layout > .login-card, .app-shell .menu-popover {
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--glass-radius);
+  }
+  .app-shell .workspace, .app-shell .sidebar nav a.active {
+    background-image: var(--glass-light);
+    border-radius: 12px;
+  }
+  .app-shell[data-shell-variant=client] .workspace,
+  .app-shell[data-shell-variant=client] .sidebar nav a.active {
+    background-image: linear-gradient(135deg, rgb(255 255 255 / .09), transparent 70%);
+  }
+  .login-page .login-private-office-intro {
+    isolation: isolate;
+    background: radial-gradient(ellipse at 103% 0%, #536b79, transparent 55%),
+      radial-gradient(ellipse at 0% 110%, #514b41, transparent 54%), var(--color-brand-navy);
+  }
+  /* Frost outer surfaces once. Tables, message bodies, and fields retain their own contrast. */
+  .app-shell[data-shell-variant] :is(
+    .stat-card, .detail-card, .activity-panel, .today-priority-panel, .client-account-card,
+    .project-list, .project-workspace, .crm-pipeline, .crm-panel, .operations-panel,
+    .operations-workspace, .schedule-workspace, .communications-workspace,
+    .marketing-workspace, .integration-control-card, .report-card, .portal-card,
+    .onboarding-panel, .onboarding-rail, .website-performance, .empty-state
+  ),
+  .app-shell[data-shell-variant] :is(
+    .crm-summary, .operations-summary, .project-summary, .integration-summary,
+    .communications-summary, .marketing-summary, .schedule-summary, .today-stats
+  ) > article {
+    background: var(--glass-light), var(--glass-fill);
+    border-radius: var(--glass-radius);
+    box-shadow: var(--glass-rim), var(--glass-shadow);
+  }
+  /* Desktop rail uses the same light as the page. Mobile drawers have a solid fill. */
+  @media (min-width: 681px) {
+    .app-shell[data-shell-variant]:not([data-shell-variant=client]) .sidebar {
+      background: var(--glass-light), var(--glass-fill);
+      border-right-color: var(--glass-edge);
+    }
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :is(.app-shell, .login-page) {
+      --glass-fill: rgb(250 249 245 / .84);
+      --glass-filter: blur(16px) saturate(130%);
+    }
+  }
+  @media (max-width: 680px) {
+    .app-shell .shell-overlay { -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .app-shell .sidebar.open { background: var(--glass-solid); }
+    .app-shell[data-shell-variant=client] .sidebar.open { background: var(--color-brand-navy); }
+    .login-page .login-private-office-layout > .login-card { width: calc(100% - 32px); margin: 20px auto; }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+    :is(.app-shell, .login-page) {
+      --glass-fill: var(--glass-solid);
+      --glass-light: none;
+      --glass-filter: none;
+      --glass-rim: 0 0 transparent;
+      --glass-shadow: 0 0 transparent;
+      --glass-edge: var(--color-border);
+      --glass-canvas: var(--color-brand-ivory);
+    }
+  }
+}

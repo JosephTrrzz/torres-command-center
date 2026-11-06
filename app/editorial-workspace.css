@@ -1,0 +1,103 @@
+/* Shared editorial treatment. No route, data, or role behavior changes. */
+:root {
+  --color-brand-ivory: #f8f8f6;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f0f0ec;
+  --color-border: #deded8;
+  --color-text: #222521;
+  --color-text-subtle: #62665f;
+  --radius-control: 4px;
+  --radius-card: 6px;
+  --shadow-soft: none;
+  --shadow-raised: 0 12px 36px rgb(19 34 56 / 10%);
+}
+
+.app-shell { background: var(--color-brand-ivory); }
+.app-shell .topbar { background: var(--color-surface); border-bottom-color: var(--color-border); }
+.app-shell .content { padding-top: clamp(32px, 4vw, 56px); }
+.app-shell .page-heading, .app-shell .client-hero {
+  gap: 24px;
+  padding-bottom: 28px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--color-border);
+}
+.app-shell :is(.page-heading, .client-hero, .detail-hero, .portal-hero) h1 {
+  font-family: Manrope, Arial, sans-serif;
+  font-size: clamp(30px, 3.4vw, 46px);
+  line-height: 1.12;
+  font-weight: 500;
+  letter-spacing: -.045em;
+  overflow-wrap: anywhere;
+}
+.app-shell .lede { font-size: 15px; line-height: 1.65; max-width: 64ch; }
+.app-shell .eyebrow { font-size: 10px; letter-spacing: .1em; }
+.app-shell .sidebar nav a { font-size: 13px; border-radius: var(--radius-control); }
+.app-shell .sidebar nav a:hover { transform: none; }
+.app-shell:not([data-shell-variant=client]) .sidebar { background: var(--color-surface); }
+.app-shell:not([data-shell-variant=client]) .sidebar nav a.active {
+  background: var(--color-surface-subtle);
+  border-color: transparent;
+  box-shadow: inset 2px 0 var(--color-brand-navy);
+}
+.app-shell:not([data-shell-variant=client]) .nav-icon { color: var(--color-text-subtle); }
+.app-shell .workspace { border-radius: var(--radius-control); box-shadow: none; }
+.app-shell .workspace:hover { transform: none; box-shadow: none; }
+.app-shell .workspace strong { font-size: 13px; }
+
+.app-shell :is(.stat-card, .detail-card, .activity-panel, .report-card, .client-card,
+  .operations-panel, .operations-workspace, .crm-pipeline, .crm-workspace,
+  .marketing-workspace, .integration-card, .settings-card, .state-panel) {
+  border-radius: var(--radius-card);
+  border-color: var(--color-border);
+  box-shadow: none;
+}
+.app-shell :is(.client-card, .report-card):hover { transform: none; box-shadow: none; }
+.app-shell :is(.crm-summary, .operations-summary) article {
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.app-shell :is(.crm-panel, .crm-control-row, .crm-composer, .crm-appointment-form) {
+  border-radius: var(--radius-card);
+}
+.app-shell .button, .login-page .button {
+  min-height: 44px;
+  padding-inline: 20px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+.app-shell .button:hover, .login-page .button:hover { transform: none; box-shadow: none; }
+.app-shell :is(input, select, textarea):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]),
+.login-page :is(input[type=email], input[type=password]) {
+  min-height: 48px;
+  border-radius: var(--radius-control) !important;
+  font-size: 16px;
+  padding: 12px 14px;
+  background: var(--color-surface) !important;
+}
+.app-shell textarea { min-height: 108px; }
+.app-shell :is(a, button, summary):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.app-shell .website-performance { padding-block: 24px; }
+.app-shell .website-metric-grid { gap: 24px; margin-block: 28px; }
+.app-shell .website-metric > strong { font-weight: 500; letter-spacing: -.04em; }
+.app-shell .website-owner-links { padding-bottom: 24px; border-bottom: 1px solid var(--color-border); }
+
+/* Keep the client role distinct while reducing decorative competition. */
+.app-shell[data-shell-variant=client]::before { opacity: .015; }
+.app-shell[data-shell-variant=client] :is(.page-heading, .client-hero) h1 { font-family: var(--font-display); }
+.login-page .login-private-office-intro { background: var(--color-brand-navy); }
+.login-page .login-private-office-intro::after { display: none; }
+.login-page .login-private-office-intro::before { opacity: .025; }
+.login-page .login-private-office-intro h2 { line-height: .98; font-size: clamp(48px, 6vw, 88px); }
+.login-page .login-private-office-layout > .login-card { border-radius: 0; }
+
+@media (max-width: 680px) {
+  .app-shell .content { padding-inline: 16px; padding-top: 28px; }
+  .app-shell .page-heading, .app-shell .client-hero { padding-bottom: 20px; margin-bottom: 24px; gap: 16px; }
+  .app-shell .lede { font-size: 14px; }
+  .app-shell .website-metric-grid { gap: 20px; }
+}

@@ -3,6 +3,8 @@ import "./globals.css";
 import "./ui-enhancements.css";
 import "./design-foundation.css";
 import "./private-office-production.css";
+import "./editorial-workspace.css";
+import "./liquid-glass.css";
 
 export const metadata: Metadata = {
   title: "Torres & Co. Command Center",

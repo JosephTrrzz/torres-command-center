@@ -36,7 +36,15 @@ Manrope is the interface family. An editorial serif stack—`Iowan Old Style`, B
 
 Use the spacing tokens (`--space-1` through `--space-6`) and a base rhythm of 4px. Controls use `--radius-control`; cards use `--radius-card`; large workspaces may use 20–22px. Avoid nested cards when spacing or a divider can communicate the same grouping.
 
+### Editorial workspace refinement — October 2026
+
+The shared `editorial-workspace.css` layer refines existing components with Squarespace-inspired restraint, not copied layouts or assets. It supersedes the earlier rounded/elevated treatment for operational surfaces: 4px controls, 6px cards, flat white surfaces, neutral dividers, and no floating-card hover movement. Staff page titles use medium-weight Manrope; client titles and the sign-in introduction retain the Torres editorial serif. Page introductions end in one divider and use readable supporting text. Inputs stay at least 48px tall with 16px values; textareas retain 108px minimum height. The client navy rail, official logos, signature loader, semantic statuses, focus indicators, mobile drawer stacking, and permission-dependent workflows remain unchanged. The client background pattern is reduced to a stationery-level accent. Existing components inherit this layer rather than adding a second component library.
+
 ## Application shells
+
+### Liquid glass material
+
+The shared sign-in card, top bar, and account menus use a frosted ivory surface with a bright rim over cool blue and champagne light. Staff and client workspace panels, summary cards, and the desktop staff rail share the sign-in material. Apply the static light and rim to outer surfaces to avoid stacking blur across dense dashboards. Workspace selection uses a shallow highlight, not an additional blur layer. Reports, charts, inputs, messages, and mobile navigation drawers remain on solid reading surfaces. Use the shared glass tokens, with opaque fills when blur is unavailable or higher contrast or reduced transparency is requested. This screen-only material adds no motion or client-side dependencies.
 
 ### Internal shell
 
