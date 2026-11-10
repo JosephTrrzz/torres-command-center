@@ -15,7 +15,7 @@ export async function verifyStudioCloudflareCredential(token: string | undefined
       redirect: 'error', signal: AbortSignal.timeout(8000),
     });
     if (response.status === 401 || response.status === 403) return { credential: 'rejected' as const };
-    if (!response.ok) return { credential: 'unavailable' as const };
+    if (!response.ok) return { credential: 'unavailable' as const, reason: 'provider_response' as const, providerStatus: response.status };
     // Cloudflare project responses may contain confidential configuration.
     // Never log, persist or return that object. Select only deployment identity.
     const body = await response.json() as {
@@ -31,9 +31,9 @@ export async function verifyStudioCloudflareCredential(token: string | undefined
     const deployment = project.canonical_deployment;
     const sourceCommit = deployment?.deployment_trigger?.metadata?.commit_hash;
     if (deployment?.environment !== 'production' || !/^[a-f0-9]{40}$/.test(sourceCommit || '') ||
-      !/^[a-zA-Z0-9-]{1,100}$/.test(deployment.id || '')) return { credential: 'unavailable' as const };
+      !/^[a-zA-Z0-9-]{1,100}$/.test(deployment.id || '')) return { credential: 'unavailable' as const, reason: 'deployment_identity' as const };
     return { credential: 'verified' as const, sourceCommit: sourceCommit!, deploymentId: deployment.id! };
   } catch {
-    return { credential: 'unavailable' as const };
+    return { credential: 'unavailable' as const, reason: 'connection_error' as const };
   }
 }

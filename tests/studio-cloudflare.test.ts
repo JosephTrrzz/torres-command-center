@@ -29,6 +29,6 @@ describe('server-only Cloudflare connection verification', () => {
   });
   it('does not leak provider errors', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw Error(token); }));
-    expect(await verifyStudioCloudflareCredential(token)).toEqual({ credential: 'unavailable' });
+    expect(await verifyStudioCloudflareCredential(token)).toEqual({ credential: 'unavailable', reason: 'connection_error' });
   });
 });
