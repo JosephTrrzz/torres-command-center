@@ -144,3 +144,12 @@ role and other accounts were unchanged. Browser verification confirmed the owner
 can open Website and load the saved canvas. All 512 tests, both type checks and
 production build passed for the checkpoint. Provider verification still requires
 resolution; publication remains disabled and no public-site draft was released.
+
+
+Connection result: production deployment `6f9ccbb3` / commit `42d6cfd` fixed a
+Workers-incompatible redirect option. The encrypted publisher credential now
+verifies against the correct public project and current source. Owner editor
+access and saved-draft loading are browser-verified. 520 tests and both type
+checks passed. Automatic publishing is still not enabled: the durable adapter,
+rendered preview validation and rollback test are not yet implemented end-to-end.
+No client website content was deployed. Latest observed saved revision is 28.

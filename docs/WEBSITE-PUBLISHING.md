@@ -13,7 +13,9 @@ secret yet and therefore remains dormant.
 
 The user saved `STUDIO_CLOUDFLARE_API_TOKEN` as an encrypted production secret
 in `torres-command-center-app`; Cloudflare's settings UI confirmed encrypted
-storage. Its validity has not been tested by a deployed publishing service.
+storage. Its validity was verified server-side on 2026-11-10 against the enrolled public
+project, source commit `3733811fd7ddab2cd25a4a62585c9b5d860076a3` and deployment
+`24602104-82ae-4476-ab6d-cb0d0ea1d022`. The credential was not extracted or exposed.
 No public website files, DNS, or draft contents were published by this change.
 
 A source audit found `JosephTrrzz/torres-co-technology` contains both Next export
@@ -151,3 +153,14 @@ completed by the control-plane or scheduler changes. No saved draft was publishe
 Still pending: deployed durable provider adapter, trusted real-source build runner,
 preview/browser application proof, rollback proof, scheduler credential and per-site
 activation. No publication readiness or successful live publication is asserted.
+
+
+Production connection verification: Cloudflare Workers rejects Fetch `redirect:
+error`. Credential checks and canonical-route verification now use `manual` and
+reject non-2xx responses without following redirects. See Cloudflare's Request
+runtime documentation: https://developers.cloudflare.com/workers/runtime-apis/request/
+The protected owner session returned `credential: verified` after deployment
+`6f9ccbb3` (commit `42d6cfd`). Readiness remains false because the durable adapter
+and real preview/rollback verification remain unfinished. Current saved draft is
+revision 28; re-read and validate it before any eventual publication rather than
+assuming the previously inspected revision 26 is still current.
