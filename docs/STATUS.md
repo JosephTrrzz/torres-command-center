@@ -156,3 +156,5 @@ No client website content was deployed. Latest observed saved revision is 28.
 
 ## Managed Website selector — November 10, 2026
 Agency owners/admins can select authorized client websites from Website and the editor. Client accounts remain assigned-site-only. Editor switching explicitly saves a checkpoint before navigation; a failed save prevents the switch. Unconnected clients remain visible with setup guidance, never a substituted preview. No database migration or publishing activation is included. Validation: 549 tests, application and Functions TypeScript, and production build passed.
+
+Deployment verification: production release `62b6feb` / Cloudflare `4f0549f5` includes the in-page Save and switch confirmation. Signed-in owner verification showed both managed clients; Torres opened its scoped saved editor and Taqueria showed truthful unconnected guidance. 549 tests pass. Browser confirmation interrupted the final save-and-switch check; awaiting dismissal of the older native popup before that final interaction can be verified. Public client websites were not published or modified.
