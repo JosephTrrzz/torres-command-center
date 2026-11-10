@@ -3,16 +3,27 @@
 ## Current status
 
 The Command Center control plane and UI are implemented. **Live publishing is NOT
-activated.** The migration is prepared; its production installation has not been verified in this worktree. The new background-check migration has not been applied. No public website files,
-DNS, credentials, or draft contents were deployed by this change.
+activated.** `studio_publications.sql` and `studio_publication_scheduler.sql`
+were applied to production Supabase project `mfdunybyzpfjqziygulk` on
+2026-11-10. Verification confirmed publication RLS is enabled, authenticated
+browser roles cannot select the ledger or execute the begin function, exactly
+one scheduler job exists, and zero sites have publishing enabled. All 26 saved
+draft revisions remain present. The scheduler has no configured invocation
+secret yet and therefore remains dormant.
+
+The user saved `STUDIO_CLOUDFLARE_API_TOKEN` as an encrypted production secret
+in `torres-command-center-app`; Cloudflare's settings UI confirmed encrypted
+storage. Its validity has not been tested by a deployed publishing service.
+No public website files, DNS, or draft contents were published by this change.
 
 A source audit found `JosephTrrzz/torres-co-technology` contains both Next export
 and Sites/Vinext tooling. The inspected Cloudflare Pages production deployment
 uses `npx next build` with `out`, at source commit
 `3733811fd7ddab2cd25a4a62585c9b5d860076a3`. The editor contains imported static snapshots. This release
 must not replace the actual site's source with those snapshots. A site-specific
-safe renderer and deployment adapter remain required; the repository does not
-currently contain either. The private service binding is intentionally absent.
+safe renderer and deployment adapter remain required. A narrow, locally tested compiler and
+all-route packager now cover the two geometry edits present in saved revision 26;
+they are not yet connected to a deployed build runner. The private service binding is intentionally absent.
 
 ## Implemented path
 
@@ -114,3 +125,29 @@ Remaining implementation: safe site-specific renderer with source-drift checks,
 private durable deployment adapter, restricted provider connection, preview
 publication/rollback verification, then per-site activation. These are NOT
 completed by the control-plane or scheduler changes. No saved draft was published.
+
+
+## 2026-11-10 — source adapter and recovery checkpoint
+
+- Added strict publication preflight: unknown fields, active markup/URL schemes,
+  malformed raster uploads and unsupported copied sections fail closed.
+- Added a source-pinned compiler for the currently saved home hero movement and
+  introduction box geometry. Other meaningful edits fail explicitly; this is not
+  a general renderer for all Website Studio features.
+- Added a pure packager that checks all eleven real export routes before producing
+  changed output, preserves unrelated files byte-for-byte, and rejects mismatched
+  markers, source commits and content-addressed scripts.
+- Added staff-only, assigned-site connection diagnostics that consume the encrypted
+  Cloudflare credential only on the server and return no provider configuration.
+  Valid credentials never activate publishing on their own.
+- Recovery now looks up hashed queued releases before reading private drafts;
+  only a definitive provider 404 permits another idempotent dispatch. Existing
+  deployments can be observed even when draft storage is unavailable.
+- Runtime geometry preserves existing absolute positioning. A static release
+  marker is not sufficient to prove runtime edits were applied: the missing build
+  runner must validate the actual rendered preview, CSP/script delivery, functional
+  forms and rollback before any production enrollment or capability advertisement.
+
+Still pending: deployed durable provider adapter, trusted real-source build runner,
+preview/browser application proof, rollback proof, scheduler credential and per-site
+activation. No publication readiness or successful live publication is asserted.

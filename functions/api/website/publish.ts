@@ -2,6 +2,7 @@ import { reconcilePublication } from '../../_shared/studio-reconcile';
 import { authJson } from '../../_shared/auth';
 import { studioAccess, studioStore } from '../../_shared/studio-access';
 import { trustedStudioRequest } from '../../_shared/studio-request';
+import { STUDIO_CLOUDFLARE_TARGET, verifyStudioCloudflareCredential } from '../../_shared/studio-cloudflare';
 import manifest from '../../../lib/canvas-manifest.json';
 import { UUID, publicPublication, publisherReady, type Publication, type PublishingEnv } from '../../_shared/studio-publisher';
 
@@ -17,7 +18,14 @@ export async function onRequest({request,env}:{request:Request;env:PublishingEnv
   if(!site || site.canvas_snapshot_id!==manifest.id || site.public_url?.replace(/\/$/,'')!==manifest.source)return authJson({error:'Publishing is unavailable for this website.'},403);
   const [latest]=await read('/studio_publications?'+scope+'&order=created_at.desc&limit=1');
   const ready=site.publishing_enabled===true && await publisherReady(env,access.clientId);
-  if(request.method==='GET')return authJson({ready,message:ready?'Review your saved draft before making it public.':unavailable,publicUrl:manifest.source,name:site.name,publication:publicPublication(latest??null)});
+  if(request.method==='GET'){
+   // Setup diagnostics are operator-only and consume the encrypted credential
+   // server-side. A valid credential alone must never enable publication.
+   const connection=!ready && access.staff && access.clientId===STUDIO_CLOUDFLARE_TARGET.client && env.STUDIO_CLOUDFLARE_API_TOKEN
+    ? await verifyStudioCloudflareCredential(env.STUDIO_CLOUDFLARE_API_TOKEN) : undefined;
+   return authJson({ready,message:ready?'Review your saved draft before making it public.':unavailable,
+    publicUrl:manifest.source,name:site.name,publication:publicPublication(latest??null),connection});
+  }
   if(!ready || !env.STUDIO_PUBLISHER)return authJson({error:unavailable},503);
   if(!request.headers.get('content-type')?.startsWith('application/json'))return authJson({error:'Send a JSON request.'},415);
   const text=await request.text();if(text.length>1024)return authJson({error:'Publishing request is too large.'},413);

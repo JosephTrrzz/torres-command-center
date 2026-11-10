@@ -105,5 +105,33 @@ release before Now Live. Closing review while polling restores editor interactio
 
 Activation remains blocked: the safe source-aware renderer and durable deployment
 adapter are not installed, and the permanent provider connection is not configured.
-Cloudflare dashboard was signed out; a sign-in handoff is pending. The scheduler
-migration is not applied. No public site content has changed. Local tests: 294 pass.
+Cloudflare dashboard access was restored. No public site content has changed.
+Local tests at the implementation checkpoint: 294 pass.
+
+### Production publishing prerequisites — November 10, 2026
+
+The user saved the approved Pages publishing token as the encrypted production
+secret `STUDIO_CLOUDFLARE_API_TOKEN` in `torres-command-center-app`. Storage was
+verified in Cloudflare; no deployed adapter has validated or consumed it yet.
+Applied `studio_publications.sql` and `studio_publication_scheduler.sql` to
+production Supabase. Verified: RLS enabled, browser SELECT and begin-publication
+EXECUTE denied, one cron job, zero enabled sites, and all 26 draft revisions
+preserved. The scheduler credential is intentionally not installed yet.
+
+Reran publishing, reconciliation, own-site, and request-security tests: 61 passed.
+This is NOT an end-to-end publication/rollback test. The private adapter and
+source-aware public renderer remain unimplemented. The Push to live site button
+must remain unavailable until these are implemented and preview-tested. A Pages
+rebuild of the current Git branch alone would not apply Supabase visual patches.
+
+
+### 2026-11-10 publishing recovery and artifact checkpoint
+
+Local implementation now includes strict draft preflight, a source-pinned compiler
+for the two saved revision-26 geometry changes, a pure all-eleven-route export
+packager, and assigned-admin-only encrypted-credential diagnostics. Recovery queries
+existing hashed releases before rereading drafts, preserving ambiguous deployment
+locks. The production publishing migrations are installed, but automatic publication
+remains disabled pending the durable build/deployment adapter and preview/rollback
+verification. Saved drafts and public website content have not been published by
+this checkpoint.

@@ -1,7 +1,8 @@
 import { studioStore } from './studio-access';
 import { canvasDraftIssue } from '../../lib/canvas-draft';
+import { publicationDraftIssue } from './studio-publication-draft';
 import manifest from '../../lib/canvas-manifest.json';
-import { contentHash, matchingReceipt, publicPublication, publisherCall, type Publication, type PublishingEnv, verifyLivePages } from './studio-publisher';
+import { contentHash, matchingReceipt, publicPublication, publisherCall, PublisherNotFound, type Publication, type PublishingEnv, verifyLivePages } from './studio-publisher';
 
 // Called only after own-site authorization or by the private scheduler.
 // A lease is fenced on every update, so an expired worker cannot commit stale state.
@@ -25,14 +26,35 @@ export async function reconcilePublication(env: PublishingEnv, initial: Publicat
    const [saved]=await r.json();if(saved)release=saved;else throw Error('Publishing status changed. Please check again.');
   };
   try {
-   const [saved]=await read('/studio_canvas_drafts?'+scope+'&snapshot_id=eq.'+release.snapshot_id+'&revision=eq.'+release.revision+'&select=draft&limit=1');
-   if(!saved || canvasDraftIssue(saved.draft)){await update({status:'failed'});return ({publication:publicPublication(release),message:'This draft could not be validated. The live website was not changed.'});}
-   const digest=await contentHash({snapshotId:release.snapshot_id,revision:release.revision,draft:saved.draft});
-   if(release.content_hash && release.content_hash!==digest)throw Error('The saved release could not be verified.');
-   if(!release.content_hash)await update({content_hash:digest});
-   const payload={protocol:1,releaseId:release.id,clientId:release.client_id,snapshotId:release.snapshot_id,revision:release.revision,contentHash:digest,publicUrl:manifest.source,draft:saved.draft};
-   // The binding must persist idempotency before acknowledging; retries reuse the exact release.
-   const receipt=release.status==='queued' ? await publisherCall(env.STUDIO_PUBLISHER,'/releases',payload) : await publisherCall(env.STUDIO_PUBLISHER,'/releases/'+release.id+'?client='+release.client_id);
+   let receipt;
+   if(release.status==='queued' && release.content_hash){
+    // Recover a lost dispatch acknowledgment before accessing draft storage.
+    // Only a definitive not-found permits another idempotent dispatch attempt.
+    try{receipt=await publisherCall(env.STUDIO_PUBLISHER,'/releases/'+release.id+'?client='+release.client_id);}
+    catch(error){if(!(error instanceof PublisherNotFound))throw error;}
+   }
+   if(release.status==='queued' && !receipt){
+    const [saved]=await read('/studio_canvas_drafts?'+scope+'&snapshot_id=eq.'+release.snapshot_id+'&revision=eq.'+release.revision+'&select=draft&limit=1');
+    const issue=!saved ? 'The saved draft is unavailable.' : canvasDraftIssue(saved.draft) || publicationDraftIssue(saved.draft,release.snapshot_id);
+    if(issue){
+     // A hash is persisted before dispatch. Its presence means an earlier POST
+     // might already be building, even if its acknowledgment was lost. Never
+     // declare that release failed based on local validation alone.
+     if(release.content_hash)throw Error('Awaiting confirmation of a previously dispatched release.');
+     await update({status:'failed'});
+     return ({publication:publicPublication(release),message:issue+' The live website was not changed.'});
+    }
+    const digest=await contentHash({snapshotId:release.snapshot_id,revision:release.revision,draft:saved.draft});
+    if(release.content_hash && release.content_hash!==digest)throw Error('The saved release could not be verified.');
+    if(!release.content_hash)await update({content_hash:digest});
+    const payload={protocol:1,releaseId:release.id,clientId:release.client_id,snapshotId:release.snapshot_id,revision:release.revision,contentHash:digest,publicUrl:manifest.source,draft:saved.draft};
+    // The binding must persist idempotency before acknowledging; retries reuse the exact release.
+    receipt=await publisherCall(env.STUDIO_PUBLISHER,'/releases',payload);
+   }else if(!receipt){
+    // Observe the immutable deployment receipt even when draft storage is down.
+    // A local read failure must never release the single-publication lock.
+    receipt=await publisherCall(env.STUDIO_PUBLISHER,'/releases/'+release.id+'?client='+release.client_id);
+   }
    if(!matchingReceipt(receipt,release))throw Error('The deployment could not be matched to this draft. Please check again.');
    if(receipt.status==='failed')await update({status:'failed',deployment_id:receipt.deploymentId});
    else if(receipt.status==='succeeded'){

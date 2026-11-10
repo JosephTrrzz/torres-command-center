@@ -4,18 +4,20 @@ import routes from '../../public/website-preview/pages.json';
 
 // A private Cloudflare service binding; never a browser-supplied URL or credential.
 export interface PublisherBinding { fetch(request: Request): Promise<Response> }
-export interface PublishingEnv extends FunctionEnv { STUDIO_PUBLISHER?: PublisherBinding }
+export interface PublishingEnv extends FunctionEnv { STUDIO_PUBLISHER?: PublisherBinding; STUDIO_CLOUDFLARE_API_TOKEN?: string }
 export type Publication = {
  id: string; client_id: string; snapshot_id: string; revision: number;
  status: 'queued'|'deploying'|'verifying'|'live'|'failed';
  content_hash: string|null; deployment_id: string|null; created_at: string; verified_at: string|null;
 };
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export class PublisherNotFound extends Error {}
 export async function publisherCall(binding: PublisherBinding, path: string, body?: unknown) {
  const response = await binding.fetch(new Request('https://studio-publisher.internal'+path, {
   method: body ? 'POST' : 'GET', headers: {'Content-Type':'application/json'},
   body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(8000),
  }));
+ if(response.status===404 && body===undefined)throw new PublisherNotFound('Release not found.');
  if (!response.ok) throw Error('The publishing service is unavailable. Your private draft is safe.');
  const text = await response.text();
  if (text.length>16384) throw Error('Invalid publishing service response.');

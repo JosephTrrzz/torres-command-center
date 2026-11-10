@@ -4,6 +4,7 @@ import {contentHash,matchingReceipt,verifyLivePages,publisherReady,type Publicat
 vi.mock('../functions/_shared/studio-access',()=>({studioAccess:vi.fn(async()=>({clientId:'11111111-1111-4111-8111-111111111111',context:{userId:'verified-actor'}})),studioStore:()=>({rest:'https://storage.example/rest/v1',headers:{}})}));
 import {onRequest} from '../functions/api/website/publish';
 import {studioAccess} from '../functions/_shared/studio-access';
+import {reconcilePublication} from '../functions/_shared/studio-reconcile';
 const json=(v:unknown)=>new Response(JSON.stringify(v),{headers:{'Content-Type':'application/json'}});
 const release:Publication={id:'22222222-2222-4222-8222-222222222222',client_id:'11111111-1111-4111-8111-111111111111',revision:3,snapshot_id:manifest.id,status:'queued',content_hash:null,deployment_id:null,created_at:'2026-11-10T00:00:00Z',verified_at:null};
 const site={name:'Torres',public_url:manifest.source,canvas_snapshot_id:manifest.id,publishing_enabled:true};
@@ -38,6 +39,47 @@ describe('publishing boundaries',()=>{
   initial();fetcher.mockResolvedValueOnce(json(release)).mockResolvedValueOnce(json([release])).mockResolvedValueOnce(json([{draft:{0:{}}}])).mockResolvedValueOnce(json([]));
   const result=await (await call(begin)).json();
   expect(result.publication.status).toBe('queued');expect(binding.fetch).toHaveBeenCalledTimes(1);
+ });
+});
+describe('publication recovery',()=>{
+ it('fails an invalid undispatched draft without calling the provider',async()=>{
+  fetcher.mockResolvedValueOnce(json([release]))
+   .mockResolvedValueOnce(json([{draft:{0:{bad:{html:'<script>bad</script>'}}}}]))
+   .mockResolvedValueOnce(json([{...release,status:'failed'}]));
+  const result=await reconcilePublication({STUDIO_PUBLISHER:binding},release);
+  expect(result.publication?.status).toBe('failed');
+  expect(binding.fetch).not.toHaveBeenCalled();
+  expect(JSON.parse(fetcher.mock.calls[2][1].body)).toEqual({status:'failed'});
+ });
+ it('keeps an ambiguously dispatched release pending when its draft is unavailable',async()=>{
+  const pending={...release,content_hash:'a'.repeat(64)};
+  fetcher.mockResolvedValueOnce(json([pending])).mockResolvedValueOnce(json([]));
+  binding.fetch.mockResolvedValueOnce(new Response(null,{status:404}));
+  const result=await reconcilePublication({STUDIO_PUBLISHER:binding},pending);
+  expect(result.publication?.status).toBe('queued');
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(binding.fetch).toHaveBeenCalledTimes(1);
+  expect(binding.fetch.mock.calls[0][0].method).toBe('GET');
+ });
+ it.each(['queued','deploying'] as const)('recovers a %s deployment without reading draft storage',async(status)=>{
+  const pending={...release,status,content_hash:'a'.repeat(64),deployment_id:'deployment-1'};
+  fetcher.mockResolvedValueOnce(json([pending])).mockResolvedValueOnce(json([{...pending,status:'deploying'}]));
+  binding.fetch.mockResolvedValueOnce(json({releaseId:pending.id,clientId:pending.client_id,
+   snapshotId:pending.snapshot_id,revision:pending.revision,contentHash:pending.content_hash,
+   deploymentId:pending.deployment_id,status:'building'}));
+  const result=await reconcilePublication({STUDIO_PUBLISHER:binding},pending);
+  expect(result.publication?.status).toBe('deploying');
+  expect(binding.fetch.mock.calls[0][0].method).toBe('GET');
+  expect(binding.fetch.mock.calls[0][0].url).toContain('/releases/'+pending.id);
+  expect(fetcher.mock.calls.every(([url])=>!String(url).includes('studio_canvas_drafts'))).toBe(true);
+ });
+ it('does not unlock a deployment on a provider timeout',async()=>{
+  const pending={...release,status:'deploying' as const,content_hash:'a'.repeat(64),deployment_id:'deployment-1'};
+  fetcher.mockResolvedValueOnce(json([pending]));
+  binding.fetch.mockRejectedValueOnce(Error('timeout'));
+  const result=await reconcilePublication({STUDIO_PUBLISHER:binding},pending);
+  expect(result.publication?.status).toBe('deploying');
+  expect(fetcher).toHaveBeenCalledTimes(1);
  });
 });
 describe('live evidence',()=>{
