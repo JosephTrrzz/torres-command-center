@@ -14,11 +14,11 @@
   for(const id of ['inspector','context-tools','button-presets']){const el=document.getElementById(id);if(el)el.hidden=true;}
   document.getElementById('canvas')?.contentWindow.postMessage({type:'clear'},'*');
  },true);
- const style=document.createElement('link');style.rel='stylesheet';style.href='/editor-chrome.css?v=1';document.head.append(style);
+ const style=document.createElement('link');style.rel='stylesheet';style.href='/website-preview/editor-chrome.css?v=1';document.head.append(style);
 })();
 
 // Keep native text undo inside fields; canvas shortcuts use the site timeline.
 if(!document.body.classList.contains('studio-shell')){
- document.addEventListener('pointerdown',()=>parent.postMessage({type:'history-boundary',epoch:Number(new URLSearchParams(location.search).get('studioEpoch')),page:location.pathname.split('/').pop()},'*'),true);
- document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&!e.altKey&&e.key.toLowerCase()==='z'&&!e.target.closest('input,textarea,[contenteditable=true]')){e.preventDefault();parent.postMessage({type:'history-request',epoch:Number(new URLSearchParams(location.search).get('studioEpoch')),page:location.pathname.split('/').pop(),direction:e.shiftKey?'redo':'undo'},'*');}});
+ document.addEventListener('pointerdown',()=>parent.postMessage({type:'history-boundary',epoch:Number(new URLSearchParams(location.search).get('studioEpoch')),page:location.pathname.split('/').pop().replace(/\.html$/, '')+'.html'},'*'),true);
+ document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&!e.altKey&&e.key.toLowerCase()==='z'&&!e.target.closest('input,textarea,[contenteditable=true]')){e.preventDefault();parent.postMessage({type:'history-request',epoch:Number(new URLSearchParams(location.search).get('studioEpoch')),page:location.pathname.split('/').pop().replace(/\.html$/, '')+'.html',direction:e.shiftKey?'redo':'undo'},'*');}});
 }

@@ -25,3 +25,18 @@ https://*.torres-command-center-app.pages.dev/*
   X-Frame-Options: SAMEORIGIN
   X-Robots-Tag: noindex, nofollow
   Cache-Control: no-store
+
+# Public snapshot assets must load inside the opaque-origin editing sandbox.
+# Documents, authenticated APIs, and private drafts retain their existing policy.
+/website-preview/assets/*
+  ! Cross-Origin-Resource-Policy
+  Cross-Origin-Resource-Policy: cross-origin
+  Access-Control-Allow-Origin: *
+
+/website-preview/*.js
+  ! Cross-Origin-Resource-Policy
+  Cross-Origin-Resource-Policy: cross-origin
+
+/website-preview/*.css
+  ! Cross-Origin-Resource-Policy
+  Cross-Origin-Resource-Policy: cross-origin

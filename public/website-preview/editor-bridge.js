@@ -6,7 +6,7 @@ if(siteHeader)sections.push(siteHeader);
 const original=new Map([...nodes,...sections].map(n=>[n,n.getAttribute('style')]));
 let editing=true,selected=null;
 const documentEpoch=Number(new URLSearchParams(location.search).get("studioEpoch"));
-const send=data=>parent.postMessage({...data,epoch:documentEpoch,page:location.pathname.split('/').pop()},'*');
+const send=data=>parent.postMessage({...data,epoch:documentEpoch,page:location.pathname.split('/').pop().replace(/\.html$/, '')+'.html'},'*');
 const style=document.createElement('style');style.textContent='[data-editable]:hover{outline:2px solid #a57d3d;outline-offset:4px;cursor:text}[contenteditable=true]:focus,[data-local-selected]{outline:2px solid #a57d3d!important;outline-offset:-2px}img[data-editable]:hover{cursor:pointer}html{scroll-behavior:auto!important}*{animation:none!important;transition:none!important}.reveal,[data-reveal]{opacity:1!important;transform:none!important}';document.head.append(style);
 const photoOffsets=new Map();
 function positionPhoto(n){const o=photoOffsets.get(n),s=n.closest('main section');if(!o||!s)return;n.style.translate=(o.x*s.clientWidth/100)+'px '+(o.y*s.clientHeight/100)+'px';n.style.position=getComputedStyle(n).position==='static'?'relative':n.style.position;n.style.zIndex='21';for(let p=n.parentElement;p&&p!==s;p=p.parentElement)p.style.overflow='visible'}
