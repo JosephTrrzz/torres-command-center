@@ -154,3 +154,9 @@ pill labels at section edges, centers, and nearby item anchors. Snap tolerance i
 are pointer-transparent, motion-free, bounded to the preview viewport, and removed
 on release, cancellation, scrolling, or Escape. They are editor-only and never
 stored in drafts. Existing keyboard nudging remains available for precise placement.
+
+### Text selection and history continuity
+
+A single click selects a text box and exposes gold resize handles; double-click or Enter enters inline typing. Escape ends typing. Resize handles support arrow keys and retain readable text rather than clipping overflow. The same interaction applies to inserted text and speech bubbles.
+
+Undo and Redo restore ordinary same-page edits in place and preserve the preview scroll position. Apply a snapshot atomically before paint, preserving the sandbox and existing event listeners. Structural section changes or navigation to another page retain the full document reconstruction path.
