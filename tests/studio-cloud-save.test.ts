@@ -4,15 +4,25 @@ import {describe,it,expect} from 'vitest';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(){
  const handlers=new Map<string,Function[]>(),sent:any[]=[],nodes=new Map<string,any>();
- const node=(id:string):any=>{if(!nodes.has(id))nodes.set(id,{hidden:false,inert:false,textContent:'',disabled:false,querySelector:(s:string)=>node(id+s),addEventListener:()=>{},replaceChildren:()=>{},querySelectorAll:()=>[]});return nodes.get(id)};
+ const node=(id:string):any=>{if(!nodes.has(id)){
+  const listeners=new Map<string,Function[]>();
+  nodes.set(id,{hidden:false,inert:false,textContent:'',disabled:false,open:false,
+   querySelector:(s:string)=>node(id+s),addEventListener:(name:string,fn:Function)=>listeners.set(name,[...(listeners.get(name)||[]),fn]),
+   replaceChildren:()=>{},querySelectorAll:()=>[],append:()=>{},after:()=>{},setAttribute:()=>{},focus:()=>{},classList:{remove:()=>{}},
+   showModal:()=>{node(id).open=true},close:()=>{node(id).open=false;listeners.get('close')?.forEach(fn=>fn())}});
+ }return nodes.get(id)};
  const parent={postMessage:(message:any)=>sent.push(message)};let serial=0;
- const context:any={URLSearchParams,location:{search:'?connected=1',origin:'https://app.test'},crypto:{randomUUID:()=>String(++serial)},parent,Intl,Date,JSON,Map,Error,Promise,Event,setTimeout:()=>1,clearTimeout:()=>{},drafts:{},dirty:false,pages:[],active:0,saveTimer:null,canvasReady:true,loadPage:()=>{},changed:()=>{context.dirty=true},captureDraft:async()=>true,persistDraft:()=>true,status:node('status'),$:node,document:{querySelector:node},addEventListener:(type:string,fn:Function)=>{handlers.set(type,[...(handlers.get(type)||[]),fn])}};
+ const context:any={URLSearchParams,location:{search:'?connected=1',origin:'https://app.test'},crypto:{randomUUID:()=>String(++serial)},parent,Intl,Date,JSON,Map,Error,Promise,Event,setTimeout:()=>1,clearTimeout:()=>{},drafts:{},dirty:false,pages:[],active:0,saveTimer:null,canvasReady:true,loadPage:()=>{},changed:()=>{context.dirty=true},captureDraft:async()=>true,persistDraft:()=>true,status:node('status'),$:node,document:{querySelector:node,createElement:node,body:node('body'),hidden:false},addEventListener:(type:string,fn:Function)=>{handlers.set(type,[...(handlers.get(type)||[]),fn])}};
  context.window={dispatchEvent:()=>{}};
  runInNewContext(readFileSync('public/website-preview/cloud-drafts.js','utf8'),context);
  const reply=(request:any,result?:any,error?:string,status?:number)=>handlers.get('message')!.forEach(fn=>fn({source:parent,origin:context.location.origin,data:{type:'canvas-result',requestId:request.requestId,result,error,status}}));
  return {context,sent,node,reply,handlers};
 }
-async function loaded(){const s=setup();s.reply(s.sent[0],{draft:{},revision:4});await tick();return s;}
+async function loaded(){const s=setup();s.reply(s.sent[0],{draft:{},revision:4});await tick();
+ const statusIndex=s.sent.findIndex(r=>r.type==='canvas-publish-status');
+ if(statusIndex>=0){s.reply(s.sent[statusIndex],{ready:false,publication:null});s.sent.splice(statusIndex,1);await tick();}
+ return s;}
+
 describe('connected draft saving',()=>{
  it('waits for confirmation and saves edits made during an in-flight save',async()=>{
   const s=await loaded();s.context.drafts={0:{text:'First'}};s.context.changed();s.context.persistDraft();
@@ -33,5 +43,18 @@ describe('connected draft saving',()=>{
  it('explicit save creates a checkpoint even when autosave is current',async()=>{
   const s=await loaded();const saving=s.node('#save').onclick();await tick();expect(s.node('.workspace').inert).toBe(true);expect(s.sent[1]).toMatchObject({checkpoint:true,revision:4,draft:{}});
   s.reply(s.sent[1],{revision:5,created_at:'2026-11-10T20:00:00Z'});await saving;expect(s.node('.workspace').inert).toBe(false);expect(s.node('status').textContent).toContain('Draft saved');
+ });
+});
+
+describe('publishing dialog recovery',()=>{
+ it('releases the editor when the review is closed during a status request',async()=>{
+  const s=await loaded();const opening=s.node('button').onclick();await tick();
+  s.reply(s.sent.at(-1),{ready:true,name:'Assigned site',publicUrl:'https://example.test',publication:{id:'release',revision:4,status:'deploying'}});await opening;
+  expect(s.node('.workspace').inert).toBe(true);
+  const checking=s.node('dialog[data-publish-check]').onclick();
+  s.node('dialog[data-publish-close]').onclick();
+  expect(s.node('.workspace').inert).toBe(false);
+  s.reply(s.sent.at(-1),{publication:{id:'release',revision:4,status:'deploying'}});await checking;
+  expect(s.node('.workspace').inert).toBe(false);
  });
 });

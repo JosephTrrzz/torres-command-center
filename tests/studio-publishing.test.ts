@@ -32,6 +32,12 @@ describe('publishing boundaries',()=>{
   binding.fetch.mockResolvedValueOnce(json(capability)).mockRejectedValueOnce(Error('timeout'));
   const data=await (await call(begin)).json();expect(data.publication.status).toBe('queued');expect(data.message).toContain('confirmation');
   const payload=await (binding.fetch.mock.calls[1][0] as Request).json();expect(payload).toMatchObject({releaseId:release.id,contentHash:digest,draft:{0:{}}});
+  expect(fetcher.mock.calls[5][0]).toContain('next_check_at=eq.');
+ });
+ it('does not dispatch if a newer worker owns the lease before the hash is saved',async()=>{
+  initial();fetcher.mockResolvedValueOnce(json(release)).mockResolvedValueOnce(json([release])).mockResolvedValueOnce(json([{draft:{0:{}}}])).mockResolvedValueOnce(json([]));
+  const result=await (await call(begin)).json();
+  expect(result.publication.status).toBe('queued');expect(binding.fetch).toHaveBeenCalledTimes(1);
  });
 });
 describe('live evidence',()=>{
@@ -46,7 +52,11 @@ describe('live evidence',()=>{
   const p={...release,content_hash:'a'.repeat(64)};
   fetcher.mockImplementation(async()=>new Response('<head><meta name="torres-studio-release" content="'+p.id+':'+p.content_hash+'"></head>',{headers:{'Content-Type':'text/html'}}));
   expect(await verifyLivePages(p)).toBe(true);expect(fetcher).toHaveBeenCalledTimes(11);
-  for(const [url,options]of fetcher.mock.calls){expect(new URL(url).origin).toBe(manifest.source);expect(options.redirect).toBe('error')}
+  for(const [url,options]of fetcher.mock.calls){expect(new URL(url).origin).toBe(manifest.source);expect(new URL(url).search).toBe('');expect(options.redirect).toBe('error')}
+ });
+ it('rejects a release visible only at a cache-busting URL',async()=>{
+  fetcher.mockImplementation(async(url:URL)=>new Response(url.search ? '<meta name="torres-studio-release" content="'+release.id+':null">' : '<head>previous release</head>',{headers:{'Content-Type':'text/html'}}));
+  expect(await verifyLivePages(release)).toBe(false);
  });
  it('does not call accepted or partially deployed releases live',async()=>{fetcher.mockImplementation(async()=>new Response('<head>old content</head>',{headers:{'Content-Type':'text/html'}}));expect(await verifyLivePages(release)).toBe(false)});
  it('rejects a marker beyond the bounded page head',async()=>{fetcher.mockImplementation(async()=>new Response('x'.repeat(65536)+'<meta name="torres-studio-release" content="'+release.id+':null">',{headers:{'Content-Type':'text/html'}}));expect(await verifyLivePages(release)).toBe(false)});

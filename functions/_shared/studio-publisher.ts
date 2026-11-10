@@ -60,7 +60,7 @@ export async function verifyLivePages(release: Publication): Promise<boolean> {
  for(let i=0;i<routes.length;i+=3){
   const results=await Promise.all(routes.slice(i,i+3).map(async page=>{
    try {
-    const url=new URL(page.route,manifest.source);url.searchParams.set('__studio_release',release.id);
+    const url=new URL(page.route,manifest.source);
     const response=await fetch(url,{redirect:'error',cache:'no-store',signal:AbortSignal.timeout(5000),headers:{'Cache-Control':'no-cache'}});
     if(!response.ok || !response.headers.get('content-type')?.includes('text/html'))return false;
     return (await boundedHead(response)).includes(marker);

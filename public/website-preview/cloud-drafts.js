@@ -117,7 +117,7 @@
  }
  publishCheck.onclick=checkPublication;
  publishClose.onclick=()=>publishDialog.close();
- publishDialog.addEventListener('close',()=>{if(!publishBusy)workspace.inert=false;publishButton.focus();});
+ publishDialog.addEventListener('close',()=>{workspace.inert=checkpointBusy;publishButton.focus();});
  publishDialog.addEventListener('cancel',e=>{if(publishBusy)e.preventDefault();});
  publishButton.onclick=async()=>{
   if(!connected||publishBusy||checkpointBusy)return;

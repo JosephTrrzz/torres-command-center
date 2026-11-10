@@ -3,11 +3,13 @@
 ## Current status
 
 The Command Center control plane and UI are implemented. **Live publishing is NOT
-activated.** The migration is prepared, not yet applied. No public website files,
+activated.** The migration is prepared; its production installation has not been verified in this worktree. The new background-check migration has not been applied. No public website files,
 DNS, credentials, or draft contents were deployed by this change.
 
-A source audit found `JosephTrrzz/torres-co-technology` now uses a Sites/Vinext
-worker build, while this editor contains imported static snapshots. This release
+A source audit found `JosephTrrzz/torres-co-technology` contains both Next export
+and Sites/Vinext tooling. The inspected Cloudflare Pages production deployment
+uses `npx next build` with `out`, at source commit
+`3733811fd7ddab2cd25a4a62585c9b5d860076a3`. The editor contains imported static snapshots. This release
 must not replace the actual site's source with those snapshots. A site-specific
 safe renderer and deployment adapter remain required; the repository does not
 currently contain either. The private service binding is intentionally absent.
@@ -17,7 +19,7 @@ currently contain either. The private service binding is intentionally absent.
 Authenticated Website editor → existing parent bridge → `/api/website/publish`
 → own-site authorization → enabled source/snapshot check → readiness check
 → atomic Supabase release reservation → private deployment adapter
-→ matching deployment receipt → exact release markers on all eleven live routes
+→ matching deployment receipt → exact release markers on all eleven canonical live routes (no cache-busting query)
 → persisted `live` state → **Now Live**.
 
 The browser sends only action, saved revision, snapshot ID and a UUID request key.
@@ -27,7 +29,7 @@ provider credential, or client ID in the mutation body.
 
 `studio_begin_publication` locks the site row, checks the newest revision, handles
 retries, enforces one active publication per site and a 30-second start cooldown.
-A 90-second database lease bounds repeated polling/delivery. The draft hash is
+A 90-second database lease bounds repeated polling/delivery; updates are fenced by that exact lease value, and work resumes from the claimed database row. The draft hash is
 canonical SHA-256. Release identity is immutable; status transitions cannot move
 backward or rewrite finished jobs. Anonymous/authenticated database access is
 revoked. Failed or ambiguous requests never display success. Ambiguous delivery
@@ -88,3 +90,27 @@ Production deployment, applied database grants, provider credentials, distribute
 WAF limits, renderer behavior and end-to-end publication have NOT been verified by
 this local control-plane change. Unit tests cover permissions, request shape,
 source binding, hashing, lease behavior, mismatched receipts and marker verification.
+
+## Background confirmation — implemented locally, activation pending
+
+`/api/website/reconcile` uses a separate scheduler credential and accepts no
+browser-supplied client, URL, draft, or status. It reads up to three due authorized
+releases and invokes the same leased reconciliation function as the editor.
+The additive `supabase/studio_publication_scheduler.sql` schedules this every two
+minutes using Vault; it makes no request without the scheduler secret and due work.
+No publishing enrollment is enabled by this migration.
+
+Set Vault `studio_publication_scheduler_secret` and matching encrypted Cloudflare
+`STUDIO_CRON_SECRET` only when the private deployment adapter is ready. The
+scheduler does not replace the adapter's durable job or cancellation guarantees.
+A timeout must never unlock a release that might still deploy. Provider-confirmed
+failure remains required before permitting a replacement release.
+
+The actual public URLs must serve release markers; a successful deployment or a
+fresh cache-busted response alone cannot produce Now Live. Existing publication
+review can be closed during a status check without leaving the editor inert.
+
+Remaining implementation: safe site-specific renderer with source-drift checks,
+private durable deployment adapter, restricted provider connection, preview
+publication/rollback verification, then per-site activation. These are NOT
+completed by the control-plane or scheduler changes. No saved draft was published.

@@ -93,3 +93,17 @@ boundary and all-route live-marker verification. Activation is blocked until the
 current public site's safe renderer/deployment adapter is implemented and connected.
 The SQL migration is not applied, and no public-site content has been published.
 See `WEBSITE-PUBLISHING.md` for the contract and concrete activation requirements.
+
+
+## Publishing reconciliation hardening — 2026-11-10
+
+Local branch `codex/secure-publishing` combines the deployed editor baseline with
+the publishing control plane. Added a private bounded scheduler endpoint and
+prepared a two-minute Supabase Vault/cron migration. Reconciliation uses a fenced
+database lease and the claimed row; canonical public pages must show the exact
+release before Now Live. Closing review while polling restores editor interaction.
+
+Activation remains blocked: the safe source-aware renderer and durable deployment
+adapter are not installed, and the permanent provider connection is not configured.
+Cloudflare dashboard was signed out; a sign-in handoff is pending. The scheduler
+migration is not applied. No public site content has changed. Local tests: 294 pass.
