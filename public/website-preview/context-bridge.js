@@ -6,6 +6,7 @@
  const ignored=n=>n.closest('script,style,svg,form,#local-image-tools,#shape-toolbar,.local-shape');
  for(const [scope,root]of Object.entries(roots)){if(!root)continue;for(const n of [root,...root.querySelectorAll('*')]){if(ignored(n)||(scope==="page"&&n.closest("header,footer")))continue;let parts=[],el=n;while(el!==root){parts.unshift([...el.parentElement.children].indexOf(el));el=el.parentElement}const key=scope+':'+parts.join('.');registry.set(key,n);n.dataset.contextKey=key;baseline.set(key,{style:n.getAttribute('style'),text:n.children.length?null:n.textContent,href:n.getAttribute('href'),src:n.getAttribute('src'),srcset:n.getAttribute('srcset'),alt:n.getAttribute('alt')});}}
  function registerAdded(){for(const root of document.querySelectorAll('[data-local-added],[data-local-copy]')){const prefix='page:'+ (root.dataset.localAdded?'added-'+root.dataset.localAdded:'copy-'+root.dataset.localCopy);for(const n of [root,...root.querySelectorAll('*')]){if(ignored(n)||n.dataset.contextKey)continue;let parts=[],el=n;while(el!==root){parts.unshift([...el.parentElement.children].indexOf(el));el=el.parentElement}const key=prefix+':'+parts.join('.');registry.set(key,n);n.dataset.contextKey=key;}}}
+ window.StudioContentSelection={register:registerAdded};
  function describe(n){if(target&&target!==n)target.contentEditable='false';const key=n.dataset.contextKey;if(!key)return;target=n;if(selected)selected.removeAttribute('data-local-selected');selected=n;n.dataset.localSelected='';dispatchEvent(new Event('resize'));send({type:'context-selected',key,region:key.split(':')[0],button:n.hasAttribute('data-studio-button'),kind:n===roots.footer?'footer':n.tagName==='A'?'link':'text',text:n.textContent.trim(),href:n.getAttribute('href')||'',fontSize:parseFloat(getComputedStyle(n).fontSize),color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor,font:getComputedStyle(n).fontFamily.split(',')[0].replace(/[\"']/g,''),bold:Number(getComputedStyle(n).fontWeight)>=600,italic:getComputedStyle(n).fontStyle==='italic'});}
  const safeURL=v=>typeof v==='string'&&(/^(https?:\/\/|mailto:|tel:|\/|#)/i.test(v))&&!v.startsWith('//');
  function patch(n,v){if(typeof v.text==='string'&&v.text.length<=10000){if(!n.children.length)n.textContent=v.text;else{const t=[...n.childNodes].find(x=>x.nodeType===3&&x.textContent.trim());if(t)t.textContent=v.text;else{const leaf=[...n.querySelectorAll('span,strong,em')].find(el=>!el.children.length&&el.textContent.trim());if(leaf)leaf.textContent=v.text;}}}
@@ -14,6 +15,7 @@
  if(bounded(v.boxWidth,40,2400)||bounded(v.boxHeight,24,2400)){if(getComputedStyle(n).display==='inline')n.style.display='inline-block';n.style.overflowWrap='anywhere';n.style.whiteSpace='normal';n.style.flexShrink='0'}
  if(bounded(v.boxWidth,40,2400)){n.style.width=v.boxWidth+'px';n.style.maxWidth='100%';n.style.boxSizing='border-box'}
  if(bounded(v.boxHeight,24,2400)){n.style.minHeight=v.boxHeight+'px';n.style.height='auto';n.style.boxSizing='border-box'}
+ if(bounded(v.offsetX,-2400,2400)&&bounded(v.offsetY,-2400,2400)){if(getComputedStyle(n).display==='inline')n.style.display='inline-block';n.style.translate=v.offsetX+'px '+v.offsetY+'px';n.dataset.studioOffsetX=v.offsetX;n.dataset.studioOffsetY=v.offsetY;}
  if(bounded(v.fontSize,10,160))n.style.fontSize=v.fontSize+'px';
  if(typeof v.bold==='boolean')n.style.fontWeight=v.bold?'700':'400';if(typeof v.italic==='boolean')n.style.fontStyle=v.italic?'italic':'normal';
  if(/^#[0-9a-f]{6}$/i.test(v.color||''))n.style.color=v.color;
@@ -55,13 +57,15 @@
   if(e.source!==parent||e.data?.type!=='history-apply')return;
   const d=e.data,x=scrollX,y=scrollY;
   dispatchEvent(new MessageEvent('message',{source:parent,data:{type:'clear'}}));
-  photoOffsets.clear();window.StudioAlignment?.clear();
+  photoOffsets.clear();for(const n of registry.values()){delete n.dataset.studioOffsetX;delete n.dataset.studioOffsetY;}window.StudioAlignment?.clear();
   for(const {n,attrs,text,textNodes}of historyBase){
    for(const [a,v]of Object.entries(attrs))if(v===null)n.removeAttribute(a);else if(n.getAttribute(a)!==v)n.setAttribute(a,v);
    if(text!==null){if(n.textContent!==text)n.textContent=text;}else for(const [t,v]of textNodes)if(t.isConnected)t.textContent=v;
   }
   // Apply the whole snapshot in a single task, before the browser paints.
   for(const message of [
+   {type:'restore-groups',groups:d.edits?.$groups||[]},
+   {type:'restore-locks',locks:[...(d.edits?.$locks||[]),...Object.keys(d.sharedContent||{}).filter(k=>d.sharedContent[k]?.movementLocked)]},
    {type:'restore-shapes',shapes:d.edits?.$shapes||[]},
    {type:'restore',edits:d.edits||{},sections:d.edits?.$sections||{}},
    {type:'shared-restore',edits:d.shared||{}},

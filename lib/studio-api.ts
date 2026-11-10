@@ -21,7 +21,7 @@ export async function studioRequest<T>(
 ): Promise<T> {
   const token = readStoredSession()?.access_token;
   if (!token)
-    throw Error("Your session has expired. Sign in again to continue.");
+    throw Object.assign(Error("Your session has expired. Sign in again to continue."), { status: 401 });
   const res = await fetch(studioUrl(path), {
     method: payload ? "POST" : "GET",
     cache: "no-store",

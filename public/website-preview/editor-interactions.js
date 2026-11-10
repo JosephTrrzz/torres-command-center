@@ -44,5 +44,5 @@
 // Keep native text undo inside fields; canvas shortcuts use the site timeline.
 if(!document.body.classList.contains('studio-shell')){
  document.addEventListener('pointerdown',()=>parent.postMessage({type:'history-boundary',epoch:Number(new URLSearchParams(location.search).get('studioEpoch')),page:location.pathname.split('/').pop().replace(/\.html$/, '')+'.html'},'*'),true);
- document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&!e.altKey&&e.key.toLowerCase()==='z'&&!e.target.closest('input,textarea,[contenteditable=true]')){e.preventDefault();parent.postMessage({type:'history-request',epoch:Number(new URLSearchParams(location.search).get('studioEpoch')),page:location.pathname.split('/').pop().replace(/\.html$/, '')+'.html',direction:e.shiftKey?'redo':'undo'},'*');}});
+ window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&!e.altKey&&e.key.toLowerCase()==='z'&&!e.target.closest('input,textarea,[contenteditable=true]')){e.preventDefault();e.stopImmediatePropagation();if(e.repeat)return;parent.postMessage({type:'history-request',epoch:Number(new URLSearchParams(location.search).get('studioEpoch')),page:location.pathname.split('/').pop().replace(/\.html$/, '')+'.html',direction:e.shiftKey?'redo':'undo'},'*');}},true);
 }

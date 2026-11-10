@@ -67,3 +67,20 @@ Session hardening adds provider logout, cross-tab logout notification, cached-pa
 
 ### Website Studio text resizing — November 10, 2026
 Added eight edge/corner grips for existing text, inline text width/wrapping support, and handle selection retention. Selected color controls reflect actual text and object colors. Local browser checks covered keyboard resizing, inline typing, and Undo; user confirmed the preview works. This release excludes the unfinished publication workflow.
+
+## Local Website Studio selection refinement — November 10, 2026
+
+Refined the local multi-selection implementation after user feedback: Shift-selected groups no longer require a mode switch before movement, new objects drag directly in selection mode, empty-canvas marquees work in ordinary editing, and four-pixel pointer tolerance avoids accidental movements. Added shared selection bounds, a move handle, and keyboard nudges. Existing private draft storage and lock persistence remain unchanged. Local interaction regression suite: 242 tests passed. Not deployed.
+
+### Selection coverage follow-up
+
+Expanded local selection to rich text blocks, icon buttons, media and shared header/footer content. Verified mixed text/button/photo selection and movement in the browser, and a header lock surviving navigation from Home to About. Added rich-text deduplication and shared-key regression coverage: 244 tests passed. No deployment performed.
+
+Local marquee repair: unselected text/images now start a selection rectangle in Select multiple mode; selected items retain group movement. A real browser mouse drag selected three items in the hero. Screenshot: /tmp/studio-marquee-fixed.png. Not deployed.
+
+Local selection styling: added surrounding pasteboard drag forwarding into the sandboxed preview and selection-anchored gold/beige toolbar. Desktop selection visual reviewed; 246 tests, both TypeScript checks, changed-script lint, and production build pass. Local only. This slice does not add persistent grouping, group duplication/deletion, or group resizing.
+
+Canva-reference selection flow follow-up: removed the selection-mode switch, added compact Group/Ungroup and lock controls, and persisted page-scoped groups in existing private draft JSON. Browser checks confirmed grouped text reselects together after a saved reload and lock/unlock updates the same group. 247 tests, both TypeScript checks and production build passed. Local preview only; no deployment. Group resize, duplication and deletion are not included in this slice.
+
+### Connected draft reliability — November 10, 2026
+Autosave confirms success only after the account bridge acknowledges persistence and follows up with edits made during an in-flight request. Transient failures keep the draft dirty and explain the Save draft retry action; reconnect retries autosave without creating a checkpoint. Authentication, permission and revision conflicts block retries rather than overwriting newer work. Restore now makes the workspace inert during capture/fetch/checkpoint, preventing concurrent edits from being lost. Missing authentication is classified as 401. Existing client-scoped API and six-checkpoint migration are unchanged. Added six connection-state regression tests; 255 tests pass. These changes are local and have not been production-validated or deployed.

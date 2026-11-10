@@ -9,6 +9,12 @@
  });
  addEventListener('message',e=>{if(e.source!==parent||e.origin!==location.origin||e.data?.type!=='canvas-result')return;const p=pending.get(e.data.requestId);if(!p)return;pending.delete(e.data.requestId);clearTimeout(p.timer);if(e.data.error)p.reject(Object.assign(Error(e.data.error),{status:e.data.status}));else p.resolve(e.data.result)});
  let revision=0;
+ function saveError(error){
+  blocked=[401,403,409].includes(error.status);
+  status.textContent=error.message+(blocked?' Keep this tab open and copy any unsaved work before signing in or reloading.':' Your changes are still open. Click Save draft to retry.');
+ }
+ // Reconnect only retries the current private draft, never creates a checkpoint or publishes.
+ addEventListener('online',()=>{if(connected&&dirty&&!blocked&&!checkpointBusy)void saveCloud();});
  async function saveCloud(){
   if(!connected||blocked)return false;
   if(inflight){await inflight;return dirty?saveCloud():!blocked;}
@@ -17,7 +23,7 @@
   inflight=request('canvas-save',{revision,draft:JSON.parse(captured)}).then(result=>{
    revision=result.revision;lastSaved=captured;dirty=JSON.stringify(drafts)!==captured;
    status.textContent=dirty?'Saving your latest changes…':'Saved to your account · Nothing was published.';return true;
-  }).catch(error=>{dirty=true;blocked=error.status===409||error.status===401||error.status===403;status.textContent=error.message;return false;}).finally(()=>{inflight=null});
+  }).catch(error=>{dirty=true;saveError(error);return false;}).finally(()=>{inflight=null});
   const ok=await inflight;if(ok&&dirty)return saveCloud();return ok;
  }
  persistDraft=function(){if(!connected)return false;if(JSON.stringify(drafts)===lastSaved){dirty=false;return true;}void saveCloud();return false;};
@@ -42,11 +48,11 @@
   if(checkpointBusy||!connected||blocked)return;
   checkpointBusy=true;buttons();workspace.inert=true;
   try{if(!await captureDraft())return;clearTimeout(saveTimer);const result=await checkpoint(drafts);dirty=false;status.textContent='Draft saved · '+dateFormat.format(new Date(result.created_at))+' · Nothing was published.';}
-  catch(error){status.textContent=error.message;}
+  catch(error){saveError(error);}
   finally{checkpointBusy=false;workspace.inert=false;buttons();}
  };
  async function restoreVersion(version){
-  if(checkpointBusy)return;checkpointBusy=true;buttons();list.inert=true;
+  if(checkpointBusy||blocked)return;checkpointBusy=true;buttons();list.inert=true;workspace.inert=true;
   historyStatus.textContent='Restoring saved draft…';
   try{
    if(!await captureDraft())throw Error('Your current changes could not be saved. Please retry.');
@@ -56,8 +62,8 @@
    window.dispatchEvent(new Event('canvas-draft-loaded'));loadPage(active);
    status.textContent='Restored draft from '+dateFormat.format(new Date(version.created_at))+' · Nothing was published.';
    $('#panel-close').click();
-  }catch(error){historyStatus.textContent=error.message;}
-  finally{checkpointBusy=false;list.inert=false;buttons();}
+  }catch(error){saveError(error);historyStatus.textContent=status.textContent;}
+  finally{checkpointBusy=false;list.inert=false;workspace.inert=false;buttons();}
  }
  historyButton.addEventListener('click',async()=>{
   if(checkpointBusy||!connected||historyDialog.hidden)return;

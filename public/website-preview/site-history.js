@@ -4,6 +4,7 @@
  const undo=$('#undo-shape'),redo=$('#redo-shape');
  undo.textContent='Undo';redo.textContent='Redo';
  undo.title='Undo last edit (⌘/Ctrl Z)';redo.title='Redo last edit (⌘/Ctrl Shift Z)';
+ undo.setAttribute('aria-keyshortcuts','Meta+Z Control+Z');redo.setAttribute('aria-keyshortcuts','Meta+Shift+Z Control+Shift+Z');
  function controls(){undo.disabled=busy||restoring||!history.canUndo&&!pending;redo.disabled=busy||restoring||!history.canRedo||pending;}
  function flush(){clearTimeout(timer);if(pending){history.record(drafts,editPage);pending=false;}controls();}
  const change=changed;changed=function(){change();if(restoring)return;pending=true;editPage=active;clearTimeout(timer);timer=setTimeout(flush,450);controls();};
@@ -32,8 +33,8 @@
  undo.onclick=()=>move('undo');redo.onclick=()=>move('redo');
  // Remove competing one-tool undo controls; all edits use the same timeline.
  for(const el of [$('#section-undo'),$('#undo-section-main'),document.querySelector('#button-presets [data-undo]')])if(el){el.style.setProperty('display','none','important');el.onclick=()=>move('undo');}
- function shortcut(e){if(!(e.metaKey||e.ctrlKey)||e.altKey||e.key.toLowerCase()!=='z'||e.target.closest('input,textarea,[contenteditable=true]'))return;e.preventDefault();move(e.shiftKey?'redo':'undo');}
- document.addEventListener('keydown',shortcut);
+ function shortcut(e){if(!(e.metaKey||e.ctrlKey)||e.altKey||e.key.toLowerCase()!=='z'||e.target.closest('input,textarea,[contenteditable=true]'))return;e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)move(e.shiftKey?'redo':'undo');}
+ window.addEventListener('keydown',shortcut,true);
  document.addEventListener('pointerdown',e=>{if(!e.target.closest('input,textarea'))flush();},true);
  addEventListener('message',e=>{
   if(e.source!==frame.contentWindow||e.origin!=='null'||e.data.page!==pages[active]?.file)return;

@@ -92,3 +92,8 @@
 #saved-drafts-panel button:focus-visible{outline:2px solid #a57d3d;outline-offset:3px}
 #saved-drafts-panel [data-confirm]{flex-basis:100%;padding:12px;background:#f5efe4;border-radius:12px}
 #saved-drafts-panel [data-confirm] button+button{margin-left:8px}
+
+/* A usable pasteboard for starting cross-canvas selection. */
+.studio-shell .stage{padding:24px 36px 28px;touch-action:none;background:#eee9e0}
+.studio-shell #canvas{border-radius:4px;box-shadow:0 2px 12px #493b2814}
+@media(max-width:700px){.studio-shell .stage{padding:16px 18px}}

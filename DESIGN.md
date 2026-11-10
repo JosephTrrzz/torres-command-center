@@ -171,3 +171,13 @@ The editor sidebar offers Saved drafts as a navigation destination, separate fro
 
 ### Existing text resizing and selected colors
 Existing text uses a brass outline with eight edge and corner grips. One click selects; double-click edits words. Narrowing wraps text without shrinking the font. Handle gestures retain selection, commit once to history, and cancel restores starting dimensions. Color circles reflect the selected text, object fill, or background; transparent fills use a checkerboard.
+
+### Canvas multi-selection and movement locks
+
+Drag from blank canvas or the surrounding beige pasteboard to select objects; Shift-click adds or removes items. No selection-mode switch is required. Intersecting text and objects join the selection, while section-sized background media must be fully enclosed. Complete text blocks and controls are deduplicated to avoid moving nested text twice.
+
+Use brass outlines, a shared dashed boundary, and a compact gold/beige toolbar anchored above or below the selection. The toolbar offers Group/Ungroup, a labeled lock toggle and a move handle. It stays within the viewport and hides during dragging. Saved groups are page-scoped and select together when any member is clicked after reload. Outside clicks clear the selection.
+
+A four-pixel threshold prevents accidental movement. Drag selected groups directly or nudge with arrow keys (1px, or 10px with Shift). Locked items stay fixed. Pointer cancellation, blur and Escape restore starting positions. Commit a group move as one undo step. Group membership and movement locks persist in private drafts, separately from Undo/Redo and six explicit checkpoints. Locks are editing safeguards, not authorization controls.
+
+Header/footer movement patches retain their shared behavior. Inputs and editor chrome are excluded from selection. All selection visuals remain editor-only; this interaction adds no publishing or access permissions.

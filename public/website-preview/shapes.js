@@ -75,6 +75,7 @@
  for(const [symbol,delta,label]of [['−',-1,'Decrease font size'],['+',1,'Increase font size']]){const b=document.createElement('button');b.type='button';b.textContent=symbol;b.setAttribute('aria-label',label);b.onclick=()=>{size.value=clamp(Number(size.value)+delta,10,120);size.dispatchEvent(new Event('input',{bubbles:true}))};if(delta<0)size.before(b);else size.after(b)}
  action('delete').innerHTML='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';action('delete').setAttribute('aria-label','Delete element');action('delete').title='Delete';
 
+ window.StudioShapeSelection={get:id=>{const v=items.find(v=>v.id===id);return v?{...v}:null;},set:(id,x,y)=>{const v=items.find(v=>v.id===id);if(v){v.x=clamp(x,0,100-v.w);v.y=clamp(y,0,100-v.h);const el=elements.get(id);if(el){el.style.left=v.x+'%';el.style.top=v.y+'%';}}},all:()=>items.map(v=>({...v}))};
  function snapshot(){return JSON.stringify(items)}
  function remember(){undo.push(snapshot());if(undo.length>40)undo.shift();redo=[]}
  function emit(){send({type:'shapes-change',shapes:items,canUndo:!!undo.length,canRedo:!!redo.length})}
