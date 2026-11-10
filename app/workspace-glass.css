@@ -20,7 +20,7 @@
     transform-origin: 50% 35%;
     animation: workspace-wave-flow 8s ease-in-out infinite alternate;
   }
-  .app-shell[data-wave-paused=true] .workspace-waves { animation-play-state: paused; }
+  [data-wave-paused=true] > .workspace-waves { animation-play-state: paused; }
   @keyframes workspace-wave-flow {
     0% { transform: translate3d(-2%, -2%, 0) scale(1.02, 1.04) rotate(-1deg); }
     50% { transform: translate3d(1%, 1%, 0) scale(1.06, .98) rotate(.5deg); }
@@ -33,8 +33,9 @@
     border: 1px solid var(--glass-edge);
     border-radius: 24px;
   }
-  .app-shell[data-shell-variant] .top-actions { gap: 10px; }
-  .app-shell[data-shell-variant] :is(.round-button, .top-avatar, .wave-motion-control) {
+  .app-shell[data-shell-variant] .top-actions { gap: 16px; background: transparent; box-shadow: none; }
+  .app-shell[data-shell-variant] :is(.round-button, .top-avatar, .wave-motion-control),
+  .login-page .wave-motion-control {
     display: grid;
     place-items: center;
     width: 44px;
@@ -48,6 +49,31 @@
     transition: background-color 150ms ease, border-color 150ms ease;
     transform: none;
   }
+  .login-page {
+    position: relative;
+    isolation: isolate;
+    background: var(--color-brand-ivory);
+    --workspace-control-edge: var(--glass-edge);
+    --workspace-control-fill: var(--glass-fill);
+    --workspace-control-radius: 999px;
+    --workspace-control-shadow: var(--glass-rim);
+  }
+  .login-page .login-private-office-layout { background: transparent; }
+  .login-wave-control { position: absolute; z-index: 2; top: 20px; right: 24px; }
+  .login-page .login-private-office-layout > .login-card { margin-top: 80px; }
+  .login-page .wave-motion-control:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+  /* Clear space between rounded surfaces; never expose the old divider-colored grid. */
+  .app-shell[data-shell-variant] .report-grid {
+    gap: 20px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  .app-shell[data-shell-variant] .report-card {
+    border: 1px solid var(--glass-edge);
+    box-shadow: var(--glass-rim);
+  }
+  .app-shell[data-shell-variant] .report-card.selected { border-color: var(--color-brand-brass); }
   .app-shell[data-shell-variant] .notification-bell { color: var(--color-brand-navy); }
   /* Supersede the legacy dark bell skin without changing its accessible control. */
   .app-shell[data-shell-variant] .notification-trigger {
@@ -118,7 +144,12 @@
       --workspace-control-edge: rgb(255 255 255 / .94);
     }
   }
+  @media (max-width: 980px) {
+    .login-page .login-private-office-intro { padding-top: 132px; }
+  }
   @media (max-width: 680px) {
+    .login-wave-control { top: 14px; right: 16px; }
+    .login-page .login-private-office-layout > .login-card { margin-top: 20px; }
     .app-shell[data-shell-variant] .topbar { margin: 10px 12px 0; padding-inline: 14px; height: 60px; border-radius: 22px; }
     .app-shell[data-shell-variant] .breadcrumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .app-shell[data-shell-variant] .top-actions { flex: 0 0 auto; }

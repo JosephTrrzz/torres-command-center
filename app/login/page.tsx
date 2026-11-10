@@ -1,5 +1,6 @@
 "use client";
 
+import { useWaveMotion, WaveMotionControl } from "../../components/wave-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -10,6 +11,7 @@ import { BrandedAppLoader, prepareSignatureEntryHandoff } from "../../components
 import { TurnstileChallenge } from "../../components/turnstile";
 
 export default function LoginPage() {
+  const { motionPaused, animationPaused, toggleBackgroundMotion } = useWaveMotion();
   const [notice, setNotice] = useState(false);
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
@@ -92,7 +94,9 @@ export default function LoginPage() {
   if (busy) return <BrandedAppLoader animate label={inviteSession ? "Activating your private workspace" : "Verifying secure access"} />;
 
   return (
-    <main className="login-page">
+    <main className="login-page" data-wave-paused={animationPaused}>
+      <div className="workspace-waves" aria-hidden="true" />
+      <div className="login-wave-control"><WaveMotionControl paused={motionPaused} onToggle={toggleBackgroundMotion} /></div>
       <div className="login-private-office-layout">
       <section className="login-private-office-intro" aria-label="Torres Private Office">
         <div className="login-brand"><Image src="/brand/torres-co-wordmark.png" alt="Torres & Co. Technology" width={270} height={106} priority className="login-wordmark" /></div>
