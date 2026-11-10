@@ -1,6 +1,6 @@
 "use client";
 
-import { useWaveMotion, WaveMotionControl } from "../../components/wave-motion";
+import { useWaveMotion } from "../../components/wave-motion";
 import { WaveBackground } from "../../components/wave-background";
 import Link from "next/link";
 import Image from "next/image";
@@ -12,7 +12,7 @@ import { BrandedAppLoader, prepareSignatureEntryHandoff } from "../../components
 import { TurnstileChallenge } from "../../components/turnstile";
 
 export default function LoginPage() {
-  const { motionPaused, animationPaused, toggleBackgroundMotion } = useWaveMotion();
+  const { animationPaused } = useWaveMotion();
   const [notice, setNotice] = useState(false);
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
@@ -97,7 +97,7 @@ export default function LoginPage() {
   return (
     <main className="login-page" data-wave-paused={animationPaused}>
       <WaveBackground paused={animationPaused} />
-      <div className="login-wave-control"><WaveMotionControl paused={motionPaused} onToggle={toggleBackgroundMotion} /></div>
+
       <div className="login-private-office-layout">
       <section className="login-private-office-intro" aria-label="Torres Private Office">
         <div className="login-brand"><Image src="/brand/torres-co-wordmark.png" alt="Torres & Co. Technology" width={270} height={106} priority className="login-wordmark" /></div>

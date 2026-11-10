@@ -19,13 +19,13 @@
     background: url('/today-waves.svg') center top / cover no-repeat;
   }
   .workspace-waves[data-vanta-ready=true] { background: var(--color-brand-ivory); }
-  .workspace-waves canvas { opacity: .72; }
+  .workspace-waves canvas { opacity: .88; }
   .workspace-waves::after {
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(125deg, rgb(238 227 207 / .32), transparent 55%, rgb(248 248 246 / .22));
+    background: linear-gradient(125deg, rgb(222 190 137 / .4), transparent 52%, rgb(178 205 218 / .18));
   }
   .app-shell[data-shell-variant] .topbar {
     margin: 16px 24px 0;
@@ -35,8 +35,7 @@
     border-radius: 24px;
   }
   .app-shell[data-shell-variant] .top-actions { gap: 16px; background: transparent; box-shadow: none; }
-  .app-shell[data-shell-variant] :is(.round-button, .top-avatar, .wave-motion-control),
-  .login-page .wave-motion-control {
+  .app-shell[data-shell-variant] :is(.round-button, .top-avatar) {
     display: grid;
     place-items: center;
     width: 44px;
@@ -60,11 +59,10 @@
     --workspace-control-shadow: var(--glass-rim);
   }
   .login-page .login-private-office-layout { background: transparent; }
-  .login-wave-control { position: absolute; z-index: 2; top: 20px; right: 24px; }
   .login-page .login-private-office-layout > .login-card { margin-top: 80px; }
-  .login-page .wave-motion-control:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
   /* Clear space between rounded surfaces; never expose the old divider-colored grid. */
-  .app-shell[data-shell-variant] .report-grid {
+  .app-shell[data-shell-variant] .report-grid,
+  .app-shell[data-shell-variant] .portal-grid {
     gap: 20px;
     background: transparent;
     border: 0;
@@ -85,7 +83,7 @@
   .app-shell[data-shell-variant] .notification-bell::before,
   .app-shell[data-shell-variant] .notification-bell::after { background: currentColor; border-color: currentColor; box-shadow: none; }
   .app-shell[data-shell-variant] .top-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
-  .app-shell[data-shell-variant] :is(.round-button, .top-avatar, .wave-motion-control):hover {
+  .app-shell[data-shell-variant] :is(.round-button, .top-avatar):hover {
     border-color: var(--color-brand-brass);
     transform: none;
   }
@@ -149,7 +147,6 @@
     .login-page .login-private-office-intro { padding-top: 132px; }
   }
   @media (max-width: 680px) {
-    .login-wave-control { top: 14px; right: 16px; }
     .login-page .login-private-office-layout > .login-card { margin-top: 20px; }
     .app-shell[data-shell-variant] .topbar { margin: 10px 12px 0; padding-inline: 14px; height: 60px; border-radius: 22px; }
     .app-shell[data-shell-variant] .breadcrumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -161,10 +158,9 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .workspace-waves { animation: none; transform: none; }
-    .wave-motion-control { display: none !important; }
   }
   @media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
-    .workspace-waves, .wave-motion-control { display: none !important; }
+    .workspace-waves { display: none !important; }
     .app-shell[data-shell-variant] {
       --workspace-control-fill: var(--glass-solid);
       --workspace-control-filter: none;
@@ -175,4 +171,4 @@
   }
 }
 
-@media print { .workspace-waves, .wave-motion-control { display: none !important; } }
+@media print { .workspace-waves { display: none !important; } }
