@@ -16,7 +16,7 @@
     z-index: -1;
     inset: 0;
     overflow: hidden;
-    background: linear-gradient(135deg, #f5ead5, #b08d57 55%, #292723);
+    background: url('/today-waves.svg') center top / cover no-repeat;
   }
   .workspace-waves[data-vanta-ready=true] { background: var(--color-brand-ivory); }
   .workspace-waves canvas { opacity: .88; }
@@ -25,7 +25,7 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(125deg, rgb(248 234 201 / .62), rgb(247 240 223 / .48) 52%, rgb(28 27 25 / .32));
+    background: linear-gradient(125deg, rgb(222 190 137 / .4), transparent 52%, rgb(178 205 218 / .18));
   }
   .app-shell[data-shell-variant] .topbar {
     margin: 16px 24px 0;

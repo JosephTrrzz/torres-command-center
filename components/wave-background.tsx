@@ -57,7 +57,7 @@ export function WaveBackground({ paused }: { paused: boolean }) {
           minHeight: 200, minWidth: 200,
           scale: Math.max(1, window.devicePixelRatio || 1),
           scaleMobile: Math.max(1.5, window.devicePixelRatio || 1),
-          color: 0xb08d57, shininess: 38, waveHeight: 18, waveSpeed: 1.25, zoom: .9,
+          color: 0x87aabd, shininess: 24, waveHeight: 18, waveSpeed: 1.25, zoom: .9,
         });
         if (effect.renderer) element!.setAttribute("data-vanta-ready", "true");
         else stop();
