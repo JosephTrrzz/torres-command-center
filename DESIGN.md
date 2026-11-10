@@ -44,6 +44,8 @@ The shared `editorial-workspace.css` layer refines existing components with Squa
 
 ### Liquid glass material
 
+Today uses a focused control layer: a bounded floating top bar, 44px circular account controls, pill navigation selection, and 48px pill actions. Keep metrics, priority text, and notification lists opaque. Use one backdrop-filter per control surface, never nested blur stacks. Mobile drawers retain the existing opaque fill and stacking order. CSS feature detection enables frosting; unsupported browsers, reduced transparency, higher contrast, and forced colors use solid surfaces. The background uses static broad waves and fine flowing lines in pale champagne, ivory, and blue-gray, with no central ornament. Higher contrast and reduced-transparency preferences remove the artwork. This is a web treatment, not a native SwiftUI implementation. There is no morphing or continuous motion.
+
 The shared sign-in card, top bar, and account menus use a frosted ivory surface with a bright rim over cool blue and champagne light. Staff and client workspace panels, summary cards, and the desktop staff rail share the sign-in material. Apply the static light and rim to outer surfaces to avoid stacking blur across dense dashboards. Workspace selection uses a shallow highlight, not an additional blur layer. Reports, charts, inputs, messages, and mobile navigation drawers remain on solid reading surfaces. Use the shared glass tokens, with opaque fills when blur is unavailable or higher contrast or reduced transparency is requested. This screen-only material adds no motion or client-side dependencies.
 
 ### Internal shell

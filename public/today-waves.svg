@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" fill="none">
+  <defs>
+    <linearGradient id="champagne" x1="0" y1="0" x2="1600" y2="700" gradientUnits="userSpaceOnUse"><stop stop-color="#e9ddc7" stop-opacity=".6"/><stop offset=".5" stop-color="#f7f3e9" stop-opacity=".1"/><stop offset="1" stop-color="#e4d4b6" stop-opacity=".4"/></linearGradient>
+    <linearGradient id="blue" x1="150" y1="300" x2="1500" y2="1000" gradientUnits="userSpaceOnUse"><stop stop-color="#cadde4" stop-opacity=".25"/><stop offset=".6" stop-color="#dbe6eb" stop-opacity=".55"/><stop offset="1" stop-color="#edf0f2" stop-opacity=".2"/></linearGradient>
+  </defs>
+  <path d="M-200 160C220-180 460 480 900 190S1400 70 1800 380" stroke="url(#champagne)" stroke-width="180"/>
+  <path d="M-200 390C260 20 440 710 970 380S1450 260 1800 570" stroke="url(#blue)" stroke-width="210"/>
+  <path d="M-200 800C210 450 530 1100 1060 760S1510 620 1800 950" stroke="url(#champagne)" stroke-width="160"/>
+  <g stroke="#d5c4a4" stroke-opacity=".23" stroke-width="1.5">
+    <path d="M-200 90C220-250 460 410 900 120S1400 0 1800 310"/>
+    <path d="M-200 112C220-228 460 432 900 142S1400 22 1800 332"/>
+    <path d="M-200 134C220-206 460 454 900 164S1400 44 1800 354"/>
+    <path d="M-200 760C210 410 530 1060 1060 720S1510 580 1800 910"/>
+    <path d="M-200 782C210 432 530 1082 1060 742S1510 602 1800 932"/>
+  </g>
+  <g stroke="#b9cdd8" stroke-opacity=".27" stroke-width="1.5">
+    <path d="M-200 440C260 70 440 760 970 430S1450 310 1800 620"/>
+    <path d="M-200 462C260 92 440 782 970 452S1450 332 1800 642"/>
+    <path d="M-200 484C260 114 440 804 970 474S1450 354 1800 664"/>
+  </g>
+</svg>

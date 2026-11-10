@@ -234,7 +234,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const avatar = initials(displayName);
   const accessLabel = organizationRoleLabel(session.organization?.role, session.profile.role);
   const organizations = session.organizations?.length ? session.organizations : session.organization ? [session.organization] : [];
-  const shell = <div className="app-shell" data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}>
+  const shell = <div className="app-shell" data-shell-flow={active === "Today" ? "today" : undefined} data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}>
     <a className="skip-link" href="#workspace-content">Skip to workspace content</a>
     {open && <button type="button" className="shell-overlay" aria-label="Close navigation" onClick={() => { setOpen(false); setWorkspaceOpen(false); }} />}
     <aside className={`sidebar ${open ? "open" : ""}`} id="workspace-navigation">
