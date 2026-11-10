@@ -1,0 +1,146 @@
+/* Shared workspace: glass belongs to navigation and controls, not the reading layer. */
+@media screen {
+  .app-shell[data-shell-variant] {
+    --workspace-control-radius: 999px;
+    --workspace-control-fill: var(--glass-solid);
+    --workspace-control-filter: none;
+    --workspace-control-edge: var(--color-border);
+    --workspace-control-shadow: var(--glass-rim), 0 4px 14px -8px rgb(19 34 56 / .22);
+    --glass-canvas: var(--color-brand-ivory);
+  }
+
+  .app-shell[data-shell-variant] { isolation: isolate; }
+  .app-shell[data-shell-variant=client]::before { content: none; }
+  .workspace-waves {
+    position: fixed;
+    z-index: -1;
+    inset: -10vh -10vw;
+    pointer-events: none;
+    background: url('/today-waves.svg') center top / max(100%, 1100px) auto repeat-y;
+    transform-origin: 50% 35%;
+    animation: workspace-wave-flow 8s ease-in-out infinite alternate;
+  }
+  .app-shell[data-wave-paused=true] .workspace-waves { animation-play-state: paused; }
+  @keyframes workspace-wave-flow {
+    0% { transform: translate3d(-2%, -2%, 0) scale(1.02, 1.04) rotate(-1deg); }
+    50% { transform: translate3d(1%, 1%, 0) scale(1.06, .98) rotate(.5deg); }
+    100% { transform: translate3d(3%, -1%, 0) scale(1.01, 1.08) rotate(1deg); }
+  }
+  .app-shell[data-shell-variant] .topbar {
+    margin: 16px 24px 0;
+    padding-inline: 24px;
+    height: 64px;
+    border: 1px solid var(--glass-edge);
+    border-radius: 24px;
+  }
+  .app-shell[data-shell-variant] .top-actions { gap: 10px; }
+  .app-shell[data-shell-variant] :is(.round-button, .top-avatar, .wave-motion-control) {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border: 1px solid var(--workspace-control-edge);
+    border-radius: var(--workspace-control-radius);
+    background: var(--glass-light), var(--workspace-control-fill);
+    color: var(--color-brand-navy);
+    box-shadow: var(--workspace-control-shadow);
+    transition: background-color 150ms ease, border-color 150ms ease;
+    transform: none;
+  }
+  .app-shell[data-shell-variant] .notification-bell { color: var(--color-brand-navy); }
+  /* Supersede the legacy dark bell skin without changing its accessible control. */
+  .app-shell[data-shell-variant] .notification-trigger {
+    background: var(--glass-light), var(--workspace-control-fill) !important;
+    border: 1px solid var(--workspace-control-edge) !important;
+    color: var(--color-brand-navy) !important;
+  }
+  .app-shell[data-shell-variant] .notification-bell::before,
+  .app-shell[data-shell-variant] .notification-bell::after { background: currentColor; border-color: currentColor; box-shadow: none; }
+  .app-shell[data-shell-variant] .top-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+  .app-shell[data-shell-variant] :is(.round-button, .top-avatar, .wave-motion-control):hover {
+    border-color: var(--color-brand-brass);
+    transform: none;
+  }
+  /* No nested backdrop filters: the top bar supplies the material for its controls. */
+  .app-shell[data-shell-variant] .workspace {
+    border-radius: 20px;
+    border: 1px solid var(--workspace-control-edge);
+    box-shadow: var(--workspace-control-shadow);
+  }
+  .app-shell[data-shell-variant]:not([data-shell-variant=client]) .workspace {
+    background: var(--glass-light), var(--workspace-control-fill);
+  }
+  .app-shell[data-shell-variant] .sidebar nav a { border-radius: var(--workspace-control-radius); }
+  .app-shell[data-shell-variant]:not([data-shell-variant=client]) .sidebar nav a.active {
+    background: var(--glass-light), var(--workspace-control-fill);
+    border: 1px solid var(--workspace-control-edge);
+    box-shadow: var(--workspace-control-shadow);
+    color: var(--color-brand-navy);
+  }
+  .app-shell[data-shell-variant] .content .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    border-radius: var(--workspace-control-radius);
+    border: 1px solid var(--workspace-control-edge);
+    background: var(--glass-light), var(--workspace-control-fill);
+    color: var(--color-brand-navy);
+    box-shadow: var(--workspace-control-shadow);
+    -webkit-backdrop-filter: var(--workspace-control-filter);
+    backdrop-filter: var(--workspace-control-filter);
+  }
+  .app-shell[data-shell-variant] .content .button-dark {
+    background: var(--color-brand-navy);
+    color: var(--color-surface);
+    border-color: var(--color-brand-navy);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .app-shell[data-shell-variant] :is(.today-priority-panel, .today-stats > div, .notification-list) {
+    background: var(--color-surface);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .app-shell[data-shell-variant] .today-priority { background: var(--color-surface); }
+  .app-shell[data-shell-variant] .today-priority:hover { transform: none; box-shadow: none; }
+  .app-shell[data-shell-variant] .today-priority:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+  .app-shell[data-shell-variant] .today-stats span { font-size: 12px; }
+  .app-shell[data-shell-variant] :is(.today-stats small, .today-priority p, .today-flow-panel span) { font-size: 12px; line-height: 1.6; }
+  .app-shell[data-shell-variant] :is(.today-priority strong, .today-flow-panel strong) { font-size: 14px; }
+
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .app-shell[data-shell-variant] {
+      --workspace-control-fill: rgb(250 249 245 / .82);
+      --workspace-control-filter: blur(16px) saturate(130%);
+      --workspace-control-edge: rgb(255 255 255 / .94);
+    }
+  }
+  @media (max-width: 680px) {
+    .app-shell[data-shell-variant] .topbar { margin: 10px 12px 0; padding-inline: 14px; height: 60px; border-radius: 22px; }
+    .app-shell[data-shell-variant] .breadcrumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .app-shell[data-shell-variant] .top-actions { flex: 0 0 auto; }
+    .app-shell[data-shell-variant] .notification-popover { top: 142px; max-height: calc(100dvh - 158px); }
+    .app-shell[data-shell-variant] .notification-list { max-height: calc(100dvh - 270px); }
+    .app-shell[data-shell-variant] .today-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .app-shell[data-shell-variant] .today-stats > div { padding: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .workspace-waves { animation: none; transform: none; }
+    .wave-motion-control { display: none !important; }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+    .workspace-waves, .wave-motion-control { display: none !important; }
+    .app-shell[data-shell-variant] {
+      --workspace-control-fill: var(--glass-solid);
+      --workspace-control-filter: none;
+      --workspace-control-edge: var(--color-border);
+      --workspace-control-shadow: none;
+      --glass-canvas: var(--color-brand-ivory);
+    }
+  }
+}
+
+@media print { .workspace-waves, .wave-motion-control { display: none !important; } }

@@ -94,6 +94,21 @@ function NotificationPanel({ items, error, unreadCount, onClose, onRetry, onMark
 
 export function Shell({ children, active }: { children: React.ReactNode; active: string }) {
   const [open, setOpen] = useState(false);
+  const [motionPaused, setMotionPaused] = useState(true);
+  const [pageVisible, setPageVisible] = useState(true);
+  useEffect(() => {
+    try { setMotionPaused(localStorage.getItem("torres-wave-motion-paused") === "true"); }
+    catch { setMotionPaused(false); }
+    const updateVisibility = () => setPageVisible(!document.hidden);
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
+  function toggleBackgroundMotion() {
+    const paused = !motionPaused;
+    setMotionPaused(paused);
+    try { localStorage.setItem("torres-wave-motion-paused", String(paused)); } catch { /* Still works for this visit. */ }
+  }
   const [notice, setNotice] = useState(false);
   const [workspaceNotifications, setWorkspaceNotifications] = useState<WorkspaceNotification[]>([]);
   const [notificationError, setNotificationError] = useState("");
@@ -234,7 +249,8 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const avatar = initials(displayName);
   const accessLabel = organizationRoleLabel(session.organization?.role, session.profile.role);
   const organizations = session.organizations?.length ? session.organizations : session.organization ? [session.organization] : [];
-  const shell = <div className="app-shell" data-shell-flow={active === "Today" ? "today" : undefined} data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}>
+  const shell = <div className="app-shell" data-wave-paused={motionPaused || !pageVisible} data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}>
+    <div className="workspace-waves" aria-hidden="true" />
     <a className="skip-link" href="#workspace-content">Skip to workspace content</a>
     {open && <button type="button" className="shell-overlay" aria-label="Close navigation" onClick={() => { setOpen(false); setWorkspaceOpen(false); }} />}
     <aside className={`sidebar ${open ? "open" : ""}`} id="workspace-navigation">
@@ -256,7 +272,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     </aside>
     <main className="main">
       <header className="mobile-header"><button onClick={() => { setOpen(!open); if (open) setWorkspaceOpen(false); }} aria-label={open ? "Close menu" : "Open menu"} aria-controls="workspace-navigation" aria-expanded={open}>☰</button><span className="brand-mark">T</span><strong>{effectiveRole === "customer" ? "Private Office" : "Torres & Co."}</strong><button className="mobile-logout" onClick={logout}>Log out</button></header>
-      <div className="topbar"><span className="breadcrumb">{effectiveRole === "customer" ? "Private Office" : "Torres & Co."} <b>/</b> {effectiveRole === "customer" ? CLIENT_NAV_LABELS[activeNavigationLabel] ?? activeNavigationLabel : activeNavigationLabel}</span><div className="top-actions"><div className="header-menu"><button type="button" className="round-button notification-trigger" onClick={() => { setNotice(!notice); setProfile(false); setWorkspaceOpen(false); }} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={notice}>{active === "Today" ? <svg className="today-notification-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg> : <span className="notification-bell" aria-hidden="true" />}{unreadCount > 0 && <b className="notification-count">{unreadCount}</b>}</button>{notice && <NotificationPanel items={workspaceNotifications} error={notificationError} unreadCount={unreadCount} onClose={() => setNotice(false)} onRetry={loadNotifications} onMarkAllRead={markAllRead} />}</div><div className="header-menu"><button type="button" className="top-avatar" onClick={() => { setProfile(!profile); setNotice(false); setWorkspaceOpen(false); }} aria-label="Open profile menu" aria-expanded={profile}>{avatarImage ? <Image src={avatarImage} alt="" width={30} height={30} unoptimized /> : avatar}</button>{profile && <div className="menu-popover profile-popover"><strong>{displayName}</strong><small>{accessLabel}</small><button type="button" onClick={logout}>Log out</button></div>}</div></div></div>
+      <div className="topbar"><span className="breadcrumb">{effectiveRole === "customer" ? "Private Office" : "Torres & Co."} <b>/</b> {effectiveRole === "customer" ? CLIENT_NAV_LABELS[activeNavigationLabel] ?? activeNavigationLabel : activeNavigationLabel}</span><div className="top-actions"><button type="button" className="wave-motion-control" onClick={toggleBackgroundMotion} aria-label={motionPaused ? "Resume background motion" : "Pause background motion"} title={motionPaused ? "Resume background motion" : "Pause background motion"} aria-pressed={motionPaused}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{motionPaused ? <path d="m8 5 11 7-11 7Z"/> : <><path d="M8 5v14M16 5v14"/></>}</svg></button><div className="header-menu"><button type="button" className="round-button notification-trigger" onClick={() => { setNotice(!notice); setProfile(false); setWorkspaceOpen(false); }} aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={notice}><svg className="workspace-notification-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>{unreadCount > 0 && <b className="notification-count">{unreadCount}</b>}</button>{notice && <NotificationPanel items={workspaceNotifications} error={notificationError} unreadCount={unreadCount} onClose={() => setNotice(false)} onRetry={loadNotifications} onMarkAllRead={markAllRead} />}</div><div className="header-menu"><button type="button" className="top-avatar" onClick={() => { setProfile(!profile); setNotice(false); setWorkspaceOpen(false); }} aria-label="Open profile menu" aria-expanded={profile}>{avatarImage ? <Image src={avatarImage} alt="" width={30} height={30} unoptimized /> : avatar}</button>{profile && <div className="menu-popover profile-popover"><strong>{displayName}</strong><small>{accessLabel}</small><button type="button" onClick={logout}>Log out</button></div>}</div></div></div>
       <div className="content" id="workspace-content" tabIndex={-1}>{children}</div>
       {effectiveRole === "customer" && <nav className="client-mobile-nav" aria-label="Primary client navigation">{nav.filter((item) => ["Today", "Projects", "Inbox", "Reports", "My account"].includes(item.label)).map((item) => <Link href={item.href} aria-current={activeNavigationLabel === item.label ? "page" : undefined} className={activeNavigationLabel === item.label ? "active" : ""} key={item.label}><AppIcon name={NAV_ICONS[item.label] ?? "portal"} size={17} /><span>{CLIENT_NAV_LABELS[item.label] ?? item.label}</span></Link>)}</nav>}
     </main>
