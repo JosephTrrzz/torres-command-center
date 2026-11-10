@@ -16,12 +16,12 @@ describe('server-only Cloudflare connection verification', () => {
     const result = await verifyStudioCloudflareCredential(token);
     expect(result).toEqual({ credential: 'verified', sourceCommit: 'a'.repeat(40), deploymentId: 'deployment-1' });
     expect(fetcher.mock.calls[0][0]).toBe(`https://api.cloudflare.com/client/v4/accounts/${target.account}/pages/projects/${target.project}`);
-    expect(fetcher.mock.calls[0][1]).toMatchObject({ redirect: 'error', headers: { Authorization: 'Bearer ' + token } });
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ redirect: 'manual', headers: { Authorization: 'Bearer ' + token } });
     expect(JSON.stringify(result)).not.toContain('must-not-escape');
   });
-  it.each([401, 403, 429, 500])('does not treat HTTP %i as connected', async status => {
+  it.each([301, 302, 307, 308, 401, 403, 429, 500])('does not treat HTTP %i as connected', async status => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('provider detail', { status })));
-    expect((await verifyStudioCloudflareCredential(token)).credential).toBe(status < 429 ? 'rejected' : 'unavailable');
+    expect((await verifyStudioCloudflareCredential(token)).credential).toBe(status === 401 || status === 403 ? 'rejected' : 'unavailable');
   });
   it.each([{ ...project, name: 'another-client' }, { ...project, domains: ['other.example'] }, { ...project, production_branch: 'preview' }])('rejects target changes', async value => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ success: true, result: value })));

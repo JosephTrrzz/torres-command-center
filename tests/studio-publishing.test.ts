@@ -83,6 +83,11 @@ describe('publication recovery',()=>{
  });
 });
 describe('live evidence',()=>{
+ it.each([301,302,307,308])('does not follow HTTP %i redirects during live verification',async status=>{
+  fetcher.mockResolvedValue(new Response(null,{status,headers:{Location:'https://other.example'}}));
+  expect(await verifyLivePages(release)).toBe(false);
+  expect(fetcher.mock.calls.every(([,options])=>options.redirect==='manual')).toBe(true);
+ });
  it('hashes equivalent object order identically and edited content differently',async()=>{expect(await contentHash({a:1,b:2})).toBe(await contentHash({b:2,a:1}));expect(await contentHash({a:2})).not.toBe(await contentHash({a:1}))});
  it.each(['clientId','releaseId','snapshotId','contentHash','revision','deploymentId'])('rejects mismatched provider %s',field=>{
   const p={...release,content_hash:'a'.repeat(64),deployment_id:'deployment-1'};
@@ -94,7 +99,7 @@ describe('live evidence',()=>{
   const p={...release,content_hash:'a'.repeat(64)};
   fetcher.mockImplementation(async()=>new Response('<head><meta name="torres-studio-release" content="'+p.id+':'+p.content_hash+'"></head>',{headers:{'Content-Type':'text/html'}}));
   expect(await verifyLivePages(p)).toBe(true);expect(fetcher).toHaveBeenCalledTimes(11);
-  for(const [url,options]of fetcher.mock.calls){expect(new URL(url).origin).toBe(manifest.source);expect(new URL(url).search).toBe('');expect(options.redirect).toBe('error')}
+  for(const [url,options]of fetcher.mock.calls){expect(new URL(url).origin).toBe(manifest.source);expect(new URL(url).search).toBe('');expect(options.redirect).toBe('manual')}
  });
  it('rejects a release visible only at a cache-busting URL',async()=>{
   fetcher.mockImplementation(async(url:URL)=>new Response(url.search ? '<meta name="torres-studio-release" content="'+release.id+':null">' : '<head>previous release</head>',{headers:{'Content-Type':'text/html'}}));

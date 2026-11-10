@@ -12,7 +12,7 @@ export async function verifyStudioCloudflareCredential(token: string | undefined
   try {
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${target.account}/pages/projects/${target.project}`, {
       headers: { Authorization: `Bearer ${token}` },
-      redirect: 'error', signal: AbortSignal.timeout(8000),
+      redirect: 'manual', signal: AbortSignal.timeout(8000),
     });
     if (response.status === 401 || response.status === 403) return { credential: 'rejected' as const };
     if (!response.ok) return { credential: 'unavailable' as const, reason: 'provider_response' as const, providerStatus: response.status };
