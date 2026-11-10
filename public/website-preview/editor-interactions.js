@@ -6,7 +6,31 @@
  document.addEventListener('toggle',e=>{if(e.target.matches?.('details')&&e.target.open&&e.target.closest(scope))for(const menu of menus())if(menu!==e.target)close(menu)},true);
  document.addEventListener('pointerdown',e=>{for(const menu of menus())if(!menu.contains(e.target))close(menu)},true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menus().length){e.stopImmediatePropagation();e.preventDefault();close(menus().at(-1),true)}},true);
- function colors(){for(const input of document.querySelectorAll('input[type=color]')){if(!input.closest(scope)||input.closest('.color-wheel,.section-color,.studio-color'))continue;const wrap=document.createElement('span');wrap.className='studio-color';input.before(wrap);wrap.append(input)}}
+ // The swatch reflects the selected value, including an honest transparent state.
+ const colorContext=document.createElement('canvas').getContext('2d');
+ function hex(value){
+  if(!value||!CSS.supports('color',value))return null;
+  colorContext.fillStyle='#000000';colorContext.fillStyle=value;
+  const normalized=colorContext.fillStyle;
+  if(/^#[a-f0-9]{6}$/i.test(normalized))return normalized;
+  if(/^#[a-f0-9]{3}$/i.test(normalized))return '#'+[...normalized.slice(1)].map(c=>c+c).join('');
+  const parts=normalized.match(/[\d.]+/g);if(!parts||parts.length<3)return null;
+  if(parts.length===4&&Number(parts[3])===0)return null;
+  return '#'+parts.slice(0,3).map(n=>Math.round(Number(n)).toString(16).padStart(2,'0')).join('');
+ }
+ function colors(){for(const input of document.querySelectorAll('input[type=color]')){
+  if(!input.closest(scope+',#section-controls'))continue;
+  let wrap=input.closest('.color-wheel,.section-color,.studio-color');
+  if(!wrap){wrap=document.createElement('span');wrap.className='studio-color';input.before(wrap);wrap.append(input)}
+  const transparent=input.dataset.transparent==='true';
+  wrap.style.background=transparent?'repeating-conic-gradient(#fff 0% 25%,#ddd 0% 50%) 50% / 12px 12px':input.value;
+  wrap.style.boxShadow='inset 0 0 0 1px rgba(73,59,40,.25)';
+  wrap.title=(input.getAttribute('aria-label')||'Change color')+' · '+(transparent?'Transparent':input.value.toUpperCase());
+ }}
+ window.StudioColor={sync:colors,set(input,value){const color=hex(value);input.value=color||'#ffffff';input.dataset.transparent=String(!color);colors()}};
+ document.addEventListener('input',e=>{if(e.target.matches('input[type=color]')){delete e.target.dataset.transparent;colors()}},true);
+ addEventListener('message',()=>requestAnimationFrame(colors));
+ addEventListener('studio-colors',colors);
  colors();new MutationObserver(colors).observe(document.body,{childList:true,subtree:true});
  // Parent chrome clicks dismiss canvas selection without intercepting editing fields.
  if(document.body.classList.contains('studio-shell'))document.addEventListener('pointerdown',e=>{

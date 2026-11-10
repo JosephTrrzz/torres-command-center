@@ -64,3 +64,6 @@ The current baseline is re-verified after the Torres AI removal with application
 Added origin and Fetch Metadata checks for private Website API routes, before request body/storage processing. Authentication and assigned-website restrictions remain mandatory. Malformed non-object save envelopes are explicitly rejected. Verified 229 tests, production build, and both TypeScript checks. No publishing endpoint or new database permissions introduced. This is a targeted code review, not a full penetration test or verification of production WAF/database settings.
 
 Session hardening adds provider logout, cross-tab logout notification, cached-page concealment, and fresh sign-in on browser history return. Verification is recorded with the release; this does not claim universal attack protection or immediate invalidation of already issued bearer tokens.
+
+### Website Studio text resizing — November 10, 2026
+Added eight edge/corner grips for existing text, inline text width/wrapping support, and handle selection retention. Selected color controls reflect actual text and object colors. Local browser checks covered keyboard resizing, inline typing, and Undo; user confirmed the preview works. This release excludes the unfinished publication workflow.

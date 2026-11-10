@@ -168,3 +168,6 @@ Undo and Redo restore ordinary same-page edits in place and preserve the preview
 ### Saved draft checkpoints
 
 The editor sidebar offers Saved drafts as a navigation destination, separate from toolbar Undo/Redo and Save draft. Its gold-and-beige panel lists at most six explicit save checkpoints with local date, time, and timezone context. Autosaves and Undo/Redo never create checkpoints. Each row offers a confirmed Restore action that creates a new private saved version, resets the session Undo timeline, and never publishes. Use the shared collapsible sidebar with Escape returning focus to its trigger, 44px controls, loading/error/empty messages, and no animation.
+
+### Existing text resizing and selected colors
+Existing text uses a brass outline with eight edge and corner grips. One click selects; double-click edits words. Narrowing wraps text without shrinking the font. Handle gestures retain selection, commit once to history, and cancel restores starting dimensions. Color circles reflect the selected text, object fill, or background; transparent fills use a checkerboard.
