@@ -38,7 +38,7 @@ export async function onRequest({request,env}:{request:Request;env:FunctionEnv})
  const text=await request.text();
  if(new TextEncoder().encode(text).length>CANVAS_DRAFT_LIMIT+1000) return authJson({error:'This draft is too large. Use smaller images.'},413);
  let body;try{body=JSON.parse(text)}catch{return authJson({error:'Invalid draft.'},400)}
- if(!body || Object.keys(body).some(k=>!['snapshotId','revision','draft','checkpoint'].includes(k)) || (body.checkpoint!==undefined&&typeof body.checkpoint!=='boolean') || body.snapshotId!==manifest.id || !Number.isSafeInteger(body.revision) || body.revision<0 || body.revision>=2147483647) return authJson({error:'Invalid draft version.'},400);
+ if(!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).some(k=>!['snapshotId','revision','draft','checkpoint'].includes(k)) || (body.checkpoint!==undefined&&typeof body.checkpoint!=='boolean') || body.snapshotId!==manifest.id || !Number.isSafeInteger(body.revision) || body.revision<0 || body.revision>=2147483647) return authJson({error:'Invalid draft version.'},400);
  const issue=canvasDraftIssue(body.draft);if(issue) return authJson({error:issue},400);
  if(body.revision!==(previous?.revision??0)) return authJson({error:'Someone saved a newer draft. Your changes are still open; reload before saving again.'},409);
  // Unique revision key arbitrates concurrent saves after the optimistic read.

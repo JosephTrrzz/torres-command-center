@@ -1,3 +1,4 @@
+import { trustedStudioRequest } from "./_shared/studio-request";
 import {
   blockedHttpMethod,
   requestBodyLimit,
@@ -24,6 +25,8 @@ export const onRequest = async (context: MiddlewareContext) => {
 
   if (blockedHttpMethod(context.request.method)) {
     response = error("Method not allowed.", 405);
+  } else if ((pathname === "/api/website" || pathname.startsWith("/api/website/")) && !trustedStudioRequest(context.request)) {
+    response = error("Website editor requests must come from this workspace.", 403);
   } else if (!await requestBodyWithinLimit(context.request, requestBodyLimit(pathname))) {
     response = error("Request body is too large or uses an unsupported encoding.", 413);
   } else {

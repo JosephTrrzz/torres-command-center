@@ -58,3 +58,7 @@ The current baseline is re-verified after the Torres AI removal with application
 - Existing Torres AI database history is retained but unavailable to application roles. A separate retention decision is required before those historical rows are deleted. Opportunities, automations, billing, and support remain roadmap capabilities.
 - Reports now use persisted daily Google observations with visible freshness. Comparison periods, scheduled delivery, and broader end-to-end production tests remain.
 - Website lead storage is implemented. Production website delivery uses a first-party Cloudflare Function because outbound Formspree webhooks require a paid plan; both Pages projects require the shared server-only intake variables.
+
+## Website Studio security follow-up — 2026-11-10
+
+Added origin and Fetch Metadata checks for private Website API routes, before request body/storage processing. Authentication and assigned-website restrictions remain mandatory. Malformed non-object save envelopes are explicitly rejected. Verified 229 tests, production build, and both TypeScript checks. No publishing endpoint or new database permissions introduced. This is a targeted code review, not a full penetration test or verification of production WAF/database settings.

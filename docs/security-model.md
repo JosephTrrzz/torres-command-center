@@ -22,3 +22,7 @@ Profiles carry `owner`, `employee`, or `customer`. Owners and employees are staf
 The current static app must keep its Supabase token readable by the browser. Unchecked sign-ins now use session-only storage, while the explicit trusted-device option uses persistent storage. Moving all session transport to an HttpOnly cookie requires a deliberate hosting/auth architecture change. Cloudflare zone-level WAF, managed rules, bot protection, and rate-limiting rules must also be enabled in production; repository code cannot prove those dashboard controls are active.
 
 Never put real secrets in `.env.example`, GitHub, browser bundles, screenshots, or support tickets.
+
+## Website Studio boundary — November 10, 2026
+
+Website API routes reject mismatched Origin and cross-origin Fetch Metadata before body processing or storage. This supplements bearer authentication; headerless non-browser callers still require valid credentials. Both administrators and clients are restricted to their explicitly assigned website. Enabled-site and approved-source checks precede draft reads/writes. Drafts are append-only, actor-attributed, revision-checked, size-bounded private records; saving is not publishing. Browser roles have no direct draft-table grants in the migration. Production grants and zone-level distributed rate limits require separate operational verification.
