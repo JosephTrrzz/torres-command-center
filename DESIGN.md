@@ -146,3 +146,11 @@ assigned site. Website uses a source-preview panel, clear private-draft saving c
 and one prominent Edit website action. Actual edits remain in the existing gold
 and beige canvas. Unassigned accounts see setup guidance, never another site's
 editor. Mobile stacks the site preview and details and retains 48px primary targets.
+
+### Canvas alignment guides
+Dragging photos, text bubbles, or shapes shows brass alignment lines and beige
+pill labels at section edges, centers, and nearby item anchors. Snap tolerance is
+8 screen pixels on either axis; Alt temporarily allows free placement. Guides
+are pointer-transparent, motion-free, bounded to the preview viewport, and removed
+on release, cancellation, scrolling, or Escape. They are editor-only and never
+stored in drafts. Existing keyboard nudging remains available for precise placement.
