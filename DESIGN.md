@@ -138,3 +138,11 @@ Scheduled report delivery is a staff-only chapter inside Reports. A schedule nam
 Authentication is the shared entrance for every role. Its editorial Private Office introduction sits beside the existing form at desktop widths and precedes it on smaller screens. It does not change account activation, return-path validation, credential handling, or role-based routing.
 
 When bot protection is configured, the login form includes a quiet Cloudflare Turnstile challenge between the credentials and session controls. The challenge uses interaction-only presentation so legitimate users are interrupted only when Cloudflare needs more evidence. Sign-in and password reset remain disabled until a valid token exists, failures reset the one-time challenge, and the control must remain keyboard accessible without competing with the page hierarchy. “Keep me signed in” is explicit: unchecked sessions end with the browser session, while checked sessions may persist on that trusted device.
+
+## Client website workspace
+
+Today and client Home link to Website only after server confirmation of a ready
+assigned site. Website uses a source-preview panel, clear private-draft saving copy,
+and one prominent Edit website action. Actual edits remain in the existing gold
+and beige canvas. Unassigned accounts see setup guidance, never another site's
+editor. Mobile stacks the site preview and details and retains 48px primary targets.

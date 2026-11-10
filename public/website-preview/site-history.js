@@ -1,0 +1,39 @@
+// One chronological history for the local site, including shared header/footer patches.
+(()=>{
+ let history=createDraftHistory(drafts);let pending=false,timer=null,busy=false,restoring=false,editPage=active;
+ const undo=$('#undo-shape'),redo=$('#redo-shape');
+ undo.textContent='Undo';redo.textContent='Redo';
+ undo.title='Undo last edit (⌘/Ctrl Z)';redo.title='Redo last edit (⌘/Ctrl Shift Z)';
+ function controls(){undo.disabled=busy||restoring||!history.canUndo&&!pending;redo.disabled=busy||restoring||!history.canRedo||pending;}
+ function flush(){clearTimeout(timer);if(pending){history.record(drafts,editPage);pending=false;}controls();}
+ const change=changed;changed=function(){change();if(restoring)return;pending=true;editPage=active;clearTimeout(timer);timer=setTimeout(flush,450);controls();};
+ const open=openPage;openPage=async function(i){if(busy||restoring)return;if(!await captureDraft())return;flush();return open(i);};
+ async function move(direction){
+  if(busy||restoring||!canvasReady)return;
+  busy=true;controls();
+  try{
+   if(!await captureDraft())return;
+   flush();const entry=history.move(direction);if(!entry)return;
+   drafts=entry.draft;dirty=true;clearTimeout(saveTimer);const saved=persistDraft();
+   restoring=true;canvasReady=false;closeInspector();
+   for(const id of ['context-tools','button-presets'])$('#'+id).hidden=true;
+   loadPage(pages[entry.page]?entry.page:active);
+   if(saved)status.textContent=direction==='undo'?'Undoing last edit…':'Restoring edit…';
+  }finally{busy=false;controls();}
+ }
+ undo.onclick=()=>move('undo');redo.onclick=()=>move('redo');
+ // Remove competing one-tool undo controls; all edits use the same timeline.
+ for(const el of [$('#section-undo'),$('#undo-section-main'),document.querySelector('#button-presets [data-undo]')])if(el){el.style.setProperty('display','none','important');el.onclick=()=>move('undo');}
+ function shortcut(e){if(!(e.metaKey||e.ctrlKey)||e.altKey||e.key.toLowerCase()!=='z'||e.target.closest('input,textarea,[contenteditable=true]'))return;e.preventDefault();move(e.shiftKey?'redo':'undo');}
+ document.addEventListener('keydown',shortcut);
+ document.addEventListener('pointerdown',e=>{if(!e.target.closest('input,textarea'))flush();},true);
+ addEventListener('message',e=>{
+  if(e.source!==frame.contentWindow||e.origin!=='null'||e.data.page!==pages[active]?.file)return;
+  if(e.data.type==='history-request')move(e.data.direction==='redo'?'redo':'undo');
+  if(e.data.type==='history-boundary')flush();
+  if(e.data.type==='context-ready'){if(restoring&&!dirty)status.textContent='Saved in this browser · Nothing was published.';restoring=false;controls();}
+  if(e.data.type==='shapes-change')queueMicrotask(controls);
+ });
+ addEventListener('canvas-draft-loaded',()=>{history=createDraftHistory(drafts);pending=false;clearTimeout(timer);controls();});
+ controls();
+})();

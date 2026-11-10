@@ -1,0 +1,82 @@
+/* Editor chrome only: never style the customer's document. */
+:root{--studio-paper:#fffcf6;--studio-surface:#f5efe4;--studio-border:#d9c9ac;--studio-ink:#493b28;--studio-accent:#805c26;--studio-hover:#e9dcc3;--studio-shadow:0 8px 28px #493b2821}
+.studio-shell{background:var(--studio-surface);color:var(--studio-ink)}
+.studio-shell>header,.studio-shell .tools{background:var(--studio-paper);border-color:var(--studio-border)}
+.studio-shell #status{background:var(--studio-surface);color:#6b5d49;margin:0;padding:12px 20px;font-size:12px;line-height:1.5}
+.studio-shell .stage{background:#eae4da}
+:is(#inspector,#context-tools,#button-presets,#shape-toolbar,.local-image-bar,.local-crop-bar,#section-picker){background:var(--studio-surface)!important;color:var(--studio-ink)!important;border:1px solid var(--studio-border)!important;border-radius:22px!important;box-shadow:var(--studio-shadow)!important;font-family:system-ui,sans-serif!important}
+:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) :is(button,summary,select,input:not([type=color]):not([type=range]),textarea){color:var(--studio-ink)!important;border-color:var(--studio-border)!important;min-height:44px;box-sizing:border-box;font-family:system-ui,sans-serif;transition:background-color 160ms ease,box-shadow 160ms ease,border-color 160ms ease!important}
+:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) :is(button,summary){border-radius:999px!important;cursor:pointer}
+:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) :is(input:not([type=color]):not([type=range]),select,textarea){background:var(--studio-paper)!important;border-radius:12px!important}
+:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) :is(button,summary):hover{background:var(--studio-hover)!important}
+:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) button:disabled{opacity:.45;cursor:default}
+:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) :is(button[aria-pressed=true],button.primary){background:var(--studio-hover)!important;color:var(--studio-accent)!important}
+.studio-shell #save{background:var(--studio-accent)!important;color:var(--studio-paper)!important;border-color:var(--studio-accent)!important}
+:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) :focus-visible{outline:2px solid var(--studio-accent)!important;outline-offset:3px}
+:is(.section-layout-fields,.component-options,#shape-toolbar .toolbar-tray){background:var(--studio-surface)!important;border-color:var(--studio-border)!important;box-shadow:var(--studio-shadow)!important;overscroll-behavior:contain}
+:is(#inspector,#button-presets,#shape-toolbar) details[open]>:not(summary){animation:studio-menu-in 160ms ease-out!important;transform-origin:top center}
+@keyframes studio-menu-in{from{opacity:0;translate:0 -3px}to{opacity:1;translate:0 0}}
+#context-tools{width:max-content;gap:8px;padding:12px!important}
+#context-tools>strong{font-size:13px}#context-tools>small{font-size:11px;letter-spacing:.02em}
+#context-tools label{gap:6px}#context-tools [data-copy] input{width:200px}#context-tools [data-link] input{width:180px}
+.studio-color{display:inline-flex!important;position:relative;width:38px!important;height:38px!important;min-width:38px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffffffcc,transparent 52%),conic-gradient(#ff275d,#ff24ed,#783dff,#176aff,#00d4ee,#12e17b,#d4f327,#ffe622,#ff8a25,#ff275d);flex-shrink:0}
+.studio-color input[type=color]{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;opacity:0!important;cursor:pointer;margin:0!important;padding:0!important}
+.studio-color:focus-within{outline:2px solid var(--studio-accent);outline-offset:3px}
+:is(#local-edit-header,#local-edit-footer){background:var(--studio-surface)!important;color:var(--studio-ink)!important;border:1px solid var(--studio-border)!important;border-radius:999px!important;min-height:44px!important;box-shadow:var(--studio-shadow)!important;font:600 13px system-ui!important}
+:is(#local-edit-header,#local-edit-footer):focus-visible{outline:2px solid var(--studio-accent)!important;outline-offset:3px}
+.local-shape-handle:after{border-color:var(--studio-accent)!important}
+[data-local-selected]{outline-color:var(--studio-accent)!important}
+@media(max-width:700px){#context-tools{padding:8px!important;gap:6px;max-height:60vh;overflow:auto}#context-tools [data-copy] input,#context-tools [data-link] input{width:145px}.studio-shell .tools{gap:8px}.studio-shell .tools>div{gap:5px;flex-wrap:wrap}.studio-shell #status{padding:8px 12px}}
+@media(prefers-reduced-motion:reduce){:is(.studio-shell .tools, .studio-shell #editor-panel, .studio-shell .editor-rail, #inspector, #context-tools, #button-presets, #shape-toolbar, .local-image-bar, .local-crop-bar, #section-picker) :is(button,summary,select,input,textarea){transition:none!important}:is(#inspector,#button-presets,#shape-toolbar) details[open]>:not(summary){animation:none!important}}
+/* Navigation and asset thumbnails keep their structural shapes. */
+.studio-shell #editor-panel #media-grid button{border-radius:14px!important}
+.studio-shell .editor-rail button{border-radius:14px!important}
+.studio-shell #editor-panel .library-tabs button{border-radius:8px!important}
+.studio-shell #save.primary{background:var(--studio-accent)!important;color:var(--studio-paper)!important}
+
+/* One composition and interaction system for the complete local editor. */
+:root{--studio-muted:#6b5d49;--studio-fast:150ms;--studio-open:180ms;--studio-ease:cubic-bezier(.22,1,.36,1)}
+.studio-shell>header strong{font-family:Georgia,serif;letter-spacing:-.025em;font-size:22px}
+.studio-shell>header strong span{font:500 12px system-ui;letter-spacing:.04em;color:var(--studio-muted)}
+.studio-shell .panel-head h1{font-size:20px;font-weight:650;letter-spacing:-.025em}
+.studio-shell .panel-head{border-bottom:1px solid var(--studio-border);margin-bottom:16px}
+.studio-shell .panel-subtitle{overflow-wrap:anywhere;line-height:1.6}
+.studio-shell .tools>strong{font-size:15px;letter-spacing:-.015em}
+.studio-shell #editor-panel p{line-height:1.6}
+.studio-shell #pages{gap:6px}
+.studio-shell #pages button{padding:12px 16px;line-height:1.4}
+.studio-shell #pages button[aria-current=page]{box-shadow:inset 3px 0 var(--studio-accent);font-weight:650}
+.studio-shell #editor-panel #upload-files.primary,.studio-shell .tools #save#save.primary{background:var(--studio-accent)!important;color:var(--studio-paper)!important;border-color:var(--studio-accent)!important}
+.studio-shell #upload-files.primary:hover,.studio-shell .tools #save.primary:hover{filter:brightness(.92)}
+.studio-shell #editor-panel #shape-picker button,.studio-shell #editor-panel .text-presets button{border-radius:14px!important}
+.studio-shell #editor-panel #media-grid button{box-shadow:0 0 0 1px var(--studio-border);transition:box-shadow var(--studio-fast) var(--studio-ease)!important}
+.studio-shell #editor-panel #media-grid button:hover{box-shadow:0 0 0 2px var(--studio-accent)}
+:is(#inspector,#context-tools,#button-presets,#shape-toolbar,.local-image-bar,.local-crop-bar,#section-picker) small{line-height:1.5}
+:is(.studio-shell .tools,.studio-shell #editor-panel,.studio-shell .editor-rail,#inspector,#context-tools,#button-presets,#shape-toolbar,.local-image-bar,.local-crop-bar,#section-picker) :is(button,summary){transition:background-color var(--studio-fast) var(--studio-ease),border-color var(--studio-fast) var(--studio-ease),box-shadow var(--studio-fast) var(--studio-ease),scale var(--studio-fast) var(--studio-ease)!important;touch-action:manipulation}
+:is(.studio-shell .tools,.studio-shell #editor-panel,.studio-shell .editor-rail,#inspector,#context-tools,#button-presets,#shape-toolbar,.local-image-bar,.local-crop-bar,#section-picker) :is(button:not(:disabled),summary):active{scale:.975}
+:is(#inspector,#button-presets,#shape-toolbar) details[open]>:not(summary){animation:studio-menu-in var(--studio-open) var(--studio-ease)!important;transform-origin:top left}
+.studio-shell #editor-panel{scrollbar-width:thin;scrollbar-color:var(--studio-border) transparent;overscroll-behavior:contain}
+.studio-color{width:44px!important;height:44px!important;min-width:44px}
+@media(max-width:700px){.studio-shell>header{padding:12px 16px}.studio-shell>header strong{font-size:19px}.studio-shell .tools button{min-height:44px}.studio-shell #editor-panel input{font-size:16px!important}}
+@media(prefers-reduced-motion:reduce){:is(.studio-shell .tools,.studio-shell #editor-panel,.studio-shell .editor-rail,#inspector,#context-tools,#button-presets,#shape-toolbar,.local-image-bar,.local-crop-bar,#section-picker) :is(button,summary){transition:none!important;scale:1!important}:is(#inspector,#button-presets,#shape-toolbar) details[open]>:not(summary){animation:none!important}}
+
+/* iOS-inspired navigation: soft tiles, inset selection and grouped controls. */
+.studio-shell #studio-navigation.editor-rail{gap:12px;padding:16px 8px;background:var(--studio-surface)}
+.studio-shell #studio-navigation.editor-rail button{border:1px solid transparent!important;border-radius:20px!important;min-height:72px;gap:7px;padding:10px 3px;background:transparent;color:var(--studio-muted)!important;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-size:11px;letter-spacing:-.015em;box-shadow:none}
+.studio-shell #studio-navigation.editor-rail button svg{width:24px;height:24px;stroke-width:1.7;color:inherit}
+.studio-shell #studio-navigation.editor-rail button[aria-pressed=true]{background:var(--studio-paper)!important;color:var(--studio-accent)!important;border-color:var(--studio-border)!important;box-shadow:0 2px 6px #493b2810,inset 0 1px 0 #fff;font-weight:700}
+.studio-shell #studio-navigation.editor-rail button:hover{background:var(--studio-hover)!important}
+.studio-shell #editor-panel #pages button{border-radius:14px!important;box-shadow:none}
+.studio-shell #editor-panel #pages button[aria-current=page]{background:var(--studio-paper)!important;box-shadow:0 1px 4px #493b2812;color:var(--studio-accent)!important}
+.studio-shell #editor-panel .library-tabs{background:var(--studio-hover);border:0;border-radius:13px;padding:4px;gap:4px}
+.studio-shell #editor-panel .library-tabs button{flex:1;border:0!important;border-radius:10px!important;background:transparent!important;min-height:38px;padding:8px 12px;font-weight:550}
+.studio-shell #editor-panel .library-tabs button[aria-pressed=true]{background:var(--studio-paper)!important;box-shadow:0 1px 4px #493b281c;color:var(--studio-ink)!important}
+.studio-shell #editor-panel #panel-close{border-radius:50%!important;background:var(--studio-paper);width:36px;height:36px;min-height:44px;min-width:44px}
+@media(max-width:700px){.studio-shell #studio-navigation.editor-rail{padding:12px 4px;gap:8px}.studio-shell #studio-navigation.editor-rail button{border-radius:16px!important;font-size:10px;min-height:64px}.studio-shell #studio-navigation.editor-rail button svg{width:22px;height:22px}}
+
+/* Header controls occupy their own row instead of obscuring header content. */
+.studio-shell .stage:has(#inspector.header-bar:not([hidden])){flex-direction:column;align-items:stretch;gap:12px}
+.studio-shell #inspector.header-bar{position:relative;left:auto;right:auto;top:auto;transform:none;align-self:center;flex-shrink:0;max-height:45vh;overflow:auto;width:100%;max-width:100%;box-sizing:border-box}
+.studio-shell #inspector.header-bar .section-layout-fields{position:static;max-width:100%;margin-top:8px;box-shadow:none!important;max-height:240px}
+.studio-shell #inspector.header-bar .section-actions{align-items:flex-start}
+.studio-shell .stage:has(#inspector.header-bar:not([hidden])) #canvas{flex:1;min-height:240px;height:0}

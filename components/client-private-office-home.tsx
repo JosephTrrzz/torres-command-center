@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { WebsiteEntry } from "./website-entry";
 import { useEffect, useMemo, useState } from "react";
 import { LoadingRegion } from "./loading-system";
 import { PrivateOfficeNextAction, PrivateOfficePortfolioPanel } from "./private-office";
@@ -95,6 +96,7 @@ export function ClientPrivateOfficeHome({ session }: { session: AuthSession }) {
       <PrivateOfficePortfolioPanel businessName={client.name} clientSince={account.created_at} servicePlan={client.services[0]} accountStatus={account.portal_status === "active" ? "Relationship active" : formatStatus(account.portal_status)} contact={people[0]?.name || account.portal_email} recordId={client.id} />
       <PrivateOfficeNextAction href={nextAction.href} eyebrow="One action for you" title={nextAction.title} description={nextAction.description} label={nextAction.label} />
     </div>
+    <WebsiteEntry />
     <section className="private-office-chapter private-office-change-chapter">
       <header><span className="private-office-kicker">What changed</span><h2>Work moved forward while you were away.</h2><p>Only updates connected to your secure workspace appear here.</p></header>
       {visibleChanges.length ? <ol>{visibleChanges.map((notice, index) => <li key={notice.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{notice.title}</strong><p>{notice.detail}</p></div><small>{notice.time}</small>{notice.href ? <Link href={notice.href} aria-label={`Open ${notice.title}`}><span className="custom-arrow" aria-hidden="true">→︎</span></Link> : null}</li>)}</ol> : <StatePanel state="empty" title="No new updates" description="Project, service, message, and performance activity will appear here when it changes." />}

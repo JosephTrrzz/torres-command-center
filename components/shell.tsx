@@ -228,7 +228,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   }
   if (!session) return <BrandedAppLoader />;
   const effectiveRole = appRoleForOrganizationRole(session.organization?.role, session.profile.role);
-  const nav = APP_NAVIGATION[effectiveRole];
+  const nav = effectiveRole === "owner" || effectiveRole === "customer" ? [...APP_NAVIGATION[effectiveRole], { href: "/website/", label: "Website" }] : APP_NAVIGATION[effectiveRole];
   const activeNavigationLabel = effectiveRole === "customer" && active === "Portal" ? "My account" : active;
   const displayName = displayNameFor(session.profile);
   const avatar = initials(displayName);

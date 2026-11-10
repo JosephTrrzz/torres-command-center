@@ -1,0 +1,20 @@
+// Direct section sizing; only minimum height changes, so content is never cropped.
+(()=>{
+ const css=document.createElement('style');css.textContent=`
+.local-section-resize{position:fixed;z-index:1100;transform:translate(-50%,-50%);min-width:44px;min-height:44px;padding:8px 16px;display:flex;gap:10px;justify-content:center;align-items:center;border:1px solid #b8985d;border-radius:999px;background:#f5efe4;color:#493b28;box-shadow:0 3px 12px #493b2826;font:600 12px system-ui;cursor:ns-resize;touch-action:none;user-select:none}
+.local-section-resize{font-size:20px}.local-section-resize:focus-visible{outline:3px solid #805c26;outline-offset:3px}.local-section-resize[hidden]{display:none!important}
+`;document.head.append(css);
+ const handle=document.createElement('button');handle.type='button';handle.className='local-section-resize';handle.hidden=true;handle.innerHTML='<svg width=20 height=20 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.8 aria-hidden=true><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg>';handle.title='Drag to resize section';handle.setAttribute('aria-label','Resize section height. Drag, or use Up and Down arrows.');document.body.append(handle);
+ let gesture=null,queued=0;
+ const section=()=>selected?.tagName==='SECTION'&&!selected.hidden?selected:null;
+ function place(){queued=0;const s=gesture?.node||section();if(!editing||!s){handle.hidden=true;return}const r=s.getBoundingClientRect();handle.hidden=!gesture&&(r.bottom<22||r.bottom>innerHeight-22);if(handle.hidden)return;handle.style.left=Math.max(28,Math.min(innerWidth-28,r.right-28))+'px';handle.style.top=Math.max(22,Math.min(innerHeight-22,r.bottom))+'px';if(gesture)handle.textContent=Math.round(r.height)+' px';else handle.innerHTML='<svg width=20 height=20 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.8 aria-hidden=true><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg>';}
+ function queue(){if(!queued)queued=requestAnimationFrame(place)}
+ function setHeight(s,height){s.style.boxSizing='border-box';s.style.minHeight=height+'px';dispatchEvent(new Event('resize'))}
+ function finish(commit){if(!gesture)return;const g=gesture;gesture=null;if(!commit){if(g.style===null)g.node.removeAttribute('style');else g.node.setAttribute('style',g.style)}else send({type:'section-resize',id:sections.indexOf(g.node),height:g.height});if(handle.hasPointerCapture(g.pointer))handle.releasePointerCapture(g.pointer);dispatchEvent(new Event('resize'));queue()}
+ handle.addEventListener('pointerdown',e=>{const s=section();if(!s||!editing||e.button!==0)return;e.preventDefault();e.stopPropagation();const start=s.getBoundingClientRect().height;gesture={node:s,pointer:e.pointerId,start,y:e.clientY,height:Math.min(6000,Math.max(160,Math.round(start))),style:s.getAttribute('style')};handle.setPointerCapture(e.pointerId)});
+ handle.addEventListener('pointermove',e=>{if(!gesture||e.pointerId!==gesture.pointer)return;gesture.height=Math.min(6000,Math.max(160,Math.round(gesture.start+e.clientY-gesture.y)));setHeight(gesture.node,gesture.height);queue()});
+ handle.addEventListener('pointerup',()=>finish(true));handle.addEventListener('pointercancel',()=>finish(false));handle.addEventListener('lostpointercapture',()=>{if(gesture)finish(false)});
+ handle.addEventListener('keydown',e=>{const s=section();if(!s||!editing||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();e.stopPropagation();const height=Math.min(6000,Math.max(160,Math.round(s.getBoundingClientRect().height)+(e.key==='ArrowUp'?-1:1)*(e.shiftKey?40:10)));setHeight(s,height);send({type:'section-resize',id:sections.indexOf(s),height});queue()});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gesture){e.preventDefault();e.stopImmediatePropagation();finish(false)}},true);
+ document.addEventListener('click',()=>queue());addEventListener('scroll',queue,{passive:true});addEventListener('resize',queue);addEventListener('message',e=>{if(e.source!==parent)return;if(['mode','clear','restore'].includes(e.data?.type)&&gesture)finish(false);queue()});queue();
+})();

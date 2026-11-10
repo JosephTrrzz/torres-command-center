@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { WebsiteEntry } from "../../components/website-entry";
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "../../components/shell";
 import { ClientPrivateOfficeHome } from "../../components/client-private-office-home";
@@ -77,6 +78,7 @@ export default function TodayPage() {
   return <Shell active="Today">
     <PageHeader className="today-heading" eyebrow={dateLabel} title="Today" description="Your live operating brief, prioritized from connected workspace activity." actions={<Link className="button button-dark" href="/reports/">Review reports <span aria-hidden="true">→︎</span></Link>} />
 
+    <WebsiteEntry />
     {error && <FeedbackBanner tone="error" title="The operating brief could not load"><p>{error}</p></FeedbackBanner>}
 
     <section className="today-stats" aria-label="Today summary">
