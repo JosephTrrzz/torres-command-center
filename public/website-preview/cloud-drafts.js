@@ -26,6 +26,61 @@
  document.querySelector('header small').textContent='PRIVATE DRAFT · Live website unchanged';
  document.querySelector('.rail-footer').textContent='WEBSITE STUDIO';
  $('#save').textContent='Save draft';
+ // Saved checkpoints are explicit actions, independent of the in-session Undo timeline.
+ const historyButton=document.createElement('button');historyButton.id='saved-drafts';historyButton.type='button';historyButton.textContent='Saved drafts';$('#save').before(historyButton);
+ const historyDialog=document.createElement('dialog');historyDialog.id='saved-drafts-dialog';historyDialog.setAttribute('aria-labelledby','saved-drafts-heading');
+ historyDialog.innerHTML='<div class="saved-drafts-heading"><h2 id="saved-drafts-heading">Saved drafts</h2><button type="button" data-close aria-label="Close saved drafts">Close</button></div><p>Your six most recent Save draft versions. Autosave and Undo/Redo are separate. Restoring never publishes your website.</p><p data-history-status role="status"></p><ol data-versions></ol>';
+ document.body.append(historyDialog);
+ const historyStatus=historyDialog.querySelector('[data-history-status]'),list=historyDialog.querySelector('[data-versions]');
+ const dateFormat=new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'medium'});
+ let checkpointBusy=false;
+ const buttons=()=>{$('#save').disabled=checkpointBusy;historyButton.disabled=checkpointBusy;};
+ async function checkpoint(draft){
+  const captured=JSON.stringify(draft);
+  const result=await request('canvas-save',{revision,draft:JSON.parse(captured),checkpoint:true});
+  revision=result.revision;lastSaved=captured;return result;
+ }
+ $('#save').onclick=async()=>{
+  if(checkpointBusy||!connected||blocked)return;
+  checkpointBusy=true;buttons();workspace.inert=true;
+  try{if(!await captureDraft())return;clearTimeout(saveTimer);const result=await checkpoint(drafts);dirty=false;status.textContent='Draft saved · '+dateFormat.format(new Date(result.created_at))+' · Nothing was published.';}
+  catch(error){status.textContent=error.message;}
+  finally{checkpointBusy=false;workspace.inert=false;buttons();}
+ };
+ historyDialog.querySelector('[data-close]').onclick=()=>historyDialog.close();
+ async function restoreVersion(version){
+  if(checkpointBusy)return;checkpointBusy=true;buttons();list.inert=true;
+  historyStatus.textContent='Restoring saved draft…';
+  try{
+   if(!await captureDraft())throw Error('Your current changes could not be saved. Please retry.');
+   const saved=await request('canvas-version',{revision:version.revision});
+   await checkpoint(saved.draft);
+   drafts=saved.draft;dirty=false;clearTimeout(saveTimer);canvasReady=false;
+   window.dispatchEvent(new Event('canvas-draft-loaded'));loadPage(active);
+   status.textContent='Restored draft from '+dateFormat.format(new Date(version.created_at))+' · Nothing was published.';
+   historyDialog.close();
+  }catch(error){historyStatus.textContent=error.message;}
+  finally{checkpointBusy=false;list.inert=false;buttons();}
+ }
+ historyButton.onclick=async()=>{
+  if(checkpointBusy||!connected)return;
+  historyDialog.showModal();list.replaceChildren();historyStatus.textContent='Loading saved drafts…';checkpointBusy=true;buttons();
+  try{
+   if(!await captureDraft())throw Error('Please wait for your current changes to save, then retry.');
+   const result=await request('canvas-history');
+   historyStatus.textContent=result.versions.length?'Times shown in '+Intl.DateTimeFormat().resolvedOptions().timeZone+'.':'No saved versions yet. Click Save draft to create your first one.';
+   for(const version of result.versions.slice(0,6)){
+    const row=document.createElement('li'),label=document.createElement('time'),action=document.createElement('button');
+    label.dateTime=version.created_at;label.textContent=dateFormat.format(new Date(version.created_at));action.type='button';action.textContent='Restore';action.setAttribute('aria-label','Restore draft saved '+label.textContent);
+    action.onclick=()=>{
+     for(const other of list.querySelectorAll('[data-confirm]'))other.remove();
+     const confirm=document.createElement('div');confirm.dataset.confirm='';const note=document.createElement('p');note.textContent='Restore this version as your current private draft? Your live website will stay unchanged.';
+     const yes=document.createElement('button'),cancel=document.createElement('button');yes.type=cancel.type='button';yes.textContent='Restore draft';cancel.textContent='Cancel';yes.onclick=()=>restoreVersion(version);cancel.onclick=()=>{confirm.remove();action.focus()};confirm.append(note,yes,cancel);row.append(confirm);yes.focus();
+    };row.append(label,action);list.append(row);
+   }
+  }catch(error){historyStatus.textContent=error.message;}
+  finally{checkpointBusy=false;buttons();}
+ };
  const workspace=document.querySelector('.workspace');workspace.inert=true;status.textContent='Connecting to your account…';
  request('canvas-load').then(info=>{
   drafts=info.draft;revision=info.revision;lastSaved=JSON.stringify(drafts);dirty=false;connected=true;

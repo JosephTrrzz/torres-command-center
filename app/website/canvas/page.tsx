@@ -21,13 +21,14 @@ export default function CanvasWebsitePage() {
   const receive=async(event:MessageEvent)=>{
    if(event.source!==frame.current?.contentWindow || event.origin!==window.location.origin || !alive) return;
    const m=event.data;
-   if(!m || !['canvas-load','canvas-save'].includes(m.type) || typeof m.requestId!=='string' || m.requestId.length>80) return;
+   if(!m || !['canvas-load','canvas-save','canvas-history','canvas-version'].includes(m.type) || typeof m.requestId!=='string' || m.requestId.length>80) return;
    const reply=(value:object)=>{if(alive)frame.current?.contentWindow?.postMessage({type:'canvas-result',requestId:m.requestId,...value},window.location.origin)};
    if(identity!==readStoredSession()?.user.id){reset();return;}
    if(busy){reply({error:'A save is already in progress. Please retry.'});return;}
    busy=true;
    try{
-    const result=m.type==='canvas-load'?await load():await studioRequest('canvas-drafts',{snapshotId:manifest.id,revision:m.revision,draft:m.draft},controller.signal);
+    if(m.type==='canvas-version'&&(!Number.isSafeInteger(m.revision)||m.revision<1))throw Error('Invalid saved draft.');
+    const result=m.type==='canvas-load'?await load():m.type==='canvas-history'?await studioRequest('canvas-drafts?history=1',undefined,controller.signal):m.type==='canvas-version'?await studioRequest('canvas-drafts?version='+m.revision,undefined,controller.signal):await studioRequest('canvas-drafts',{snapshotId:manifest.id,revision:m.revision,draft:m.draft,checkpoint:m.checkpoint===true},controller.signal);
     reply({result});
    }catch(error){reply({error:error instanceof Error?error.message:'Saving failed. Keep this page open.',status:(error as {status?:number}).status});}
    finally{busy=false;}

@@ -160,3 +160,7 @@ stored in drafts. Existing keyboard nudging remains available for precise placem
 A single click selects a text box and exposes gold resize handles; double-click or Enter enters inline typing. Escape ends typing. Resize handles support arrow keys and retain readable text rather than clipping overflow. The same interaction applies to inserted text and speech bubbles.
 
 Undo and Redo restore ordinary same-page edits in place and preserve the preview scroll position. Apply a snapshot atomically before paint, preserving the sandbox and existing event listeners. Structural section changes or navigation to another page retain the full document reconstruction path.
+
+### Saved draft checkpoints
+
+The editor toolbar offers Saved drafts beside Save draft. A viewport-bounded ivory dialog lists at most six explicit save checkpoints with local date, time, and timezone context. Autosaves and Undo/Redo never create checkpoints. Each row offers a confirmed Restore action that creates a new private saved version, resets the session Undo timeline, and never publishes. Use native dialog focus containment and Escape dismissal, 44px controls, loading/error/empty messages, and no animation.
