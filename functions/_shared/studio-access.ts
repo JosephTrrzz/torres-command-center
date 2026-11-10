@@ -6,6 +6,12 @@ import {
   type FunctionEnv,
 } from "./auth";
 
+export function studioAdministrator(user: AuthContext) {
+  return !user.websiteOnly && !user.memberships?.some(m => m.organizationId === user.organizationId && m.kind === "client") && (user.organizationRole
+    ? ["owner", "admin"].includes(user.organizationRole)
+    : user.role === "owner");
+}
+
 export async function studioAccess(
   request: Request,
   env: FunctionEnv,
@@ -21,9 +27,8 @@ export async function studioAccess(
     (user.organizationRole
       ? user.organizationRole === "client"
       : user.role === "customer");
-  // Client memberships are authoritative over stale profile assignments. Agency
-  // administrators must also have an explicit profile website assignment; their
-  // broader agency-management role never grants editor access to every client.
+  // Client memberships override stale profile assignments. Administrators may
+  // select a managed client, but requireAuth must verify that target separately.
   const activeMembership = user.memberships?.find(
     (membership) => membership.organizationId === user.organizationId,
   );
@@ -31,11 +36,12 @@ export async function studioAccess(
     ? activeMembership.legacyClientId
     : customer && user.memberships?.length ? null : user.clientId;
   const requested = new URL(request.url).searchParams.get("client");
-  const clientId = assigned;
+  const administrator = studioAdministrator(user);
+  const clientId = administrator ? requested || assigned : assigned;
   if (
     !clientId ||
     !/^[0-9a-f-]{36}$/i.test(clientId) ||
-    (requested && requested !== clientId)
+    (!administrator && requested && requested !== clientId)
   )
     return {
       response: authJson({ error: "Website access is unavailable." }, 403),
@@ -43,11 +49,8 @@ export async function studioAccess(
   const result = await requireAuth(request, env, { clientId });
   if ("response" in result) return result;
   const c = result.context;
-  const staff =
-    !c.websiteOnly &&
-    (c.organizationRole
-      ? ["owner", "admin"].includes(c.organizationRole)
-      : c.role === "owner");
+  const staff = !c.websiteOnly && (c.organizationRole
+    ? ["owner", "admin"].includes(c.organizationRole) : c.role === "owner");
   const client = c.organizationRole
     ? c.organizationRole === "client"
     : c.role === "customer";

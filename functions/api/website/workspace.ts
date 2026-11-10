@@ -36,6 +36,7 @@ export async function onRequestGet({
     );
   const [site] = await response.json();
   return authJson({
+    clientId: access.clientId,
     state: !site ? "unconfigured" : site.enabled ? "ready" : "disabled",
     clientWorkspace: !access.staff,
     canvasEnabled: Boolean(site?.enabled && site.canvas_snapshot_id === manifest.id && site.public_url?.replace(/\/$/, "") === manifest.source),

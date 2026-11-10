@@ -153,3 +153,6 @@ access and saved-draft loading are browser-verified. 520 tests and both type
 checks passed. Automatic publishing is still not enabled: the durable adapter,
 rendered preview validation and rollback test are not yet implemented end-to-end.
 No client website content was deployed. Latest observed saved revision is 28.
+
+## Managed Website selector — November 10, 2026
+Agency owners/admins can select authorized client websites from Website and the editor. Client accounts remain assigned-site-only. Editor switching explicitly saves a checkpoint before navigation; a failed save prevents the switch. Unconnected clients remain visible with setup guidance, never a substituted preview. No database migration or publishing activation is included. Validation: 549 tests, application and Functions TypeScript, and production build passed.

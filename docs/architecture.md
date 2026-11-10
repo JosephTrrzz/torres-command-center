@@ -132,3 +132,6 @@ staff browser → /api/campaigns → draft + reviewed recipients
 ```
 
 Announcements, newsletters, and review requests belong to one organization and one client. Review requests may reference only a completed service job. Suppressions are organization-wide and are checked during audience creation and immediately before sending. Public unsubscribe links use opaque per-recipient tokens; they never expose tenant identifiers, and they create durable suppression records. Browser writes to campaign, recipient, and suppression tables are revoked.
+
+## Website Studio management scope
+Agency owners and administrators may select managed client websites. Every Studio read, draft/history write, and publication request independently revalidates the selected client through the organization-aware authentication boundary. Client and website-only accounts remain bound to their assigned client; a query parameter cannot widen their access. The managed directory uses the same per-client check and excludes unauthorized clients. Selecting a client does not enroll its website, enable publishing, or substitute the Torres snapshot for an unconnected site.
