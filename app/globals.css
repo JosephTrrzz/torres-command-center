@@ -53,3 +53,6 @@ nav a em{background:#eee4d2}
 .crm-live-control button:disabled svg{animation:crm-refresh-spin .9s linear infinite}
 @keyframes crm-refresh-spin{to{transform:rotate(360deg)}}
 @media(max-width:800px){.crm-heading-actions{justify-items:stretch;width:100%}.crm-live-control{justify-content:space-between}}
+
+/* Never reveal a cached authenticated screen during history restoration. */
+html[data-session-locked=true] .app-shell { visibility: hidden !important; }

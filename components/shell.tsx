@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { APP_NAVIGATION, appRoleForOrganizationRole, canAccessPath, defaultRouteForRole, organizationRoleLabel } from "../lib/access-control";
-import { AUTH_SESSION_EVENT, clearAuthSession, createAuthSessionFromTokens, readStoredSession, storeAuthSession, switchOrganization } from "../lib/supabase-auth";
+import { AUTH_SESSION_EVENT, clearAuthSession, signOutSession, createAuthSessionFromTokens, readStoredSession, storeAuthSession, switchOrganization } from "../lib/supabase-auth";
 import type { AuthSession, ClientSummary, OrganizationAccess } from "../lib/types";
 import { readProfileAvatar } from "./profile-picture-editor";
 import { fetchClients } from "../lib/supabase-data";
@@ -121,6 +121,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     const onSessionChanged = (event: Event) => {
       const nextSession = (event as CustomEvent<AuthSession>).detail ?? readStoredSession();
       if (nextSession) setSession(nextSession);
+      else { setSession(null); router.replace("/login/"); }
     };
     window.addEventListener("torres-profile-avatar-changed", onAvatarChanged);
     window.addEventListener(AUTH_SESSION_EVENT, onSessionChanged);
@@ -149,6 +150,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
     setSession(stored);
     if (!Array.isArray(stored.organizations)) {
       void createAuthSessionFromTokens(stored.access_token, stored.refresh_token, stored.expires_at, stored.user).then((freshSession) => {
+        if (readStoredSession()?.access_token !== stored.access_token) return;
         storeAuthSession(freshSession);
         setSession(freshSession);
       }).catch(() => undefined);
@@ -186,7 +188,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   }, [notice, profile, workspaceOpen]);
 
   const logout = () => {
-    clearAuthSession();
+    void signOutSession();
     router.replace("/login/");
   };
   const unreadCount = workspaceNotifications.filter((item) => !item.read).length;

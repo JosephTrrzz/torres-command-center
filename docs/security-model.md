@@ -26,3 +26,9 @@ Never put real secrets in `.env.example`, GitHub, browser bundles, screenshots, 
 ## Website Studio boundary — November 10, 2026
 
 Website API routes reject mismatched Origin and cross-origin Fetch Metadata before body processing or storage. This supplements bearer authentication; headerless non-browser callers still require valid credentials. Both administrators and clients are restricted to their explicitly assigned website. Enabled-site and approved-source checks precede draft reads/writes. Drafts are append-only, actor-attributed, revision-checked, size-bounded private records; saving is not publishing. Browser roles have no direct draft-table grants in the migration. Production grants and zone-level distributed rate limits require separate operational verification.
+
+## Session exit and browser history — November 10, 2026
+
+Explicit logout clears both browser stores immediately, notifies mounted screens, broadcasts to other open tabs, and requests Supabase global logout with a keepalive request. Browser Back/Forward history navigation with an active session, and restored back-forward-cache pages, require fresh sign-in. Cached authenticated shell content is hidden on page exit. Normal in-app links and ordinary reloads retain their existing behavior. A late profile refresh may not restore a cleared session.
+
+Provider logout revokes refresh credentials; already issued bearer access tokens may remain valid until expiry. Network failure cannot guarantee provider revocation, but local access is still cleared. This does not replace short provider token lifetimes, MFA, server-side session revocation enforcement, or operational WAF configuration. These controls have not been claimed as verified in this change.

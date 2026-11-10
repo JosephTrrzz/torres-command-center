@@ -2,6 +2,7 @@ import { ROLE_PERMISSIONS } from "./organization-access";
 import type { AppRole, AuthSession, AuthUser, OrganizationAccess, OrganizationKind, OrganizationRole, UserProfile } from "./types";
 
 const SESSION_KEY = "torres-auth-session";
+export const AUTH_LOGOUT_KEY = "torres-auth-logout";
 export const AUTH_SESSION_EVENT = "torres-auth-session-changed";
 
 function getConfig() {
@@ -220,6 +221,7 @@ export function clearAuthSession() {
     window.localStorage.removeItem(SESSION_KEY);
     window.sessionStorage.removeItem(SESSION_KEY);
     window.localStorage.removeItem("torres-demo-session");
+    window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT, { detail: null }));
   }
 }
 
@@ -237,4 +239,18 @@ export async function requestPasswordReset(email: string, captchaToken?: string)
     }),
   });
   if (!response.ok) throw new Error(await parseError(response));
+}
+
+// Clear local access immediately; revoke refresh credentials with Supabase too.
+export async function signOutSession() {
+  const token = readStoredSession()?.access_token;
+  clearAuthSession();
+  window.localStorage.setItem(AUTH_LOGOUT_KEY, String(Date.now()));
+  if (!token) return;
+  try {
+    const { url, key } = getConfig();
+    await fetch(`${url}/auth/v1/logout?scope=global`, {
+      method: "POST", headers: { apikey: key, Authorization: `Bearer ${token}` }, keepalive: true,
+    });
+  } catch { /* Local access stays cleared even when the provider is unreachable. */ }
 }

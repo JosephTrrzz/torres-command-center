@@ -1,3 +1,4 @@
+import { SessionHistoryGuard } from "../components/session-history-guard";
 import type { Metadata } from "next";
 import "./globals.css";
 import "./ui-enhancements.css";
@@ -13,5 +14,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body><SessionHistoryGuard />{children}</body></html>;
 }
