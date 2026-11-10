@@ -1,7 +1,7 @@
 // Navigation changes never reset the selected page, canvas edits or library data.
 (()=>{
  const workspace=document.querySelector('.workspace'),title=document.querySelector('#panel-title');
- const tools=[['pages-tab','Pages','pages-panel'],['shapes','Elements','shape-picker'],['text-tab','Text','text-panel'],['uploads-tab','Uploads','uploads-panel']];
+ const tools=[['pages-tab','Pages','pages-panel'],['shapes','Elements','shape-picker'],['text-tab','Text','text-panel'],['uploads-tab','Uploads','uploads-panel'],['saved-drafts','Saved drafts','saved-drafts-panel']];
  let current='uploads-tab';
  function show(id,collapse=false){current=id;workspace.classList.toggle('panel-collapsed',collapse);for(const [key,label,panel]of tools){const button=document.querySelector('#'+key);button.setAttribute('aria-pressed',key===id&&!collapse);button.setAttribute('aria-expanded',key===id&&!collapse);document.querySelector('#'+panel).hidden=key!==id;if(key===id)title.textContent=label}document.querySelector('#pages').hidden=false;document.querySelector('#pages-heading').hidden=false}
  for(const [id]of tools)document.querySelector('#'+id).onclick=()=>show(id,current===id&&!workspace.classList.contains('panel-collapsed'));

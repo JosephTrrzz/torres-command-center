@@ -82,13 +82,13 @@
 .studio-shell .stage:has(#inspector.header-bar:not([hidden])) #canvas{flex:1;min-height:240px;height:0}
 
 /* Explicit saved checkpoints, separate from canvas Undo / Redo. */
-#saved-drafts-dialog{width:min(560px,calc(100vw - 32px));max-height:80dvh;overflow:auto;box-sizing:border-box;padding:24px;border:1px solid #d9c9ac;border-radius:20px;background:#fffcf6;color:#493b28;box-shadow:0 20px 60px #13223826;font:14px/1.5 system-ui}
-#saved-drafts-dialog::backdrop{background:#13223866}
-#saved-drafts-dialog .saved-drafts-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
-#saved-drafts-dialog h2{margin:0;font-size:22px}
-#saved-drafts-dialog ol{padding:0;list-style:none;margin:16px 0 0}
-#saved-drafts-dialog li{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 0;border-top:1px solid #e5e0d7}
-#saved-drafts-dialog button{min-height:44px;padding:10px 16px;border:1px solid #d9c9ac;border-radius:999px;background:#f5efe4;color:#493b28;cursor:pointer;font:inherit}
-#saved-drafts-dialog button:focus-visible{outline:2px solid #a57d3d;outline-offset:3px}
-#saved-drafts-dialog [data-confirm]{flex-basis:100%;padding:12px;background:#f5efe4;border-radius:12px}
-#saved-drafts-dialog [data-confirm] button+button{margin-left:8px}
+#saved-drafts-panel{color:#493b28;font:14px/1.5 system-ui;min-width:0}
+#saved-drafts-panel::backdrop{background:#13223866}
+#saved-drafts-panel .saved-drafts-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+#saved-drafts-panel h2{margin:0;font-size:22px}
+#saved-drafts-panel ol{padding:0;list-style:none;margin:16px 0 0}
+#saved-drafts-panel li{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 0;border-top:1px solid #e5e0d7}
+#saved-drafts-panel button{min-height:44px;padding:10px 16px;border:1px solid #d9c9ac;border-radius:999px;background:#f5efe4;color:#493b28;cursor:pointer;font:inherit}
+#saved-drafts-panel button:focus-visible{outline:2px solid #a57d3d;outline-offset:3px}
+#saved-drafts-panel [data-confirm]{flex-basis:100%;padding:12px;background:#f5efe4;border-radius:12px}
+#saved-drafts-panel [data-confirm] button+button{margin-left:8px}

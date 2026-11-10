@@ -27,10 +27,8 @@
  document.querySelector('.rail-footer').textContent='WEBSITE STUDIO';
  $('#save').textContent='Save draft';
  // Saved checkpoints are explicit actions, independent of the in-session Undo timeline.
- const historyButton=document.createElement('button');historyButton.id='saved-drafts';historyButton.type='button';historyButton.textContent='Saved drafts';$('#save').before(historyButton);
- const historyDialog=document.createElement('dialog');historyDialog.id='saved-drafts-dialog';historyDialog.setAttribute('aria-labelledby','saved-drafts-heading');
- historyDialog.innerHTML='<div class="saved-drafts-heading"><h2 id="saved-drafts-heading">Saved drafts</h2><button type="button" data-close aria-label="Close saved drafts">Close</button></div><p>Your six most recent Save draft versions. Autosave and Undo/Redo are separate. Restoring never publishes your website.</p><p data-history-status role="status"></p><ol data-versions></ol>';
- document.body.append(historyDialog);
+ const historyButton=$('#saved-drafts');historyButton.hidden=false;
+ const historyDialog=$('#saved-drafts-panel');
  const historyStatus=historyDialog.querySelector('[data-history-status]'),list=historyDialog.querySelector('[data-versions]');
  const dateFormat=new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'medium'});
  let checkpointBusy=false;
@@ -47,7 +45,6 @@
   catch(error){status.textContent=error.message;}
   finally{checkpointBusy=false;workspace.inert=false;buttons();}
  };
- historyDialog.querySelector('[data-close]').onclick=()=>historyDialog.close();
  async function restoreVersion(version){
   if(checkpointBusy)return;checkpointBusy=true;buttons();list.inert=true;
   historyStatus.textContent='Restoring saved draft…';
@@ -58,13 +55,13 @@
    drafts=saved.draft;dirty=false;clearTimeout(saveTimer);canvasReady=false;
    window.dispatchEvent(new Event('canvas-draft-loaded'));loadPage(active);
    status.textContent='Restored draft from '+dateFormat.format(new Date(version.created_at))+' · Nothing was published.';
-   historyDialog.close();
+   $('#panel-close').click();
   }catch(error){historyStatus.textContent=error.message;}
   finally{checkpointBusy=false;list.inert=false;buttons();}
  }
- historyButton.onclick=async()=>{
-  if(checkpointBusy||!connected)return;
-  historyDialog.showModal();list.replaceChildren();historyStatus.textContent='Loading saved drafts…';checkpointBusy=true;buttons();
+ historyButton.addEventListener('click',async()=>{
+  if(checkpointBusy||!connected||historyDialog.hidden)return;
+  list.replaceChildren();historyStatus.textContent='Loading saved drafts…';checkpointBusy=true;buttons();
   try{
    if(!await captureDraft())throw Error('Please wait for your current changes to save, then retry.');
    const result=await request('canvas-history');
@@ -80,7 +77,7 @@
    }
   }catch(error){historyStatus.textContent=error.message;}
   finally{checkpointBusy=false;buttons();}
- };
+ });
  const workspace=document.querySelector('.workspace');workspace.inert=true;status.textContent='Connecting to your account…';
  request('canvas-load').then(info=>{
   drafts=info.draft;revision=info.revision;lastSaved=JSON.stringify(drafts);dirty=false;connected=true;
