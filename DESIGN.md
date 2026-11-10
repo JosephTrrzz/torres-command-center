@@ -181,3 +181,17 @@ Use brass outlines, a shared dashed boundary, and a compact gold/beige toolbar a
 A four-pixel threshold prevents accidental movement. Drag selected groups directly or nudge with arrow keys (1px, or 10px with Shift). Locked items stay fixed. Pointer cancellation, blur and Escape restore starting positions. Commit a group move as one undo step. Group membership and movement locks persist in private drafts, separately from Undo/Redo and six explicit checkpoints. Locks are editing safeguards, not authorization controls.
 
 Header/footer movement patches retain their shared behavior. Inputs and editor chrome are excluded from selection. All selection visuals remain editor-only; this interaction adds no publishing or access permissions.
+
+### Publishing a website
+
+Website Studio keeps Save draft and the latest six Saved drafts separate from
+publication. A single gold “Push to live site” action opens a native, focus-trapped
+review dialog naming the assigned website and saved revision. Cancel closes it;
+no deployment starts on opening the dialog. The editor is inert during review so
+the confirmed revision cannot change under the user. Pending states say queued,
+building/deploying, or checking live pages, without invented progress percentages.
+“Now Live” is reserved for a server-verified release of the current saved draft;
+new edits restore the publish label. The dialog wraps controls on mobile, announces
+status, preserves drafts on failure, and offers a safe live-site link only after
+verification. An unconfigured publishing connection is visibly explained and the
+final action is disabled. Never simulate publication in the production UI.

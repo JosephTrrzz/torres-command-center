@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequest as canvasDrafts } from "../functions/api/website/canvas-drafts";
+import { onRequest as publish } from "../functions/api/website/publish";
 import { studioAccess } from "../functions/_shared/studio-access";
 import { requireAuth, type AuthContext } from "../functions/_shared/auth";
 vi.mock("../functions/_shared/auth", async original => ({ ...await original<typeof import("../functions/_shared/auth")>(), requireAuth: vi.fn() }));
@@ -50,4 +51,13 @@ it.each(["owner", "admin", "client"] as const)("blocks foreign draft reads and w
     expect(response.status).toBe(403);
   }
   expect(storage).not.toHaveBeenCalled();
+});
+
+it.each(["owner", "admin", "client"] as const)("blocks foreign publishing for %s before storage or provider calls", async role => {
+ identity(role,own,role==="client");const storage=vi.fn();vi.stubGlobal("fetch",storage);
+ for(const method of ["GET","POST"]){
+  const response=await publish({env:{},request:new Request("https://app.test/api/website/publish?client="+other,{method,...(method==="POST"?{headers:{"Content-Type":"application/json"},body:"{}"}:{})})});
+  expect(response.status).toBe(403);
+ }
+ expect(storage).not.toHaveBeenCalled();
 });

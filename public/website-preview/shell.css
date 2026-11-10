@@ -109,3 +109,17 @@
 #context-tools{max-width:calc(100% - 24px);flex-wrap:wrap;border-radius:22px}#context-tools label{display:flex;gap:6px;align-items:center;font-size:12px}#context-tools input{width:140px;min-height:44px}#context-tools input[type=number]{width:70px}#context-tools input[type=color]{width:44px;border-radius:50%}#context-tools [hidden]{display:none!important}#context-tools small{width:100%;color:#806a47}
 
 #context-tools input,#context-tools select{background:#fffcf6;color:#493b28;border:1px solid #d9c9ac;border-radius:12px;padding:8px;font:14px system-ui;min-height:44px}#context-tools input:focus-visible,#context-tools select:focus-visible{outline:2px solid #a57d3d;outline-offset:2px}#context-tools input[type=color]{padding:3px;border-radius:50%}
+
+/* Publication review uses native focus management and the existing studio palette. */
+.publish-review{box-sizing:border-box;width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;margin:auto;padding:28px;border:1px solid #d9c9ac;border-radius:24px;background:#fffcf6;color:#493b28;box-shadow:0 16px 64px #13223826}
+.publish-review::backdrop{background:#13223866}
+.publish-review h2{margin:0 0 16px;font-size:24px}.publish-review p{line-height:1.6;overflow-wrap:anywhere}
+.publish-review [data-publish-message]{padding:16px;background:#f5efe4;border-radius:12px;font-weight:600;min-height:56px}
+.publish-review .publish-note{font-size:13px;color:#6d604d}.publish-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px;align-items:center}
+.publish-actions button,.publish-actions a{min-height:44px;border-radius:999px;padding:12px 18px}.publish-actions a{color:#795723}
+.publish-review [hidden]{display:none!important}
+@media(max-width:560px){.publish-review{padding:20px}.publish-actions>*{width:100%;text-align:center}}
+.studio-shell #publish-site,.publish-review button.primary{background:var(--editor-accent);border-color:var(--editor-accent);color:#fff}
+.studio-shell #publish-site:hover,.publish-review button.primary:hover{background:#6b491c}
+.studio-shell #save:not(.primary){background:var(--editor-beige);border-color:var(--editor-border);color:var(--editor-text)}
+.publish-review h2{text-transform:none;letter-spacing:-.02em}

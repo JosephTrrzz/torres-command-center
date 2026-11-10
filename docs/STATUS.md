@@ -84,3 +84,12 @@ Canva-reference selection flow follow-up: removed the selection-mode switch, add
 
 ### Connected draft reliability — November 10, 2026
 Autosave confirms success only after the account bridge acknowledges persistence and follows up with edits made during an in-flight request. Transient failures keep the draft dirty and explain the Save draft retry action; reconnect retries autosave without creating a checkpoint. Authentication, permission and revision conflicts block retries rather than overwriting newer work. Restore now makes the workspace inert during capture/fetch/checkpoint, preventing concurrent edits from being lost. Missing authentication is classified as 401. Existing client-scoped API and six-checkpoint migration are unchanged. Added six connection-state regression tests; 255 tests pass. These changes are local and have not been production-validated or deployed.
+
+## Website publishing control plane — 2026-11-10
+
+Local implementation adds an assigned-site publishing review/button, immutable
+release ledger migration, atomic revision/idempotency reservation, private adapter
+boundary and all-route live-marker verification. Activation is blocked until the
+current public site's safe renderer/deployment adapter is implemented and connected.
+The SQL migration is not applied, and no public-site content has been published.
+See `WEBSITE-PUBLISHING.md` for the contract and concrete activation requirements.

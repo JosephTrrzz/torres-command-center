@@ -149,7 +149,7 @@ export async function requireAuth(
   const authorized = await authorizeVerifiedUser({ id: user.id, email: user.email }, env, options);
   if ("response" in authorized) return authorized;
   const path = new URL(request.url).pathname.replace(/\/$/, "");
-  const websitePaths = ["/api/website/canvas-drafts", "/api/website/workspace", "/api/website/revisions", "/api/website/assets", "/api/website/reviews", "/api/customer-activate", "/api/invitation-accept"];
+  const websitePaths = ["/api/website/publish", "/api/website/canvas-drafts", "/api/website/workspace", "/api/website/revisions", "/api/website/assets", "/api/website/reviews", "/api/customer-activate", "/api/invitation-accept"];
   if (authorized.context.websiteOnly && !websitePaths.includes(path))
     return { response: json({ error: "This account has access to Website only." }, 403) };
   return authorized;
