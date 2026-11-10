@@ -33,7 +33,11 @@ export async function verifyStudioCloudflareCredential(token: string | undefined
     if (deployment?.environment !== 'production' || !/^[a-f0-9]{40}$/.test(sourceCommit || '') ||
       !/^[a-zA-Z0-9-]{1,100}$/.test(deployment.id || '')) return { credential: 'unavailable' as const, reason: 'deployment_identity' as const };
     return { credential: 'verified' as const, sourceCommit: sourceCommit!, deploymentId: deployment.id! };
-  } catch {
-    return { credential: 'unavailable' as const, reason: 'connection_error' as const };
+  } catch (error) {
+    const name = error instanceof Error ? error.name : '';
+    const reason = ['TimeoutError', 'AbortError'].includes(name) ? 'timeout'
+      : name === 'SyntaxError' ? 'invalid_provider_response'
+      : name === 'TypeError' ? 'request_error' : 'connection_error';
+    return { credential: 'unavailable' as const, reason };
   }
 }

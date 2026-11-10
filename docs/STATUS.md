@@ -135,3 +135,12 @@ locks. The production publishing migrations are installed, but automatic publica
 remains disabled pending the durable build/deployment adapter and preview/rollback
 verification. Saved drafts and public website content have not been published by
 this checkpoint.
+
+
+Production follow-up (2026-11-10): deployed recovery/connection diagnostics through
+Cloudflare (latest deployment `086fbb24`, source `598bf9e`). Corrected the existing
+owner profile's null `client_id` to the already enrolled Torres company site;
+role and other accounts were unchanged. Browser verification confirmed the owner
+can open Website and load the saved canvas. All 512 tests, both type checks and
+production build passed for the checkpoint. Provider verification still requires
+resolution; publication remains disabled and no public-site draft was released.
