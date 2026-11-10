@@ -1,5 +1,6 @@
 "use client";
 import { useWaveMotion, WaveMotionControl } from "./wave-motion";
+import { WaveBackground } from "./wave-background";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -237,7 +238,7 @@ export function Shell({ children, active }: { children: React.ReactNode; active:
   const accessLabel = organizationRoleLabel(session.organization?.role, session.profile.role);
   const organizations = session.organizations?.length ? session.organizations : session.organization ? [session.organization] : [];
   const shell = <div className="app-shell" data-wave-paused={animationPaused} data-shell-variant={effectiveRole === "customer" ? "client" : "internal"}>
-    <div className="workspace-waves" aria-hidden="true" />
+    <WaveBackground paused={animationPaused} />
     <a className="skip-link" href="#workspace-content">Skip to workspace content</a>
     {open && <button type="button" className="shell-overlay" aria-label="Close navigation" onClick={() => { setOpen(false); setWorkspaceOpen(false); }} />}
     <aside className={`sidebar ${open ? "open" : ""}`} id="workspace-navigation">

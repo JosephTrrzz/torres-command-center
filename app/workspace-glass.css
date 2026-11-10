@@ -14,18 +14,10 @@
   .workspace-waves {
     position: fixed;
     z-index: -1;
-    inset: -10vh -10vw;
-    pointer-events: none;
-    background: url('/today-waves.svg') center top / max(100%, 1100px) auto repeat-y;
-    transform-origin: 50% 35%;
-    animation: workspace-wave-flow 8s ease-in-out infinite alternate;
+    inset: 0;
+    overflow: hidden;
   }
-  [data-wave-paused=true] > .workspace-waves { animation-play-state: paused; }
-  @keyframes workspace-wave-flow {
-    0% { transform: translate3d(-2%, -2%, 0) scale(1.02, 1.04) rotate(-1deg); }
-    50% { transform: translate3d(1%, 1%, 0) scale(1.06, .98) rotate(.5deg); }
-    100% { transform: translate3d(3%, -1%, 0) scale(1.01, 1.08) rotate(1deg); }
-  }
+  .workspace-waves svg { display: block; width: 100%; height: 100%; }
   .app-shell[data-shell-variant] .topbar {
     margin: 16px 24px 0;
     padding-inline: 24px;
