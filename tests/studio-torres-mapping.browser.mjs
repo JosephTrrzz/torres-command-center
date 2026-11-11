@@ -6,7 +6,7 @@ import {readFile} from 'node:fs/promises';
 const require=createRequire(import.meta.url);
 const {build}=require('esbuild');
 const {chromium}=require(process.env.STUDIO_PLAYWRIGHT_MODULE||'playwright');
-const compiled=await build({entryPoints:['functions/_shared/studio-torres-artifact.ts'],bundle:true,platform:'node',format:'cjs',write:false});
+const compiled=await build({entryPoints:['functions/_shared/studio-torres-artifact.ts'],bundle:true,keepNames:true,platform:'node',format:'cjs',write:false});
 const module={exports:{}};
 new Function('module','exports','require',compiled.outputFiles[0].text)(module,module.exports,require);
 const {compileTorresArtifact,TORRES_SOURCE_COMMIT}=module.exports;
