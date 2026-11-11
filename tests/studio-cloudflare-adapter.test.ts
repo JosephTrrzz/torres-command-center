@@ -106,6 +106,13 @@ async function verifiedPreview() {
 }
 
 describe('private adapter contract and durable stages',()=>{
+  it('returns operator cancellation without observing or promoting a late preview',async()=>{
+    await post();Object.assign(rows.get(previewId)!,{stage:'cancelled'});
+    vi.mocked(observeStudioBuild).mockClear();vi.mocked(dispatchStudioBuild).mockClear();vi.mocked(reserveBuildAttempt).mockClear();
+    expect(await (await get()).json()).toMatchObject({status:'failed',phase:'preview_cancelled'});
+    expect(observeStudioBuild).not.toHaveBeenCalled();expect(dispatchStudioBuild).not.toHaveBeenCalled();
+    expect(reserveBuildAttempt).not.toHaveBeenCalled();expect(verifier).not.toHaveBeenCalled();
+  });
   it.each([undefined,'invalid-json'])('credentialed connection observes without valid enrollment (%s), with capabilities false',async value=>{
     await post();const connected=withStudioPublisher({...env,STUDIO_PUBLISHING_ENROLLMENT:value});
     expect(connected.STUDIO_PUBLISHER).toBeDefined();expect(await publisherReady(connected,target.client)).toBe(false);

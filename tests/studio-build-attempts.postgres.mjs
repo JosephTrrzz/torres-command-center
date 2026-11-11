@@ -42,6 +42,8 @@ describe('studio_build_attempts PostgreSQL behavior', () => {
     await db.exec(sql('studio_build_attempts.sql'));
     // Replaying the additive migration must preserve the constraints and grants.
     await db.exec(sql('studio_build_attempts.sql'));
+    await db.exec(sql('studio_preview_cancellation.sql'));
+    await db.exec(sql('studio_preview_cancellation.sql'));
   });
   beforeEach(async () => {
     await db.exec('truncate public.clients cascade;');
@@ -144,4 +146,57 @@ describe('studio_build_attempts PostgreSQL behavior', () => {
     await assert.rejects(reserve({ id: second,environment:'production',branch:'main',preview:attempt }), /check constraint/);
     await assert.rejects(reserve({ id: second,branch:'unapproved' }), /check constraint/);
   });
+  const cancel = (patch={}) => {
+    const p={id:attempt,client,release,hash,source,expected:'ambiguous',reason:'Operator revoked preview after uncertain create; provider outcome unknown.',...patch};
+    return db.query('select * from public.studio_cancel_preview_attempt($1,$2,$3,$4,$5,$6,$7)',
+      [p.id,p.client,p.release,p.hash,p.source,p.expected,p.reason]);
+  };
+  it('atomically cancels unknown preview without inventing provider evidence; fences late writes',async()=>{
+    await reserve();await claim();await advance('triggering','ambiguous');
+    const before=(await db.query('select * from studio_build_attempts')).rows[0];
+    const cancelled=(await cancel()).rows[0];
+    assert.equal(cancelled.stage,'cancelled');assert.equal(cancelled.provider_deployment_id,null);
+    assert.equal(cancelled.preview_evidence,null);assert.ok(cancelled.cancelled_at);assert.ok(cancelled.cancellation_actor);
+    for(const key of ['id','client_id','release_id','content_hash','source_commit','branch','environment'])assert.equal(cancelled[key],before[key]);
+    assert.equal(cancelled.triggered_at.getTime(),before.triggered_at.getTime());
+    assert.equal((await db.query('select status from studio_publications')).rows[0].status,'failed');
+    assert.equal((await advance('ambiguous','building','late-provider')).rows.length,0);
+    await assert.rejects(advance('cancelled','building','late-provider'),/immutable/);
+    await assert.rejects(db.exec("update studio_build_attempts set cancellation_reason='rewritten'"),/immutable/);
+    assert.equal((await claim()).rows.length,0);
+    await assert.rejects(reserve({id:second}),/active publication/);
+    // A NEW saved checkpoint/release can proceed; old attempt/parent stay terminal.
+    await db.query("insert into studio_canvas_drafts(client_id,snapshot_id,revision,draft,actor_id) values ($1,$2,2,'{}',$1)",[client,hash]);
+    await db.query('insert into studio_publications(id,client_id,snapshot_id,revision,actor_id,request_key,content_hash) values ($1,$2,$3,2,$2,$1,$3)',[second,client,hash]);
+    assert.equal((await reserve({id:second,release:second})).rows[0].stage,'reserved');
+  });
+  it('denies cancellation to browser and service roles including the generic advance RPC',async()=>{
+    await reserve();await claim();await advance('triggering','ambiguous');
+    for(const role of ['anon','authenticated','service_role'])await assert.rejects(asRole(role,()=>cancel()),/permission denied/);
+    await assert.rejects(asRole('service_role',()=>advance('ambiguous','cancelled')),/claim function/);
+    assert.equal((await db.query('select status from studio_publications')).rows[0].status,'queued');
+  });
+  it('rejects stale and foreign cancellation identities without changing the parent',async()=>{
+    await reserve();await claim();await advance('triggering','ambiguous');
+    for(const patch of [{client:foreign},{release:second},{hash:'d'.repeat(64)},{source:'c'.repeat(40)},{expected:'triggering'},{reason:''}])await assert.rejects(cancel(patch));
+    assert.equal((await db.query('select stage from studio_build_attempts')).rows[0].stage,'ambiguous');
+    assert.equal((await db.query('select status from studio_publications')).rows[0].status,'queued');
+  });
+  it('cancels reserved and known building previews while retaining any provider ID',async()=>{
+    await reserve();const reserved=(await cancel({expected:'reserved'})).rows[0];
+    assert.equal(reserved.triggered_at,null);assert.equal(reserved.stage,'cancelled');
+  });
+  it('retains the known provider when revoking a building preview',async()=>{
+    await reserve();await claim();await advance('triggering','building','known-provider');
+    assert.equal((await cancel({expected:'building'})).rows[0].provider_deployment_id,'known-provider');
+  });
+  it('never cancels a production attempt or a release that already reserved production',async()=>{
+    await previewSuccess();await reserve({id:second,environment:'production',branch:'main',preview:attempt,previous:'baseline'});
+    await claim(second);await advance('triggering','ambiguous',null,null,second);
+    await assert.rejects(cancel({id:second}),/preview identity/);
+    await assert.rejects(cancel({expected:'succeeded'}),/active preview stage/);
+    assert.equal((await db.query('select status from studio_publications')).rows[0].status,'queued');
+    await assert.rejects(advance('ambiguous','failed',null,null,second),/check constraint/);
+  });
+
 });

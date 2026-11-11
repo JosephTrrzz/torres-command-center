@@ -235,11 +235,11 @@ export function createStudioCloudflareAdapter(env: PublishingEnv, options: Studi
       if (!saved) throw new AdapterError(503);
       return exact(saved,p,a.environment,a.id);
     }
-    if (['succeeded','failed'].includes(a.stage)) return a;
+    if (['succeeded','failed','cancelled'].includes(a.stage)) return a;
     const observed = await observeStudioBuild(env,{id:a.id,clientId:p.client_id});
     if (!observed.attempt) throw new AdapterError(503);
     a = exact(observed.attempt,p,a.environment,a.id);
-    if (a.stage === 'failed' || !observed.provider || observed.provider.state !== 'succeeded' || !verifier) return a;
+    if (a.stage === 'failed' || a.stage === 'cancelled' || !observed.provider || observed.provider.state !== 'succeeded' || !verifier) return a;
     const d = observed.provider;
     if (d.id !== a.provider_deployment_id || d.sourceCommit !== a.source_commit || d.environment !== a.environment || d.branch !== a.branch) throw new AdapterError(409);
     const compiled = await artifact(p);
@@ -268,10 +268,11 @@ export function createStudioCloudflareAdapter(env: PublishingEnv, options: Studi
       production = await progress(p,production,observeOnly);
       return receipt(p,production.stage === 'succeeded' ? 'succeeded' : production.stage === 'failed' ? 'failed' : 'deploying','production');
     }
+    if (preview.stage === 'cancelled') return receipt(p,'failed','preview_cancelled');
     if (preview.stage === 'failed') return receipt(p,'failed','preview');
     if (preview.stage !== 'succeeded') {
       preview = await progress(p,preview,observeOnly);
-      return receipt(p,preview.stage === 'failed' ? 'failed' : 'building',preview.stage === 'succeeded' ? 'preview_verified' : 'preview');
+      return receipt(p,['failed','cancelled'].includes(preview.stage) ? 'failed' : 'building',preview.stage === 'cancelled' ? 'preview_cancelled' : preview.stage === 'succeeded' ? 'preview_verified' : 'preview');
     }
     const compiled = await artifact(p);
     if (!preview.provider_deployment_id || !validProof(preview.preview_evidence,preview.provider_deployment_id,artifactHash(compiled))) throw new AdapterError(409);

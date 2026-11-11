@@ -2,7 +2,7 @@ import type { FunctionEnv } from './auth';
 import { studioStore } from './studio-access';
 import { UUID } from './studio-publisher';
 
-export type BuildStage = 'reserved' | 'triggering' | 'building' | 'succeeded' | 'failed' | 'ambiguous';
+export type BuildStage = 'reserved' | 'triggering' | 'building' | 'succeeded' | 'failed' | 'ambiguous' | 'cancelled';
 export type BuildEnvironment = 'preview' | 'production';
 export type PreviewEvidence = {
   deployment_id: string; artifact_hash: string; verified_at: string;
@@ -29,7 +29,7 @@ export class BuildAttemptWriteUncertain extends Error {
 }
 const hash = /^[a-f0-9]{64}$/;
 const providerId = /^[a-zA-Z0-9_-]{1,160}$/;
-const stages: BuildStage[] = ['reserved','triggering','building','succeeded','failed','ambiguous'];
+const stages: BuildStage[] = ['reserved','triggering','building','succeeded','failed','ambiguous','cancelled'];
 const branches = { preview: 'codex/studio-publish-preview', production: 'main' } as const;
 function scope(input: BuildAttemptScope) {
   if (!UUID.test(input.id) || !UUID.test(input.clientId)) throw Error('Invalid build attempt scope.');
@@ -69,7 +69,8 @@ function row(value: unknown, input: BuildAttemptScope): BuildAttempt {
     || !(a.provider_deployment_id === null || typeof a.provider_deployment_id === 'string' && providerId.test(a.provider_deployment_id))
     || !(a.previous_production_deployment_id === null || typeof a.previous_production_deployment_id === 'string' && providerId.test(a.previous_production_deployment_id))
     || !(a.preview_attempt_id === null || typeof a.preview_attempt_id === 'string' && UUID.test(a.preview_attempt_id))
-    || (a.stage !== 'reserved' && a.stage !== 'failed' && (!a.triggered_at || !Number.isFinite(Date.parse(a.triggered_at))))) {
+    || (a.stage === 'cancelled' && a.environment !== 'preview')
+    || (a.stage !== 'cancelled' && a.stage !== 'reserved' && a.stage !== 'failed' && (!a.triggered_at || !Number.isFinite(Date.parse(a.triggered_at))))) {
     throw Error('Invalid build attempt storage response.');
   }
   if (a.preview_evidence !== null) evidence(a.preview_evidence);

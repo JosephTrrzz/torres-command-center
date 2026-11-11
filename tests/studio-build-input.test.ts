@@ -55,7 +55,7 @@ describe('private authenticated build input', () => {
     expect(mocks.attempt).not.toHaveBeenCalled();
   });
   it.each([
-    { ...attempt, stage: 'succeeded' }, { ...attempt, source_commit: 'c'.repeat(40) },
+    { ...attempt, stage: 'cancelled' }, { ...attempt, stage: 'succeeded' }, { ...attempt, source_commit: 'c'.repeat(40) },
     { ...attempt, provider_deployment_id: '87654321-1234-4123-8123-123456789012' },
     { ...attempt, triggered_at: new Date(Date.now() - 31 * 60 * 1000).toISOString() },
   ])('rejects stale or mismatched attempts', async value => {

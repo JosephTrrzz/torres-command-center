@@ -29,6 +29,12 @@ beforeEach(() => { fetcher.mockReset(); vi.stubGlobal('fetch', fetcher); });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('durable build attempt transport', () => {
+  it('reads cancelled previews without provider identity and strips operator audit fields',async()=>{
+    fetcher.mockResolvedValue(json([{...reserved,stage:'cancelled',cancellation_reason:'operator audit'}]));
+    expect(await getBuildAttempt(env,{id,clientId})).toEqual({...reserved,stage:'cancelled'});
+    fetcher.mockResolvedValue(json([{...triggering,stage:'cancelled',environment:'production',branch:'main'}]));
+    await expect(getBuildAttempt(env,{id,clientId})).rejects.toThrow('Invalid');
+  });
   it('resolves only the recorded immutable deployment prefix for the fixed client', async () => {
     const building = {...triggering, stage:'building' as const,provider_deployment_id:other};
     fetcher.mockResolvedValue(json([building]));

@@ -29,7 +29,7 @@ export async function observeStudioBuild(env: PublishingEnv, scope: BuildAttempt
     throw Error('Publishing connection is unavailable.');
   }
   const attempt = await getBuildAttempt(env, scope);
-  if (!attempt || ['reserved','succeeded','failed'].includes(attempt.stage) || !attempt.provider_deployment_id) {
+  if (!attempt || ['reserved','succeeded','failed','cancelled'].includes(attempt.stage) || !attempt.provider_deployment_id) {
     return { attempt, provider: null };
   }
   const result = await readStudioGitBuild(env.STUDIO_CLOUDFLARE_API_TOKEN, attempt, attempt.provider_deployment_id);

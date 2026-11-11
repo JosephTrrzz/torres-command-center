@@ -8,6 +8,14 @@ const env = { STUDIO_CLOUDFLARE_API_TOKEN: 'server-only-test-credential' };
 const attempt = { id: scope.id, client_id: scope.clientId, stage: 'triggering', triggered_at: '2026-11-10T20:00:00Z' };
 beforeEach(() => { vi.resetAllMocks(); mocks.claim.mockResolvedValue(attempt); mocks.read.mockResolvedValue(attempt); });
 describe('durable build dispatch', () => {
+  it('does not observe or redispatch an operator-cancelled preview even with a provider ID', async () => {
+    const cancelled = { ...attempt, stage: 'cancelled', provider_deployment_id: scope.id };
+    mocks.read.mockResolvedValue(cancelled); mocks.claim.mockResolvedValue(null);
+    expect(await observeStudioBuild(env, scope)).toEqual({ attempt: cancelled, provider: null });
+    expect(await dispatchStudioBuild(env, scope)).toEqual(cancelled);
+    expect(mocks.observe).not.toHaveBeenCalled(); expect(mocks.start).not.toHaveBeenCalled();
+    expect(mocks.advance).not.toHaveBeenCalled();
+  });
   it('requires the enrolled client before touching any storage or provider', async () => {
     await expect(dispatchStudioBuild(env, { ...scope, clientId: 'another-client' })).rejects.toThrow('unavailable');
     expect(mocks.claim).not.toHaveBeenCalled(); expect(mocks.start).not.toHaveBeenCalled();
