@@ -96,24 +96,31 @@
  function publishState(message){
   const active=publication&&['queued','deploying','verifying'].includes(publication.status);
   const same=publication?.revision===revision&&!dirty;
+  publishVersion.textContent='Saved draft · Version '+revision+(publication&&publication.revision!==revision?' · Publication · Version '+publication.revision:'');
   publishButton.textContent=active?'Publishing…':publication?.status==='live'&&same?'Now Live':'Push to live site';
   publishButton.setAttribute('aria-busy',active?'true':'false');
   publishConfirm.hidden=Boolean(active)||publication?.status==='live'&&same;
-  publishConfirm.disabled=!publishReady||publishBusy||reviewRevision!==revision;
+  publishConfirm.disabled=!publishReady||publishBusy||dirty||reviewRevision!==revision;
   publishClose.textContent=active||publication?.status==='live'?'Close':'Cancel';
-  publishCheck.hidden=!active;publishCheck.disabled=publishBusy;
+  publishCheck.hidden=false;publishCheck.disabled=publishBusy;
   publishLink.hidden=publication?.status!=='live';
   const labels={queued:'Publication queued.',deploying:'Building and deploying your saved draft…',verifying:'Deployment complete. Checking the live pages…',live:'Now Live',failed:'Publishing failed. Your draft is still saved. Review the draft and save a new version before retrying.'};
-  publishMessage.textContent=message||(publication?labels[publication.status]:'Review the site and saved version, then push it live.');
+  publishMessage.textContent=message||(publication?labels[publication.status]:dirty?'Save your changes before publishing.':'Review the site and saved version, then push it live.');
   if(publication?.status==='live'&&same){status.textContent='Now Live · Published '+dateFormat.format(new Date(publication.verifiedAt));}
  }
  function schedulePublishCheck(){clearTimeout(publishTimer);if(publication&&['queued','deploying','verifying'].includes(publication.status))publishTimer=setTimeout(checkPublication,30000);}
+ async function refreshPublication(){
+  const info=await request('canvas-publish-status');publishReady=info.ready;publication=info.publication;
+  publishDialog.querySelector('[data-publish-target]').textContent=info.name+' · '+info.publicUrl;
+  publishLink.href=info.publicUrl;
+  publishState(info.ready?undefined:info.message);
+ }
  async function checkPublication(){
-  if(!publication||publishBusy||document.hidden){schedulePublishCheck();return;}
-  publishBusy=true;publishState();
-  try{const result=await request('canvas-publish-check',{id:publication.id});publication=result.publication;publishState(result.message);}
+  if(publishBusy||document.hidden){schedulePublishCheck();return;}
+  publishBusy=true;publishReady=false;publishState();
+  try{await refreshPublication();}
   catch(error){publishState(error.message);}
-  finally{publishBusy=false;publishCheck.disabled=false;schedulePublishCheck();}
+  finally{publishBusy=false;publishState(publishMessage.textContent);schedulePublishCheck();}
  }
  publishCheck.onclick=checkPublication;
  publishClose.onclick=()=>publishDialog.close();
@@ -121,18 +128,14 @@
  publishDialog.addEventListener('cancel',e=>{if(publishBusy)e.preventDefault();});
  publishButton.onclick=async()=>{
   if(!connected||publishBusy||checkpointBusy)return;
-  publishDialog.showModal();workspace.inert=true;publishReady=false;reviewRevision=null;publishConfirm.disabled=true;publishMessage.textContent='Checking your saved draft and publishing connection…';
+  publishDialog.showModal();workspace.inert=true;publishBusy=true;publishReady=false;reviewRevision=null;publishConfirm.disabled=true;publishMessage.textContent='Checking your saved draft and publishing connection…';
   try {
-   if(!await captureDraft())throw Error('Save your current changes before publishing.');
-   const info=await request('canvas-publish-status');publishReady=info.ready;publication=info.publication;
-   publishDialog.querySelector('[data-publish-target]').textContent=info.name+' · '+info.publicUrl;
-   publishLink.href=info.publicUrl;reviewRevision=revision;requestKey=crypto.randomUUID();
-   publishVersion.textContent='Saved draft · Version '+revision;
-   publishState(info.ready?undefined:info.message);schedulePublishCheck();
+   await refreshPublication();reviewRevision=revision;requestKey=crypto.randomUUID();
   }catch(error){publishState(error.message);}
+  finally{publishBusy=false;publishState(publishMessage.textContent);schedulePublishCheck();}
  };
  publishConfirm.onclick=async()=>{
-  if(!publishReady||publishBusy||reviewRevision!==revision)return;
+  if(!publishReady||publishBusy||dirty||reviewRevision!==revision)return;
   publishBusy=true;publishClose.disabled=true;publishState('Submitting your saved draft…');
   try{
    const result=await request('canvas-publish',{revision:reviewRevision,requestKey});publication=result.publication;

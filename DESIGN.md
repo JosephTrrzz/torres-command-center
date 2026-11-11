@@ -195,6 +195,10 @@ new edits restore the publish label. The dialog wraps controls on mobile, announ
 status, preserves drafts on failure, and offers a safe live-site link only after
 verification. An unconfigured publishing connection is visibly explained and the
 final action is disabled. Never simulate publication in the production UI.
+Opening the dialog and refreshing status only read the latest publication; they
+do not capture or save a draft or advance delivery. If the publication revision
+differs, name it separately beside the editor's saved version. Unsaved edits keep
+confirmation disabled until saved through the existing draft workflow.
 
 ### Managed website selection
 Agency owners and administrators use a labeled, keyboard-accessible Client website selector above the Website workspace and editor. It lists only server-authorized clients; unconnected sites show setup guidance rather than another site's preview. Clients never receive this directory. Switching from the editor confirms saving, waits for a successful saved checkpoint, and performs a full navigation so iframe state and pending replies cannot cross websites. Selected client scope persists in editor links and every API request. The selector fills available width on mobile and adds no motion.

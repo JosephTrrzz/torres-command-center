@@ -3,7 +3,7 @@ import {runInNewContext} from 'node:vm';
 import {describe,it,expect} from 'vitest';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(){
- const handlers=new Map<string,Function[]>(),sent:any[]=[],nodes=new Map<string,any>();
+ const handlers=new Map<string,Function[]>(),sent:any[]=[],nodes=new Map<string,any>(),timers:{fn:Function;ms:number}[]=[];
  const node=(id:string):any=>{if(!nodes.has(id)){
   const listeners=new Map<string,Function[]>();
   nodes.set(id,{hidden:false,inert:false,textContent:'',disabled:false,open:false,
@@ -12,11 +12,11 @@ function setup(){
    showModal:()=>{node(id).open=true},close:()=>{node(id).open=false;listeners.get('close')?.forEach(fn=>fn())}});
  }return nodes.get(id)};
  const parent={postMessage:(message:any)=>sent.push(message)};let serial=0;
- const context:any={URLSearchParams,location:{search:'?connected=1',origin:'https://app.test'},crypto:{randomUUID:()=>String(++serial)},parent,Intl,Date,JSON,Map,Error,Promise,Event,setTimeout:()=>1,clearTimeout:()=>{},drafts:{},dirty:false,pages:[],active:0,saveTimer:null,canvasReady:true,loadPage:()=>{},changed:()=>{context.dirty=true},captureDraft:async()=>true,persistDraft:()=>true,status:node('status'),$:node,document:{querySelector:node,createElement:node,body:node('body'),hidden:false},addEventListener:(type:string,fn:Function)=>{handlers.set(type,[...(handlers.get(type)||[]),fn])}};
+ const context:any={URLSearchParams,location:{search:'?connected=1',origin:'https://app.test'},crypto:{randomUUID:()=>String(++serial)},parent,Intl,Date,JSON,Map,Error,Promise,Event,setTimeout:(fn:Function,ms:number)=>{timers.push({fn,ms});return timers.length},clearTimeout:()=>{},drafts:{},dirty:false,pages:[],active:0,saveTimer:null,canvasReady:true,loadPage:()=>{},changed:()=>{context.dirty=true},captureDraft:async()=>true,persistDraft:()=>true,status:node('status'),$:node,document:{querySelector:node,createElement:node,body:node('body'),hidden:false},addEventListener:(type:string,fn:Function)=>{handlers.set(type,[...(handlers.get(type)||[]),fn])}};
  context.window={dispatchEvent:()=>{}};
  runInNewContext(readFileSync('public/website-preview/cloud-drafts.js','utf8'),context);
  const reply=(request:any,result?:any,error?:string,status?:number)=>handlers.get('message')!.forEach(fn=>fn({source:parent,origin:context.location.origin,data:{type:'canvas-result',requestId:request.requestId,result,error,status}}));
- return {context,sent,node,reply,handlers};
+ return {context,sent,node,reply,handlers,timers};
 }
 async function loaded(){const s=setup();s.reply(s.sent[0],{draft:{},revision:4});await tick();
  const statusIndex=s.sent.findIndex(r=>r.type==='canvas-publish-status');
@@ -47,6 +47,56 @@ describe('connected draft saving',()=>{
 });
 
 describe('publishing dialog recovery',()=>{
+ it('polls the latest status without draft or delivery mutations',async()=>{
+  const s=await loaded();const opening=s.node('button').onclick();
+  s.reply(s.sent.at(-1),{ready:true,name:'Assigned site',publicUrl:'https://example.test',publication:{id:'active',revision:4,status:'deploying'}});await opening;
+  const polling=s.timers.filter(t=>t.ms===30000).at(-1)!.fn();
+  expect(s.sent.at(-1).type).toBe('canvas-publish-status');
+  s.reply(s.sent.at(-1),{ready:true,name:'Assigned site',publicUrl:'https://example.test',publication:{id:'active',revision:4,status:'live',verifiedAt:'2026-11-10T20:00:00Z'}});await polling;
+  expect(s.node('button').textContent).toBe('Now Live');
+  expect(s.node('dialog[data-publish-version]').textContent).toBe('Saved draft · Version 4');
+  expect(s.sent.some(r=>['canvas-save','canvas-publish','canvas-publish-check'].includes(r.type))).toBe(false);
+ });
+
+ it('discovers the latest publication without saving or advancing an old cached release',async()=>{
+  const s=await loaded();const opening=s.node('button').onclick();
+  s.reply(s.sent.at(-1),{ready:false,name:'Assigned site',publicUrl:'https://example.test',message:'Not connected',publication:{id:'old',revision:4,status:'failed'}});await opening;
+  expect(s.node('dialog[data-publish-check]').hidden).toBe(false);
+  s.context.drafts={0:{text:'Unsaved'}};s.context.dirty=true;
+  const before=s.sent.length;const checking=s.node('dialog[data-publish-check]').onclick();
+  expect(s.sent.slice(before).map(r=>r.type)).toEqual(['canvas-publish-status']);
+  s.reply(s.sent.at(-1),{ready:false,name:'Assigned site',publicUrl:'https://example.test',message:'Not connected',publication:{id:'latest',revision:5,status:'deploying'}});await checking;
+  expect(s.node('dialog[data-publish-version]').textContent).toBe('Saved draft · Version 4 · Publication · Version 5');
+  expect(s.node('dialog[data-publish-confirm]').hidden).toBe(true);
+  expect(s.context.dirty).toBe(true);expect(s.context.drafts).toEqual({0:{text:'Unsaved'}});
+  expect(s.sent.some(r=>['canvas-save','canvas-publish','canvas-publish-check'].includes(r.type))).toBe(false);
+ });
+ it('opens status without capturing or saving dirty drafts and refuses confirmation',async()=>{
+  const s=await loaded();s.context.dirty=true;s.context.drafts={0:{text:'Keep private'}};
+  const opening=s.node('button').onclick();
+  expect(s.sent.at(-1).type).toBe('canvas-publish-status');
+  s.reply(s.sent.at(-1),{ready:true,name:'Assigned site',publicUrl:'https://example.test',publication:null});await opening;
+  expect(s.node('dialog[data-publish-confirm]').disabled).toBe(true);
+  expect(s.node('dialog[data-publish-message]').textContent).toContain('Save your changes');
+  const count=s.sent.length;await s.node('dialog[data-publish-confirm]').onclick();expect(s.sent).toHaveLength(count);
+  expect(s.sent.some(r=>r.type==='canvas-save')).toBe(false);
+ });
+ it('refreshes from no cached publication and never labels a different revision as the current live draft',async()=>{
+  const s=await loaded();const checking=s.node('dialog[data-publish-check]').onclick();
+  s.reply(s.sent.at(-1),{ready:true,name:'Assigned site',publicUrl:'https://example.test',publication:{id:'latest',revision:5,status:'live',verifiedAt:'2026-11-10T20:00:00Z'}});await checking;
+  expect(s.node('button').textContent).toBe('Push to live site');
+  expect(s.node('dialog[data-publish-version]').textContent).toContain('Publication · Version 5');
+  expect(s.node('dialog[data-publish-link]').hidden).toBe(false);
+ });
+ it('keeps status refresh retryable on error and prevents confirmation from stale readiness',async()=>{
+  const s=await loaded();const opening=s.node('button').onclick();
+  s.reply(s.sent.at(-1),{ready:true,name:'Assigned site',publicUrl:'https://example.test',publication:null});await opening;
+  expect(s.node('dialog[data-publish-confirm]').disabled).toBe(false);
+  const checking=s.node('dialog[data-publish-check]').onclick();s.reply(s.sent.at(-1),undefined,'Unavailable',503);await checking;
+  expect(s.node('dialog[data-publish-check]').disabled).toBe(false);
+  expect(s.node('dialog[data-publish-confirm]').disabled).toBe(true);
+  expect(s.node('dialog[data-publish-message]').textContent).toBe('Unavailable');
+ });
  it('releases the editor when the review is closed during a status request',async()=>{
   const s=await loaded();const opening=s.node('button').onclick();await tick();
   s.reply(s.sent.at(-1),{ready:true,name:'Assigned site',publicUrl:'https://example.test',publication:{id:'release',revision:4,status:'deploying'}});await opening;

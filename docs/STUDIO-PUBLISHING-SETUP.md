@@ -48,6 +48,45 @@ Unsupported draft edits fail closed and remain saved. A new public source commit
 requires review and a new source pin/enrollment check. Disabling enrollment blocks
 new builds; it cannot cancel a provider build that was already dispatched.
 
+### Operator-only preview revocation
+
+After `supabase/studio_preview_cancellation.sql`, a database operator may call
+`studio_cancel_preview_attempt(p_id,p_client,p_release,p_hash,p_source,p_expected,p_reason)`
+with the exact stored identity, current active stage, and a factual reason. Inspect
+the attempt and parent first; never substitute an unrelated provider deployment.
+The function is unavailable to browser and service roles and has no HTTP endpoint.
+
+This atomically marks the preview attempt `cancelled` and its parent publication
+`failed`, recording the cancellation time, database actor, and reason. It preserves
+identity, trigger time, any known provider ID, and the separate dispatch journal.
+It rejects production attempts, terminal attempts, stale identities/stages, and any
+release that already has a production attempt. Unknown production dispatches remain
+locked; missing provider results or elapsed time do not prove failure.
+
+This revokes Studio approval, **not Cloudflare execution**. A late preview may exist
+or finish, including one that already received artifact bytes. Further build-input
+requests are refused, late transitions cannot reopen the attempt, and the cancelled
+release cannot authorize production. After confirming both terminal rows, use a new
+saved checkpoint/release if another preview is authorized; never retry the cancelled
+attempt or fabricate a provider ID/failure to release its lock.
+
+Validation for this change: 844 tests passed, 15 skipped with local-server permission;
+16 PostgreSQL-engine tests passed locally in PGlite. These are not live build or
+rollback proof. At this update, operator-reported preview `06fe7f30` failed with
+diagnostic `client-navigation-errors`. Enrollment remains absent; publishing
+activation is not complete and the navigation root cause remains under investigation.
+
+### Installing enrollment evidence
+
+Only after real preview and recovery verification, install the reviewed,
+source-specific `STUDIO_PUBLISHING_ENROLLMENT` in Command Center production and
+redeploy Command Center so its Functions receive the binding. Preserve existing
+configuration and credentials. [Cloudflare Pages binding documentation](https://developers.cloudflare.com/pages/functions/bindings/)
+Keep the site's publishing gate disabled during configuration/deployment and the
+scheduler paused until activation is authorized. Once enrollment and the site gate
+are enabled, an existing active release can advance on reconciliation without a
+new Publish click. A paused cron alone does not prevent browser/manual reconciliation.
+
 Local compiler/unit tests are not a live publication or recovery test. The runner's
 functional evidence covers its documented browser checks only; it does not prove
 external contact delivery, payment providers, analytics or every possible interaction.
