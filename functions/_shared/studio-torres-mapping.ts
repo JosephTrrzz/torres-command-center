@@ -1,7 +1,7 @@
 // Reviewed static targets only. No selectors or source identities come from drafts.
 // Source fixtures retain the exact Git blobs used for this mapping; tests bind
 // numeric/context identities to the imported snapshot and static source JSX.
-export const TORRES_SOURCE_COMMIT = '62a0b0539cf0ea232dcc9eb02c3837928efb7d5c';
+export const TORRES_SOURCE_COMMIT = '5a9196fd3e3b8658cc4d30d82826d4d048cff61d';
 export const TORRES_MAPPING_SNAPSHOT = 'b6262015e3786ff49fa48d8341c685e7194777f51780f6f56ef75ba1c94b324e';
 export interface TorresTarget {
   id: string; page: string; route: string; nodeId: string | null; contextKey: string | null;
