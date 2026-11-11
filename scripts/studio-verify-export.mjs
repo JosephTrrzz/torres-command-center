@@ -7,7 +7,37 @@ import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 import {TORRES_ROUTES,packageApprovedTorresArtifact} from './studio-source-package.mjs';
 const require=createRequire(import.meta.url);
-const fail=code=>{throw new Error(`Export verification failed: ${code}`);};
+// Only fixed codes cross the build-log boundary. Never serialize Playwright
+// messages, URLs, selectors, page errors, or diagnostic callback state.
+const failureCodes=new WeakMap();
+const ASSERTION_CODES=new Set([
+  'identity','unsupported-runtime-wrapper','nonliteral-runtime-payload','runtime-payload',
+  'unsafe-export','export-limit','preexisting-proof','unsupported-routing-pattern',
+  'unsupported-header-rule','unsupported-redirect-rule','unpackaged-export',
+  'patch-result-selector','patch-result-tag','patch-result-text','patch-result-emphasis',
+  'patch-result-attribute','patch-result-style','patch-result-section','patch-result-movement',
+  'patch-result-image','patch-result-status','responsive-content-clipped','menu-contract',
+  'menu-not-visible','menu-link','form-contract','form-field','required-field','form-controls',
+  'service-option','form-state-lost','form-validity','route-response','route-marker','script-load',
+  'replaced-protected-nodes','browser-errors','navigation-marker','navigation-errors',
+  'client-router-unavailable','client-navigation-reloaded','client-navigation-marker',
+  'client-navigation-errors','incomplete-checks','export-changed','arguments','input-limit',
+]);
+const TIMEOUT_PHASES=new Set(['browser-context','direct-route','brand-navigation-home','client-navigation-away','client-navigation-back']);
+export const browserAssertionCode=code=>ASSERTION_CODES.has(code)?'browser-verification-assertion-'+code:'browser-verification-assertion';
+export function browserFailureCode(error,phase){
+  if(error && typeof error==='object' && failureCodes.has(error))return failureCodes.get(error);
+  const message=typeof error?.message==='string'?error.message:'';
+  if(phase==='launch'){
+    if(/Host system is missing dependencies|error while loading shared libraries|cannot open shared object file|Missing libraries:/i.test(message))return 'browser-launch-missing-libraries';
+    if(/Executable doesn't exist/i.test(message))return 'browser-launch-executable-missing';
+    if(error?.name==='TimeoutError')return 'browser-launch-timeout';
+    return 'browser-launch-failed';
+  }
+  if(error?.name==='TimeoutError')return TIMEOUT_PHASES.has(phase)?'browser-verification-timeout-'+phase:'browser-verification-timeout';
+  return 'browser-verification-failed';
+}
+const fail=code=>{const safe=ASSERTION_CODES.has(code)?code:'assertion';const error=new Error(`Export verification failed: ${safe}`);failureCodes.set(error,browserAssertionCode(code));throw error;};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 export const PROOF_PATH='_studio/verification.json';
@@ -103,7 +133,7 @@ async function runtimeCheck(page,payload,route){
       for(const [key,value] of Object.entries(op.attrs))if(node.getAttribute(key)!==value)return 'attribute';
       for(const [key,value] of Object.entries(op.styles)){
         const expected=document.createElement('span').style;expected[key]=value;
-        if(!expected[key]||node.style[key]!==expected[key])return 'style-'+key;
+        if(!expected[key]||node.style[key]!==expected[key])return 'style';
       }
       if(op.move){const section=document.querySelector(op.target.sectionSelector);if(!section)return 'section';const xy=node.style.translate.split(' ').map(parseFloat);if(xy.length!==2||Math.abs(xy[0]-op.move.x*section.clientWidth/100)>0.02||Math.abs(xy[1]-op.move.y*section.clientHeight/100)>0.02)return 'movement';}
       if(op.target.kind==='image'&&(!node.complete||!node.naturalWidth))return 'image';
@@ -157,10 +187,12 @@ export async function verifyTorresExport({outDir,approved,browserType,executable
   const server=await serveExport(files,packaged.routeFiles);let browser,currentPage,currentRoute,currentWidth,phase;const pageErrors=[];
   const browserEnv={};for(const key of ['PATH','HOME','TMPDIR','TMP','TEMP','SystemRoot'])if(typeof env[key]==='string')browserEnv[key]=env[key];
   try{
+    phase='launch';
     browser=await (browserType||require('playwright-core').chromium).launch({headless:true,env:browserEnv,...(executablePath?{executablePath}:{})});
+    phase='browser-context';
     let routesChecked=0,menusChecked=0,formsChecked=0,navigationsChecked=0;
     for(const width of [1440,390]){
-      currentWidth=width;
+      currentWidth=width;phase='browser-context';
       const context=await browser.newContext({viewport:{width,height:900},isMobile:width===390,hasTouch:width===390,serviceWorkers:'block'});
       let badNetwork=false;
       await context.route('**/*',async route=>{
@@ -229,11 +261,16 @@ export async function verifyTorresExport({outDir,approved,browserType,executable
     const after=await exportFiles(outDir);if(!same(Object.keys(files).sort(),Object.keys(after).sort())||Object.entries(files).some(([p,v])=>!v.equals(after[p])))fail('export-changed');
     return proof;
   }catch(error){
+    const code=browserFailureCode(error,phase);
     if(onDiagnostic){
+      try{
       const state=await currentPage?.evaluate(operations=>({url:location.pathname,readyState:document.readyState,applied:document.documentElement.dataset.studioApplied||null,targets:operations.map(op=>{const nodes=document.querySelectorAll(op.target.selector),node=nodes[0];return {id:op.target.id,count:nodes.length,tag:node?.tagName,textMatches:op.text===undefined?null:Array.from(node?.childNodes||[]).some(n=>n.nodeType===3&&n.nodeValue===op.text),stylesMatch:node?Object.entries(op.styles).every(([k,v])=>{const expected=document.createElement('span').style;expected[k]=v;return node.style[k]===expected[k];}):false};})}),payload.operations.filter(op=>op.target.route===currentRoute)).catch(()=>null);
       await onDiagnostic({route:currentRoute,width:currentWidth,phase,pageErrors,state});
+      }catch{/* Optional private diagnostics must not replace the failure code. */}
     }
-    throw error;
+    if(failureCodes.has(error))throw error;
+    const safeError=new Error(`Export verification failed: ${code}`);
+    failureCodes.set(safeError,code);throw safeError;
   }finally{try{await browser?.close();}finally{await server.close();}}
 }
 

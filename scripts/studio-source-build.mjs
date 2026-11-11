@@ -6,7 +6,7 @@ import {join,dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {packageApprovedTorresArtifact,TORRES_ROUTES} from './studio-source-package.mjs';
-import {verifyTorresExport,expectedAttestation,PROOF_PATH} from './studio-verify-export.mjs';
+import {verifyTorresExport,expectedAttestation,PROOF_PATH,browserFailureCode} from './studio-verify-export.mjs';
 
 export const BUILD_INPUT_URL='https://admin.torrescotechnology.com/api/website/build-input';
 const BRANCHES=Object.freeze({preview:'codex/studio-publish-preview',production:'main'});
@@ -175,7 +175,7 @@ export async function runStudioSourceBuild({cwd=process.cwd(),env=process.env}={
     // are an in-process test seam, never read from deployment environment/input.
     let proof;
     try{proof=await verifyTorresExport({outDir:staged,approved,env:childEnv,...deps.browserOptions});}
-    catch{fail('browser-verification-failed');}
+    catch(error){fail(browserFailureCode(error));}
     if(canonical(proof)!==canonical(expectedAttestation(approved)))fail('invalid-browser-proof');
     const checked=await readTree(staged);
     if(Object.keys(checked.files).length!==Object.keys(packaged.files).length||Object.entries(packaged.files).some(([path,bytes])=>!Buffer.from(bytes).equals(checked.files[path]||Buffer.alloc(0))))fail('verified-output-changed');

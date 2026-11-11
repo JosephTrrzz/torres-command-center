@@ -70,7 +70,7 @@ describe.skipIf(!chromium)('actual Chromium export verification (React fixture, 
         expect(cmd).toBe('npx');expect(args).toEqual(['--no-install','next','build']);await writeTree(join(root,'out'),files);return '';
       }};
       const pending=runStudioSourceBuild({cwd:root,env},deps);
-      if(broken){await expect(pending).rejects.toThrow('browser-verification-failed');await expect(access(join(root,'out',PROOF_PATH))).rejects.toThrow();expect(await readFile(join(root,'out/index.html'),'utf8')).not.toContain(approved.artifact.marker);}
+      if(broken){await expect(pending).rejects.toThrow('browser-verification-timeout-direct-route');await expect(access(join(root,'out',PROOF_PATH))).rejects.toThrow();expect(await readFile(join(root,'out/index.html'),'utf8')).not.toContain(approved.artifact.marker);}
       else{await pending;expect(JSON.parse(await readFile(join(root,'out',PROOF_PATH),'utf8'))).toEqual(expectedAttestation(approved));expect(await readFile(join(root,'out/app.js'),'utf8')).toBe(files['app.js']);}
       expect(await readFile(join(root,'functions/api/contact.js'),'utf8')).toBe('// retained function');expect(fetchCount).toBeGreaterThanOrEqual(2);expect(calls.filter(([cmd])=>cmd==='npx')).toHaveLength(1);
     }finally{await rm(root,{recursive:true,force:true});}
