@@ -135,3 +135,23 @@ Announcements, newsletters, and review requests belong to one organization and o
 
 ## Website Studio management scope
 Agency owners and administrators may select managed client websites. Every Studio read, draft/history write, and publication request independently revalidates the selected client through the organization-aware authentication boundary. Client and website-only accounts remain bound to their assigned client; a query parameter cannot widen their access. The managed directory uses the same per-client check and excludes unauthorized clients. Selecting a client does not enroll its website, enable publishing, or substitute the Torres snapshot for an unconnected site.
+
+## Website Studio publishing build boundary
+Saved Supabase drafts are the content source; the reviewed public website repository
+remains the application source. The server-owned publishing adapter reserves one
+immutable build attempt before contacting Cloudflare. An uncertain provider response
+keeps that attempt locked for reconciliation rather than creating another deployment.
+Browser roles cannot read the build ledger or execute its transition functions.
+
+The public-site build runner uses a separate encrypted build-input credential to
+request only its approved artifact from Command Center. The endpoint independently
+checks the provider deployment, client, source commit, saved revision, and release
+hash. The permanent Cloudflare token and Supabase service credential never enter
+the browser or the public-site build. The runner builds the real Next.js source,
+preserves its navigation and forms, applies allowlisted content/layout edits, and
+rejects unsupported edits. A compiled preview copy is not a substitute for that build.
+
+Publishing enrollment remains disabled until real preview and recovery evidence is
+installed for the exact approved source. A provider accepting a build is not success:
+preview and production require matching verification evidence, and the final public
+routes must identify the exact release before the application reports “Now Live.”

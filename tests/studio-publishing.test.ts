@@ -42,6 +42,28 @@ describe('publishing boundaries',()=>{
  });
 });
 describe('publication recovery',()=>{
+ it.each([404,503])('observation never falls back to POST or draft reads on HTTP %i',async status=>{
+  const pending={...release,content_hash:'a'.repeat(64)};
+  fetcher.mockResolvedValueOnce(json([pending]));binding.fetch.mockResolvedValueOnce(new Response(null,{status}));
+  const result=await reconcilePublication({STUDIO_PUBLISHER:binding},pending,{observeOnly:true});
+  expect(result.publication?.status).toBe('queued');expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(binding.fetch).toHaveBeenCalledTimes(1);expect(binding.fetch.mock.calls[0][0].method).toBe('GET');
+  expect(binding.fetch.mock.calls[0][0].url).toContain('&observe=1');
+ });
+ it('observation does not hash or dispatch an undispatched queued release',async()=>{
+  fetcher.mockResolvedValueOnce(json([release]));
+  await reconcilePublication({STUDIO_PUBLISHER:binding},release,{observeOnly:true});
+  expect(fetcher).toHaveBeenCalledTimes(1);expect(binding.fetch).not.toHaveBeenCalled();
+ });
+ it('observation recovers a queued lost acknowledgment using only the existing receipt',async()=>{
+  const pending={...release,content_hash:'a'.repeat(64)};
+  fetcher.mockResolvedValueOnce(json([pending])).mockResolvedValueOnce(json([{...pending,status:'deploying',deployment_id:'deployment-1'}]));
+  binding.fetch.mockResolvedValueOnce(json({releaseId:pending.id,clientId:pending.client_id,snapshotId:pending.snapshot_id,
+   revision:pending.revision,contentHash:pending.content_hash,deploymentId:'deployment-1',status:'building'}));
+  expect((await reconcilePublication({STUDIO_PUBLISHER:binding},pending,{observeOnly:true})).publication?.status).toBe('deploying');
+  expect(binding.fetch).toHaveBeenCalledTimes(1);expect(binding.fetch.mock.calls[0][0].url).toContain('&observe=1');
+  expect(fetcher.mock.calls.every(([url])=>!String(url).includes('studio_canvas_drafts'))).toBe(true);
+ });
  it('fails an invalid undispatched draft without calling the provider',async()=>{
   fetcher.mockResolvedValueOnce(json([release]))
    .mockResolvedValueOnce(json([{draft:{0:{bad:{html:'<script>bad</script>'}}}}]))

@@ -158,3 +158,22 @@ No client website content was deployed. Latest observed saved revision is 28.
 Agency owners/admins can select authorized client websites from Website and the editor. Client accounts remain assigned-site-only. Editor switching explicitly saves a checkpoint before navigation; a failed save prevents the switch. Unconnected clients remain visible with setup guidance, never a substituted preview. No database migration or publishing activation is included. Validation: 549 tests, application and Functions TypeScript, and production build passed.
 
 Deployment verification: production release `62b6feb` / Cloudflare `4f0549f5` includes the in-page Save and switch confirmation. Signed-in owner verification showed both managed clients; Torres opened its scoped saved editor and Taqueria showed truthful unconnected guidance. 549 tests pass. Browser confirmation interrupted the final save-and-switch check; awaiting dismissal of the older native popup before that final interaction can be verified. Public client websites were not published or modified.
+
+### 2026-11-10 durable publishing connection — work in progress
+Installed `studio_build_attempts.sql` in the existing production Supabase project.
+Verified RLS enabled, authenticated browser SELECT/claim privileges absent, and zero
+publishing-enabled sites. Added the dedicated build-input credential to Command Center
+production and both public-site environments; verified prior configuration and secret
+bindings were preserved. The credential is separate from the permanent publisher token.
+
+Local implementation now includes durable dispatch, independently verified build
+identity, a private artifact endpoint, and a server-owned publishing adapter. The
+current checks pass 819 tests plus application and Functions TypeScript. Actual saved
+revision 36 passed real Next export/browser checks at desktop/mobile widths including
+same-document navigation. The reviewed public runner commit is
+`62a0b0539cf0ea232dcc9eb02c3837928efb7d5c`; Command Center is pinned to it.
+The dedicated scheduler credential is stored in Cloudflare and Supabase Vault,
+with the cron job paused until activation. Provider runner/Chromium validation,
+enrollment/recovery proof and final end-to-end publication are still pending. No saved draft has
+been published by this work, and the button must remain unavailable until those checks
+succeed. These are implementation tests, not evidence of a successful live deployment.

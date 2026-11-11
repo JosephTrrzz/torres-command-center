@@ -6,7 +6,7 @@ import { contentHash, matchingReceipt, publicPublication, publisherCall, Publish
 
 // Called only after own-site authorization or by the private scheduler.
 // A lease is fenced on every update, so an expired worker cannot commit stale state.
-export async function reconcilePublication(env: PublishingEnv, initial: Publication) {
+export async function reconcilePublication(env: PublishingEnv, initial: Publication, options: {observeOnly?:boolean} = {}) {
  let release=initial;
  const {rest,headers}=studioStore(env),scope='client_id=eq.'+release.client_id;
  const read=async(path:string)=>{const r=await fetch(rest+path,{headers,signal:AbortSignal.timeout(8000)});if(!r.ok)throw Error('Publishing records are unavailable.');return r.json();};
@@ -27,7 +27,12 @@ export async function reconcilePublication(env: PublishingEnv, initial: Publicat
   };
   try {
    let receipt;
-   if(release.status==='queued' && release.content_hash){
+   if(options.observeOnly){
+    // A queued row can already have a dispatched attempt after a lost response.
+    // Never fall through to draft loading, hashing or POST on a missing receipt.
+    if(!release.content_hash)return ({publication:publicPublication(release),retryAfter:30});
+    receipt=await publisherCall(env.STUDIO_PUBLISHER,'/releases/'+release.id+'?client='+release.client_id+'&observe=1');
+   }else if(release.status==='queued' && release.content_hash){
     // Recover a lost dispatch acknowledgment before accessing draft storage.
     // Only a definitive not-found permits another idempotent dispatch attempt.
     try{receipt=await publisherCall(env.STUDIO_PUBLISHER,'/releases/'+release.id+'?client='+release.client_id);}

@@ -1,0 +1,9 @@
+{
+  "name": "torres-studio-build-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "acorn": "8.19.0",
+    "playwright-core": "1.56.1"
+  }
+}

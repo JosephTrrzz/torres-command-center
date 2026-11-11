@@ -2,9 +2,12 @@ import type { FunctionEnv } from './auth';
 import manifest from '../../lib/canvas-manifest.json';
 import routes from '../../public/website-preview/pages.json';
 
-// A private Cloudflare service binding; never a browser-supplied URL or credential.
+// A server-owned publishing adapter; never a browser-supplied URL or credential.
 export interface PublisherBinding { fetch(request: Request): Promise<Response> }
-export interface PublishingEnv extends FunctionEnv { STUDIO_PUBLISHER?: PublisherBinding; STUDIO_CLOUDFLARE_API_TOKEN?: string }
+export interface PublishingEnv extends FunctionEnv {
+ STUDIO_PUBLISHER?: PublisherBinding; STUDIO_CLOUDFLARE_API_TOKEN?: string;
+ STUDIO_BUILD_INPUT_SECRET?: string; STUDIO_PUBLISHING_ENROLLMENT?: string;
+}
 export type Publication = {
  id: string; client_id: string; snapshot_id: string; revision: number;
  status: 'queued'|'deploying'|'verifying'|'live'|'failed';

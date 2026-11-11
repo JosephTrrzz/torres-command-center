@@ -1,6 +1,7 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import manifest from '../lib/canvas-manifest.json';
 import {onRequest} from '../functions/api/website/reconcile';
+import {publisherReady} from '../functions/_shared/studio-publisher';
 import {reconcilePublication} from '../functions/_shared/studio-reconcile';
 vi.mock('../functions/_shared/studio-access',()=>({studioStore:()=>({rest:'https://storage.example/rest/v1',headers:{}})}));
 vi.mock('../functions/_shared/studio-reconcile',()=>({reconcilePublication:vi.fn(async()=>({publication:null}))}));
@@ -12,7 +13,7 @@ const site={public_url:manifest.source,canvas_snapshot_id:manifest.id,enabled:tr
 const json=(data:unknown)=>new Response(JSON.stringify(data));
 let fetcher:ReturnType<typeof vi.fn>;
 const call=(token=secret,method='POST',environment=env)=>onRequest({env:environment,request:new Request('https://app.example/api/website/reconcile',{method,headers:{'x-torres-studio-secret':token}})});
-beforeEach(()=>{fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);vi.mocked(reconcilePublication).mockClear();});
+beforeEach(()=>{fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);vi.mocked(reconcilePublication).mockClear();vi.mocked(publisherReady).mockResolvedValue(true);});
 afterEach(()=>vi.unstubAllGlobals());
 describe('publication background reconciliation',()=>{
  it('refuses missing or incorrect scheduler credentials before reading drafts',async()=>{
@@ -22,16 +23,23 @@ describe('publication background reconciliation',()=>{
  it('advances an already approved release without an open editor',async()=>{
   fetcher.mockResolvedValueOnce(json([release])).mockResolvedValueOnce(json([site]));
   expect(await (await call()).json()).toEqual({checked:1,deferred:0});
-  expect(reconcilePublication).toHaveBeenCalledWith(env,release);
+  expect(reconcilePublication).toHaveBeenCalledWith(env,release,{observeOnly:false});
   expect(fetcher.mock.calls[0][0]).toContain('limit=3');
  });
- it('blocks new delivery after enrollment is disabled',async()=>{
+ it('requests observation only for queued releases after the site is disabled',async()=>{
   fetcher.mockResolvedValueOnce(json([release])).mockResolvedValueOnce(json([{...site,publishing_enabled:false}]));
-  expect(await (await call()).json()).toEqual({checked:0,deferred:1});expect(reconcilePublication).not.toHaveBeenCalled();
+  expect(await (await call()).json()).toEqual({checked:1,deferred:0});expect(reconcilePublication).toHaveBeenCalledWith(env,release,{observeOnly:true});
  });
  it('continues observing a dispatched release after enrollment is disabled',async()=>{
   fetcher.mockResolvedValueOnce(json([{...release,status:'deploying'}])).mockResolvedValueOnce(json([{...site,publishing_enabled:false}]));
   expect(await (await call()).json()).toEqual({checked:1,deferred:0});
+ });
+ it('observes queued lost-ack releases when capabilities are revoked',async()=>{
+  vi.mocked(publisherReady).mockResolvedValue(false);
+  const pending={...release,content_hash:'a'.repeat(64)};
+  fetcher.mockResolvedValueOnce(json([pending])).mockResolvedValueOnce(json([site]));
+  expect(await (await call()).json()).toEqual({checked:1,deferred:0});
+  expect(reconcilePublication).toHaveBeenCalledWith(env,pending,{observeOnly:true});
  });
  it('does not deliver to a mismatched website',async()=>{
   fetcher.mockResolvedValueOnce(json([release])).mockResolvedValueOnce(json([{...site,public_url:'https://different.example'}]));

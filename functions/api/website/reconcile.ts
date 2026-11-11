@@ -1,3 +1,4 @@
+import { withStudioPublisher } from '../../_shared/studio-publishing-connection';
 import { authJson } from '../../_shared/auth';
 import { studioStore } from '../../_shared/studio-access';
 import { reconcilePublication } from '../../_shared/studio-reconcile';
@@ -22,6 +23,7 @@ async function authorized(request: Request, env: Env) {
 export async function onRequest({request,env}:{request:Request;env:Env}) {
  if(request.method!=='POST')return authJson({error:'Unsupported method.'},405);
  if(!await authorized(request,env))return authJson({error:'Invalid scheduler credentials.'},401);
+ env=withStudioPublisher(env);
  if(!env.STUDIO_PUBLISHER || !env.SUPABASE_SERVICE_ROLE_KEY)return authJson({error:'Publishing connection is unavailable.'},503);
  const {rest,headers}=studioStore(env);
  try {
@@ -36,9 +38,8 @@ export async function onRequest({request,env}:{request:Request;env:Env}) {
     if(!site || site.public_url?.replace(/\/$/,'')!==manifest.source || site.canvas_snapshot_id!==release.snapshot_id || release.snapshot_id!==manifest.id)return false;
     // Disabling enrollment blocks new delivery. Already dispatched work must still
     // be observed; disabling a switch cannot cancel an in-flight provider job.
-    if(release.status==='queued' && (!site.enabled || !site.publishing_enabled))return false;
-    if(!await publisherReady(env,release.client_id))return false;
-    await reconcilePublication(env,release);
+    const observeOnly=!site.enabled || !site.publishing_enabled || !await publisherReady(env,release.client_id);
+    await reconcilePublication(env,release,{observeOnly});
     return true;
    }catch{return false;}
   }));

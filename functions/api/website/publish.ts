@@ -1,3 +1,4 @@
+import { withStudioPublisher } from '../../_shared/studio-publishing-connection';
 import { reconcilePublication } from '../../_shared/studio-reconcile';
 import { authJson } from '../../_shared/auth';
 import { studioAccess, studioStore } from '../../_shared/studio-access';
@@ -8,6 +9,7 @@ import { UUID, publicPublication, publisherReady, type Publication, type Publish
 
 const unavailable='Live publishing is not connected yet. Your edits remain safely saved as private drafts.';
 export async function onRequest({request,env}:{request:Request;env:PublishingEnv}):Promise<Response> {
+ env=withStudioPublisher(env);
  if(!trustedStudioRequest(request))return authJson({error:'This request is not allowed.'},403);
  const access=await studioAccess(request,env);if('response' in access)return access.response;
  if(!['GET','POST'].includes(request.method))return authJson({error:'Unsupported method.'},405);
